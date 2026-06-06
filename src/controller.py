@@ -77,6 +77,12 @@ class Controller:
         with self._lock:
             return self._muted[track]
 
+    def sync_mute_state(self, track: int, muted: bool) -> None:
+        """Update internal mute tracking without sending CC — used to sync from OP-1."""
+        self._validate_track(track)
+        with self._lock:
+            self._muted[track] = muted
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------

@@ -41,10 +41,15 @@ def main() -> None:
     def on_beat(beat_num: int) -> None:
         bridge.beat.emit(beat_num)
 
+    def on_cc(channel: int, control: int, value: int) -> None:
+        # Runs on the clock daemon thread — emit signal only.
+        bridge.cc_received.emit(channel, control, value)
+
     clock = ClockListener(
         in_port,
         beat_callback=on_beat,
         tick_callback=engine.on_tick,
+        cc_callback=on_cc,
     )
     clock.start()
 

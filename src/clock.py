@@ -32,18 +32,20 @@ class ClockListener:
         in_port: mido.ports.BaseInput,
         beat_callback: Callable[[int], None] | None = None,
         tick_callback: Callable[[int, int], None] | None = None,
+        cc_callback: Callable[[int, int, int], None] | None = None,
     ) -> None:
         """
         Args:
             in_port:        Shared mido input port (already open).
             beat_callback:  Called with beat number (1-based) every 24 ticks.
-                            Runs on the clock thread — keep it fast.
             tick_callback:  Called with (tick_count, beat_count) on every tick.
-                            Used by the automation engine for sub-beat resolution.
+            cc_callback:    Called with (channel, control, value) for every CC
+                            message received — used to sync UI from OP-1 knobs.
         """
         self._port = in_port
         self._beat_callback = beat_callback
         self._tick_callback = tick_callback
+        self._cc_callback = cc_callback
 
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -96,7 +98,8 @@ class ClockListener:
             for msg in self._port.iter_pending():
                 if msg.type == "clock":
                     self._handle_tick()
-                # ignore note-on/off, CC, sysex, etc. for now
+                elif msg.type == "control_change" and self._cc_callback:
+                    self._cc_callback(msg.channel, msg.control, msg.value)
             # Yield the GIL briefly rather than busy-spinning
             # (Event.wait with a short timeout replaces time.sleep)
             self._stop_event.wait(timeout=0.001)
