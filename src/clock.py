@@ -31,15 +31,19 @@ class ClockListener:
         self,
         in_port: mido.ports.BaseInput,
         beat_callback: Callable[[int], None] | None = None,
+        tick_callback: Callable[[int, int], None] | None = None,
     ) -> None:
         """
         Args:
             in_port:        Shared mido input port (already open).
-            beat_callback:  Called with the beat number (1-based) on every beat.
+            beat_callback:  Called with beat number (1-based) every 24 ticks.
                             Runs on the clock thread — keep it fast.
+            tick_callback:  Called with (tick_count, beat_count) on every tick.
+                            Used by the automation engine for sub-beat resolution.
         """
         self._port = in_port
         self._beat_callback = beat_callback
+        self._tick_callback = tick_callback
 
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -122,6 +126,12 @@ class ClockListener:
             else:
                 beat_num = 0
 
-        # Call outside the lock so the callback can safely read .bpm / .tick_count
+            # Capture snapshots for callbacks (called outside the lock below)
+            tick_snap = self._tick_count
+            beat_snap = self._beat_count
+
+        # Call outside the lock so callbacks can safely read .bpm / .tick_count
+        if self._tick_callback:
+            self._tick_callback(tick_snap, beat_snap)
         if is_beat and self._beat_callback:
             self._beat_callback(beat_num)

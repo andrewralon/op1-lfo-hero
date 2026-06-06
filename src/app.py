@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 from src.midi_connection import connect
 from src.clock import ClockListener
 from src.controller import Controller
+from src.automation import AutomationEngine, Parameter
 from src.ui import MainWindow, ClockBridge, apply_dark_theme
 
 
@@ -31,14 +32,23 @@ def main() -> None:
     controller = Controller(out_port)
     bridge = ClockBridge()
 
-    def on_beat(beat_num: int) -> None:
+    def on_automation_update(track: int, param: Parameter, value: int) -> None:
         # Runs on the clock daemon thread — only emit signals here.
+        bridge.automation_update.emit(track, param.value, value)
+
+    engine = AutomationEngine(controller, update_callback=on_automation_update)
+
+    def on_beat(beat_num: int) -> None:
         bridge.beat.emit(beat_num)
 
-    clock = ClockListener(in_port, beat_callback=on_beat)
+    clock = ClockListener(
+        in_port,
+        beat_callback=on_beat,
+        tick_callback=engine.on_tick,
+    )
     clock.start()
 
-    window = MainWindow(controller, clock, bridge, port_name)
+    window = MainWindow(controller, clock, engine, bridge, port_name)
     window.show()
 
     def on_quit() -> None:
