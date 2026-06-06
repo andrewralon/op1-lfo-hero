@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QApplication, QComboBox, QSpinBox, QListWidget, QListWidgetItem,
 )
 from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer, QPointF, QSize
-from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QPixmap, QPolygonF, QIcon
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QPixmap, QIcon
 
 from src.controller import Controller, CC_VOLUME, CC_MUTE, CC_PAN
 from src.automation import (
@@ -42,23 +42,6 @@ def _midi_to_ui(v: int) -> int:
 def _ui_to_midi(v: int) -> int:
     return round(v * 127 / 99)
 
-def _transport_icon(shape: str, color: str, size: int = 18) -> QIcon:
-    """Draw a play triangle or stop square into a QIcon."""
-    px = QPixmap(size, size)
-    px.fill(Qt.GlobalColor.transparent)
-    p = QPainter(px)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing)
-    p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(QColor(color))
-    if shape == "play":
-        s = float(size)
-        p.drawPolygon(QPolygonF([QPointF(1.0, 0.5), QPointF(s - 0.5, s / 2.0), QPointF(1.0, s - 0.5)]))
-    else:  # stop
-        m = 2
-        p.drawRect(m, m, size - 2 * m, size - 2 * m)
-    p.end()
-    return QIcon(px)
-
 
 def apply_dark_theme(app: QApplication) -> None:
     app.setStyle("Fusion")
@@ -77,22 +60,17 @@ def apply_dark_theme(app: QApplication) -> None:
 # ---------------------------------------------------------------------------
 
 class ClockBridge(QObject):
-    """
-    Signals emitted from clock/automation daemon threads; Qt delivers them to
-    the main thread via AutoConnection (queued cross-thread).
-    Never touch widgets inside these emit calls — signals only.
-    """
-    beat             = pyqtSignal(int)        # every 24 MIDI ticks (one beat)
-    automation_update = pyqtSignal(int, str, int)  # (track, param_name, value)
-    cc_received      = pyqtSignal(int, int, int)   # (channel, control, value)
+    beat              = pyqtSignal(int)
+    automation_update = pyqtSignal(int, str, int)
+    cc_received       = pyqtSignal(int, int, int)
 
 
 # ---------------------------------------------------------------------------
-# Pan dial with center reference marker
+# Pan dial with center reference dot
 # ---------------------------------------------------------------------------
 
 class PanDial(QDial):
-    """QDial with a fixed dot at 12 o'clock: gray when off-center, accent when centered."""
+    """QDial with a fixed dot at 12 o'clock: gray off-center, accent at center."""
     def paintEvent(self, event):
         super().paintEvent(event)
         painter = QPainter(self)
@@ -110,7 +88,7 @@ class PanDial(QDial):
 # ---------------------------------------------------------------------------
 
 class WaveformPreview(QWidget):
-    """Paints a live waveform curve for the selected LFO settings."""
+    """Draws 2 cycles of the LFO waveform with an animated beat playhead."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -118,8 +96,12 @@ class WaveformPreview(QWidget):
         self._depth  = 20
         self._center = 64
         self._phase  = 0.0
-        self.setMinimumHeight(80)
-        self.setMaximumHeight(80)
+        self.setFixedHeight(90)
+        self.setStyleSheet(
+            f"background-color: {_BG};"
+            "border: 1px solid #2e2e2e;"
+            "border-radius: 4px;"
+        )
 
     def set_params(self, wave: LfoWave, depth: int, center: int) -> None:
         self._wave   = wave
@@ -135,20 +117,20 @@ class WaveformPreview(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         w, h = self.width(), self.height()
-        margin_y = 10
+        pad = 8
 
         p.fillRect(self.rect(), QColor(_BG))
 
         cy        = h / 2.0
-        amplitude = h / 2.0 - margin_y
+        amplitude = h / 2.0 - pad
 
         # Center dashed line
-        p.setPen(QPen(QColor("#3a3a3a"), 1, Qt.PenStyle.DashLine))
+        p.setPen(QPen(QColor("#333333"), 1, Qt.PenStyle.DashLine))
         p.drawLine(QPointF(0.0, cy), QPointF(float(w), cy))
 
-        # Waveform — 2 cycles across the full width
+        # Waveform — 2 cycles
         n_cycles = 2
-        steps    = w * 2      # half-pixel resolution
+        steps    = w * 2
         pen = QPen(QColor(_ACCENT), 2)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         p.setPen(pen)
@@ -164,26 +146,16 @@ class WaveformPreview(QWidget):
                 p.drawLine(prev_pt, pt)
             prev_pt = pt
 
-        # Playhead — position within first cycle
+        # Beat playhead (first cycle position)
         phx = self._phase * (float(w) / n_cycles)
         p.setPen(QPen(QColor(_TEXT), 1, Qt.PenStyle.SolidLine))
         p.drawLine(QPointF(phx, 2.0), QPointF(phx, float(h) - 2.0))
-
-        # Hi / lo value labels
-        lo = max(0, self._center - self._depth)
-        hi = min(127, self._center + self._depth)
-        f = QFont()
-        f.setPointSize(8)
-        p.setFont(f)
-        p.setPen(QColor(_DIM))
-        p.drawText(4, margin_y, str(_midi_to_ui(hi)))
-        p.drawText(4, h - 2,    str(_midi_to_ui(lo)))
 
         p.end()
 
 
 # ---------------------------------------------------------------------------
-# Per-track strip — OP-1 Field style
+# Per-track strip
 # ---------------------------------------------------------------------------
 
 class TrackStrip(QFrame):
@@ -191,20 +163,18 @@ class TrackStrip(QFrame):
         super().__init__(parent)
         self._track = track
         self._ctrl  = controller
-        self._ready = False   # suppress CC sends during __init__ setup
+        self._ready = False
         self._setup_ui()
         self._ready = True
 
     def _setup_ui(self) -> None:
-        color = TRACK_COLORS[self._track]
-
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setObjectName("TrackStrip")
         self.setStyleSheet(
             "QFrame#TrackStrip {"
             f"  background-color: {_PANEL};"
             "   border-radius: 10px;"
-            f"  border: 1px solid #2e2e2e;"
+            "   border: 1px solid #2e2e2e;"
             "}"
         )
         self.setFixedWidth(148)
@@ -213,7 +183,7 @@ class TrackStrip(QFrame):
         outer.setSpacing(0)
         outer.setContentsMargins(0, 0, 0, 0)
 
-        # ── Header acts as mute toggle ──
+        # Header = mute toggle button
         hf = QFont()
         hf.setPointSize(9)
         hf.setBold(True)
@@ -227,24 +197,21 @@ class TrackStrip(QFrame):
         self._set_mute_style(False)
         outer.addWidget(self._mute_btn)
 
-        # ── Body ──
         body = QVBoxLayout()
         body.setSpacing(8)
-        body.setContentsMargins(10, 12, 10, 12)
+        body.setContentsMargins(10, 10, 10, 10)
 
-        # Pan knob (L / R flanking, no extra label)
-        _side_style = f"color: {_DIM}; font-size: 10pt; font-weight: bold;"
+        # Pan knob with L / R flanking labels
+        _side = f"color: {_DIM}; font-size: 10pt; font-weight: bold;"
         l_lbl = QLabel("L")
         l_lbl.setFixedWidth(18)
         l_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        l_lbl.setStyleSheet(_side_style)
-
+        l_lbl.setStyleSheet(_side)
         r_lbl = QLabel("R")
         r_lbl.setFixedWidth(18)
         r_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        r_lbl.setStyleSheet(_side_style)
+        r_lbl.setStyleSheet(_side)
 
-        # Range 0–128: midpoint = 64 lands exactly at 12 o'clock
         self._pan_dial = PanDial()
         self._pan_dial.setRange(0, 128)
         self._pan_dial.setValue(64)
@@ -261,14 +228,14 @@ class TrackStrip(QFrame):
         pan_row.addWidget(r_lbl)
         body.addLayout(pan_row)
 
-        # Volume fader (no label; value shown below)
+        # Volume fader
         self._vol_slider = QSlider(Qt.Orientation.Vertical)
         self._vol_slider.setRange(0, 127)
         self._vol_slider.setValue(100)
         self._vol_slider.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding
         )
-        self._vol_slider.setMinimumHeight(130)
+        self._vol_slider.setMinimumHeight(110)
         self._vol_slider.valueChanged.connect(self._on_volume_changed)
         body.addWidget(self._vol_slider, alignment=Qt.AlignmentFlag.AlignHCenter)
 
@@ -304,7 +271,7 @@ class TrackStrip(QFrame):
         )
 
     def _on_pan_changed(self, value: int) -> None:
-        cc = min(value, 127)   # dial range is 0–128; clamp top end for MIDI
+        cc = min(value, 127)
         if self._ready:
             self._ctrl.set_pan(self._track, cc)
 
@@ -314,7 +281,7 @@ class TrackStrip(QFrame):
             self._ctrl.set_volume(self._track, value)
 
     # ------------------------------------------------------------------
-    # External updates (automation + OP-1 → UI sync)
+    # External updates
     # ------------------------------------------------------------------
 
     def current_midi_value(self, param: Parameter) -> int:
@@ -327,7 +294,7 @@ class TrackStrip(QFrame):
         return 64
 
     def set_automation_value(self, param_name: str, value: int) -> None:
-        """Move a control to reflect an automation value — no CC sent."""
+        """Update a control from automation — does not re-send CC."""
         if param_name == Parameter.VOLUME.value:
             self._vol_slider.blockSignals(True)
             self._vol_slider.setValue(value)
@@ -347,7 +314,7 @@ class TrackStrip(QFrame):
             self._set_mute_style(muted)
 
     def update_from_cc(self, control: int, value: int) -> None:
-        """Sync UI from a CC message received from the OP-1 — no CC sent back."""
+        """Sync UI from OP-1 CC — does not re-send CC."""
         if control == CC_VOLUME:
             self._vol_slider.blockSignals(True)
             self._vol_slider.setValue(value)
@@ -374,53 +341,64 @@ class TrackStrip(QFrame):
 class LfoPanel(QFrame):
     def __init__(self, engine: AutomationEngine, clock, get_value_fn, parent=None):
         super().__init__(parent)
-        self._engine    = engine
-        self._clock     = clock
-        self._get_value = get_value_fn   # (track: int, param: Parameter) -> int
+        self._engine      = engine
+        self._clock       = clock
+        self._get_value   = get_value_fn
         self._active_lfos: list[LfoClip] = []
         self._setup_ui()
 
     def _setup_ui(self) -> None:
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setStyleSheet(
-            f"LfoPanel {{ background-color: {_PANEL}; border-radius: 8px; border: 1px solid #2e2e2e; }}"
+            f"LfoPanel {{ background-color: {_PANEL}; border-radius: 8px;"
+            f"  border: 1px solid #2e2e2e; }}"
         )
 
         root = QVBoxLayout(self)
         root.setSpacing(8)
-        root.setContentsMargins(14, 10, 14, 12)
+        root.setContentsMargins(14, 10, 14, 10)
 
-        # Title
-        title = QLabel("LFO MODULATOR")
+        # ── Row 1: title + Track / Param / Wave combos on one line ──
+        hdr = QHBoxLayout()
+        hdr.setSpacing(8)
+
+        title = QLabel("LFO")
         tf = QFont()
         tf.setPointSize(10)
         tf.setBold(True)
         tf.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2.0)
         title.setFont(tf)
         title.setStyleSheet(f"color: {_DIM};")
-        root.addWidget(title)
+        hdr.addWidget(title)
 
-        # Controls row: Track / Param / Wave selectors
-        ctrl_row = QHBoxLayout()
-        ctrl_row.setSpacing(8)
+        hdr.addSpacing(8)
+
         self._track_combo = self._make_combo([str(t) for t in (1, 2, 3, 4)])
         self._param_combo = self._make_combo(list(PARAMETER_LABELS))
         self._wave_combo  = self._make_combo(list(LFO_WAVE_LABELS))
+
         for lbl_text, widget in [
             ("Track", self._track_combo),
             ("Param", self._param_combo),
             ("Wave",  self._wave_combo),
         ]:
-            ctrl_row.addWidget(self._dim_label(lbl_text))
-            ctrl_row.addWidget(widget)
-        ctrl_row.addStretch()
-        root.addLayout(ctrl_row)
+            hdr.addWidget(self._dim_label(lbl_text))
+            hdr.addWidget(widget)
 
-        # Waveform preview
+        hdr.addStretch()
+        root.addLayout(hdr)
+
+        # ── Row 2: waveform preview ──
         self._preview = WaveformPreview()
         root.addWidget(self._preview)
 
-        # Rate / Depth / Center row
+        # ── Row 3: Range readout (below canvas, clearly outside it) ──
+        self._range_label = QLabel()
+        self._range_label.setStyleSheet(f"color: {_DIM}; font-size: 9pt;")
+        self._range_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        root.addWidget(self._range_label)
+
+        # ── Row 4: Rate / Depth / Center ──
         params_row = QHBoxLayout()
         params_row.setSpacing(6)
 
@@ -431,13 +409,17 @@ class LfoPanel(QFrame):
         self._depth_spin.setRange(0, 63)
         self._depth_spin.setValue(20)
         self._depth_spin.setFixedWidth(52)
-        self._depth_spin.setStyleSheet(f"color: {_TEXT}; background-color: {_BG}; font-size: 11pt;")
+        self._depth_spin.setStyleSheet(
+            f"color: {_TEXT}; background-color: {_BG}; font-size: 11pt;"
+        )
 
         self._center_spin = QSpinBox()
         self._center_spin.setRange(0, 127)
         self._center_spin.setValue(64)
         self._center_spin.setFixedWidth(52)
-        self._center_spin.setStyleSheet(f"color: {_TEXT}; background-color: {_BG}; font-size: 11pt;")
+        self._center_spin.setStyleSheet(
+            f"color: {_TEXT}; background-color: {_BG}; font-size: 11pt;"
+        )
 
         use_cur_btn = QPushButton("Use current")
         use_cur_btn.setFixedHeight(26)
@@ -451,10 +433,10 @@ class LfoPanel(QFrame):
         params_row.addWidget(self._dim_label("Rate"))
         params_row.addWidget(self._rate_combo)
         params_row.addWidget(self._dim_label("b/cycle"))
-        params_row.addSpacing(10)
+        params_row.addSpacing(12)
         params_row.addWidget(self._dim_label("Depth ±"))
         params_row.addWidget(self._depth_spin)
-        params_row.addSpacing(10)
+        params_row.addSpacing(12)
         params_row.addWidget(self._dim_label("Center"))
         params_row.addWidget(self._center_spin)
         params_row.addSpacing(6)
@@ -462,40 +444,44 @@ class LfoPanel(QFrame):
         params_row.addStretch()
         root.addLayout(params_row)
 
-        # Action buttons
+        # ── Row 5: action buttons ──
         action_row = QHBoxLayout()
         action_row.setSpacing(8)
 
-        _btn_style = (
-            lambda bg, bg2, fg="": (
-                f"QPushButton {{ background-color: {bg}; color: {fg or _TEXT};"
-                f"  border: none; border-radius: 4px; font-size: 11pt; }}"
-                f"QPushButton:hover {{ background-color: {bg2}; }}"
-            )
-        )
-
         start_btn = QPushButton("▶  Start")
-        start_btn.setFixedHeight(30)
-        start_btn.setStyleSheet(_btn_style("#1e4a1e", "#2a6a2a"))
+        start_btn.setFixedHeight(28)
+        start_btn.setStyleSheet(
+            f"QPushButton {{ background-color: #1e4a1e; color: {_TEXT};"
+            f"  border: none; border-radius: 4px; font-size: 11pt; }}"
+            f"QPushButton:hover {{ background-color: #2a6a2a; }}"
+        )
         start_btn.clicked.connect(self._on_start)
 
-        stop_btn = QPushButton("✕  Stop Selected")
-        stop_btn.setFixedHeight(30)
-        stop_btn.setStyleSheet(_btn_style(_MUTE_OFF, "#3a3a3a"))
-        stop_btn.clicked.connect(self._on_stop_selected)
+        stop_sel_btn = QPushButton("✕  Stop Selected")
+        stop_sel_btn.setFixedHeight(28)
+        stop_sel_btn.setStyleSheet(
+            f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT};"
+            f"  border: none; border-radius: 4px; font-size: 11pt; }}"
+            f"QPushButton:hover {{ background-color: #3a3a3a; }}"
+        )
+        stop_sel_btn.clicked.connect(self._on_stop_selected)
 
         stop_all_btn = QPushButton("✕  Stop All")
-        stop_all_btn.setFixedHeight(30)
-        stop_all_btn.setStyleSheet(_btn_style(_MUTE_OFF, "#3a3a3a", _DIM))
+        stop_all_btn.setFixedHeight(28)
+        stop_all_btn.setStyleSheet(
+            f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_DIM};"
+            f"  border: none; border-radius: 4px; font-size: 11pt; }}"
+            f"QPushButton:hover {{ background-color: #3a3a3a; color: {_TEXT}; }}"
+        )
         stop_all_btn.clicked.connect(self._on_stop_all)
 
         action_row.addWidget(start_btn)
-        action_row.addWidget(stop_btn)
+        action_row.addWidget(stop_sel_btn)
         action_row.addWidget(stop_all_btn)
         action_row.addStretch()
         root.addLayout(action_row)
 
-        # Active LFO list
+        # ── Row 6: active LFO list ──
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet("border: none; background-color: #333333; max-height: 1px;")
@@ -511,14 +497,12 @@ class LfoPanel(QFrame):
         self._lfo_list.setMaximumHeight(70)
         root.addWidget(self._lfo_list)
 
-        # Live preview wiring
+        # Wire up live preview
         self._wave_combo.currentTextChanged.connect(self._update_preview)
         self._depth_spin.valueChanged.connect(self._update_preview)
         self._center_spin.valueChanged.connect(self._update_preview)
         self._update_preview()
 
-    # ------------------------------------------------------------------
-    # Helpers
     # ------------------------------------------------------------------
 
     def _make_combo(self, items: list[str]) -> QComboBox:
@@ -536,15 +520,14 @@ class LfoPanel(QFrame):
         lbl.setStyleSheet(f"color: {_DIM}; font-size: 10pt; font-weight: bold;")
         return lbl
 
-    # ------------------------------------------------------------------
-    # Slots
-    # ------------------------------------------------------------------
-
     def _update_preview(self, *_) -> None:
         wave   = LFO_WAVE_LABELS[self._wave_combo.currentText()]
         depth  = self._depth_spin.value()
         center = self._center_spin.value()
         self._preview.set_params(wave, depth, center)
+        lo = _midi_to_ui(max(0, center - depth))
+        hi = _midi_to_ui(min(127, center + depth))
+        self._range_label.setText(f"Range: {lo} – {hi}")
 
     def _on_use_current(self) -> None:
         track = int(self._track_combo.currentText())
@@ -622,33 +605,21 @@ class MainWindow(QMainWindow):
 
     def _setup_ui(self, controller: Controller, engine: AutomationEngine, port_name: str) -> None:
         self.setWindowTitle("OP-1 Field MIDI Controller")
-        self.setMinimumSize(700, 560)
+        self.setMinimumSize(700, 680)
         self.setStyleSheet(f"QMainWindow {{ background-color: {_BG}; }}")
 
         central = QWidget()
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
-        root.setSpacing(14)
-        root.setContentsMargins(18, 16, 18, 16)
+        root.setSpacing(12)
+        root.setContentsMargins(18, 14, 18, 14)
 
-        # Header
+        # ── Compact header: status left, BPM right ──
         header = QHBoxLayout()
-        header.setSpacing(6)
 
-        self._stop_btn = QPushButton()
-        self._stop_btn.setIcon(_transport_icon("stop", _TEXT))
-        self._stop_btn.setIconSize(QSize(16, 16))
-        self._stop_btn.setFixedSize(48, 34)
-        self._stop_btn.setToolTip("Stop")
-        self._stop_btn.setStyleSheet(
-            f"QPushButton {{"
-            f"  background-color: {_PANEL}; border: 1px solid #3a3a3a; border-radius: 7px;"
-            f"}}"
-            f"QPushButton:hover {{ background-color: #2a2a2a; }}"
-            f"QPushButton:pressed {{ background-color: #111; }}"
-        )
-        self._stop_btn.clicked.connect(self._on_stop)
-        header.addWidget(self._stop_btn)
+        status = QLabel(f"● Connected: {port_name}")
+        status.setStyleSheet(f"color: {_GREEN}; font-size: 11pt; font-weight: bold;")
+        header.addWidget(status)
 
         header.addStretch()
 
@@ -660,16 +631,12 @@ class MainWindow(QMainWindow):
         header.addWidget(self._bpm_label)
         root.addLayout(header)
 
-        status = QLabel(f"● Connected: {port_name}")
-        status.setStyleSheet(f"color: {_GREEN}; font-size: 11pt; font-weight: bold;")
-        root.addWidget(status)
-
         sep = QFrame()
         sep.setFrameShape(QFrame.Shape.HLine)
         sep.setStyleSheet("border: none; background-color: #2a2a2a; max-height: 1px;")
         root.addWidget(sep)
 
-        # Track strips
+        # ── Track strips ──
         tracks_row = QHBoxLayout()
         tracks_row.setSpacing(10)
         for t in (1, 2, 3, 4):
@@ -684,6 +651,7 @@ class MainWindow(QMainWindow):
         sep2.setStyleSheet("border: none; background-color: #2a2a2a; max-height: 1px;")
         root.addWidget(sep2)
 
+        # ── LFO panel ──
         self._lfo_panel = LfoPanel(engine, self._clock, self._get_strip_value)
         root.addWidget(self._lfo_panel)
 
@@ -704,13 +672,9 @@ class MainWindow(QMainWindow):
             strip.set_automation_value(param_name, value)
 
     def _on_cc_received(self, channel: int, control: int, value: int) -> None:
-        # mido channels are 0-indexed; channel 0 = track 1
         strip = self._strips.get(channel + 1)
         if strip:
             strip.update_from_cc(control, value)
-
-    def _on_stop(self) -> None:
-        self._controller.stop()
 
     def _get_strip_value(self, track: int, param: Parameter) -> int:
         strip = self._strips.get(track)
