@@ -77,6 +77,10 @@ class Controller:
         with self._lock:
             return self._muted[track]
 
+    def stop(self) -> None:
+        """Send MIDI Stop (0xFC) to the OP-1."""
+        self._port.send(mido.Message("stop"))
+
     def sync_mute_state(self, track: int, muted: bool) -> None:
         """Update internal mute tracking without sending CC — used to sync from OP-1."""
         self._validate_track(track)

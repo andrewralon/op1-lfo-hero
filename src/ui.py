@@ -8,8 +8,8 @@ from PyQt6.QtWidgets import (
     QApplication, QComboBox, QSpinBox, QCheckBox, QListWidget,
     QListWidgetItem,
 )
-from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer, QPointF
-from PyQt6.QtGui import QFont, QColor, QPainter
+from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer, QPointF, QSize
+from PyQt6.QtGui import QFont, QColor, QPainter, QPixmap, QPolygonF, QIcon
 
 from src.controller import Controller, CC_VOLUME, CC_MUTE, CC_PAN
 from src.automation import AutomationEngine, Clip, Parameter, CURVE_LABELS, PARAMETER_LABELS
@@ -39,6 +39,23 @@ def _midi_to_ui(v: int) -> int:
 
 def _ui_to_midi(v: int) -> int:
     return round(v * 127 / 99)
+
+def _transport_icon(shape: str, color: str, size: int = 18) -> QIcon:
+    """Draw a play triangle or stop square into a QIcon."""
+    px = QPixmap(size, size)
+    px.fill(Qt.GlobalColor.transparent)
+    p = QPainter(px)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor(color))
+    if shape == "play":
+        s = float(size)
+        p.drawPolygon(QPolygonF([QPointF(1.0, 0.5), QPointF(s - 0.5, s / 2.0), QPointF(1.0, s - 0.5)]))
+    else:  # stop
+        m = 2
+        p.drawRect(m, m, size - 2 * m, size - 2 * m)
+    p.end()
+    return QIcon(px)
 
 
 def apply_dark_theme(app: QApplication) -> None:
@@ -461,6 +478,7 @@ class MainWindow(QMainWindow):
         port_name: str,
     ) -> None:
         super().__init__()
+        self._controller = controller
         self._clock = clock
         self._last_beat_time: float | None = None
         self._strips: dict[int, TrackStrip] = {}
@@ -487,7 +505,25 @@ class MainWindow(QMainWindow):
 
         # Header
         header = QHBoxLayout()
+        header.setSpacing(6)
+
+        self._stop_btn = QPushButton()
+        self._stop_btn.setIcon(_transport_icon("stop", _TEXT))
+        self._stop_btn.setIconSize(QSize(16, 16))
+        self._stop_btn.setFixedSize(48, 34)
+        self._stop_btn.setToolTip("Stop")
+        self._stop_btn.setStyleSheet(
+            f"QPushButton {{"
+            f"  background-color: {_PANEL}; border: 1px solid #3a3a3a; border-radius: 7px;"
+            f"}}"
+            f"QPushButton:hover {{ background-color: #2a2a2a; }}"
+            f"QPushButton:pressed {{ background-color: #111; }}"
+        )
+        self._stop_btn.clicked.connect(self._on_stop)
+        header.addWidget(self._stop_btn)
+
         header.addStretch()
+
         self._bpm_label = QLabel("BPM: --")
         bf = QFont("Menlo", 20)
         bf.setBold(True)
@@ -544,6 +580,9 @@ class MainWindow(QMainWindow):
         strip = self._strips.get(channel + 1)
         if strip:
             strip.update_from_cc(control, value)
+
+    def _on_stop(self) -> None:
+        self._controller.stop()
 
     def _check_clock_loss(self) -> None:
         if (

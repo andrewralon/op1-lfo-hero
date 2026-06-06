@@ -5,7 +5,8 @@
 - [ ] Pan control as a rotary knob (12 o'clock = center)
 
 ## To do
-- [ ] Play / Stop buttons in the header: send MIDI Start (0xFA) and Stop (0xFC) transport messages to the OP-1
+- [x] Stop icon button in the header: sends MIDI Stop (0xFC) to the OP-1
+- ✗ Play button: the OP-1 Field ignores incoming Continue/Start messages when acting as MIDI clock master — remote play is not possible
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
 - [ ] Graceful MIDI disconnect: detect OP-1 unplug mid-session, show reconnect dialog instead of crashing
 - [ ] Preset saving: save/load slider positions and automation clips as JSON
