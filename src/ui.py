@@ -11,6 +11,7 @@ from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer, QPointF, QSize
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QPixmap, QIcon
 
 from src.controller import Controller, CC_VOLUME, CC_MUTE, CC_PAN
+from src.clock import PPQN
 from src.automation import (
     AutomationEngine, Parameter, PARAMETER_LABELS,
     LfoWave, LfoClip, lfo_wave_value, LFO_WAVE_LABELS,
@@ -41,6 +42,30 @@ def _midi_to_ui(v: int) -> int:
 
 def _ui_to_midi(v: int) -> int:
     return round(v * 127 / 99)
+
+
+# Rate 1 (slowest) → 8 (fastest): ticks per LFO cycle
+_RATE_TICKS: dict[int, int] = {
+    1: 16 * PPQN,   # once per 16 beats
+    2: 8  * PPQN,   # once per 8 beats
+    3: 4  * PPQN,   # once per 4 beats
+    4: 2  * PPQN,   # once per 2 beats
+    5: PPQN,        # once per beat
+    6: PPQN // 2,   # twice per beat
+    7: PPQN // 4,   # 4× per beat
+    8: PPQN // 8,   # 8× per beat
+}
+
+_RATE_DESC: dict[int, str] = {
+    1: "1× / 16 beats",
+    2: "1× / 8 beats",
+    3: "1× / 4 beats",
+    4: "1× / 2 beats",
+    5: "1× / beat",
+    6: "2× / beat",
+    7: "4× / beat",
+    8: "8× / beat",
+}
 
 
 def apply_dark_theme(app: QApplication) -> None:
@@ -402,24 +427,31 @@ class LfoPanel(QFrame):
         params_row = QHBoxLayout()
         params_row.setSpacing(6)
 
-        self._rate_combo = self._make_combo(["1", "2", "4", "8", "16"])
-        self._rate_combo.setCurrentText("4")
+        _spin_style = f"color: {_TEXT}; background-color: {_BG}; font-size: 11pt;"
+
+        self._rate_spin = QSpinBox()
+        self._rate_spin.setRange(1, 8)
+        self._rate_spin.setValue(3)   # default: 4 beats/cycle
+        self._rate_spin.setFixedWidth(44)
+        self._rate_spin.setStyleSheet(_spin_style)
+
+        self._rate_desc_lbl = QLabel(_RATE_DESC[3])
+        self._rate_desc_lbl.setStyleSheet(f"color: {_DIM}; font-size: 9pt;")
+        self._rate_spin.valueChanged.connect(
+            lambda v: self._rate_desc_lbl.setText(_RATE_DESC[v])
+        )
 
         self._depth_spin = QSpinBox()
-        self._depth_spin.setRange(0, 63)
-        self._depth_spin.setValue(20)
+        self._depth_spin.setRange(0, 49)
+        self._depth_spin.setValue(16)   # ≈ MIDI 20
         self._depth_spin.setFixedWidth(52)
-        self._depth_spin.setStyleSheet(
-            f"color: {_TEXT}; background-color: {_BG}; font-size: 11pt;"
-        )
+        self._depth_spin.setStyleSheet(_spin_style)
 
         self._center_spin = QSpinBox()
-        self._center_spin.setRange(0, 127)
-        self._center_spin.setValue(64)
+        self._center_spin.setRange(0, 99)
+        self._center_spin.setValue(50)  # ≈ MIDI 64 (center)
         self._center_spin.setFixedWidth(52)
-        self._center_spin.setStyleSheet(
-            f"color: {_TEXT}; background-color: {_BG}; font-size: 11pt;"
-        )
+        self._center_spin.setStyleSheet(_spin_style)
 
         use_cur_btn = QPushButton("Use current")
         use_cur_btn.setFixedHeight(26)
@@ -431,8 +463,8 @@ class LfoPanel(QFrame):
         use_cur_btn.clicked.connect(self._on_use_current)
 
         params_row.addWidget(self._dim_label("Rate"))
-        params_row.addWidget(self._rate_combo)
-        params_row.addWidget(self._dim_label("b/cycle"))
+        params_row.addWidget(self._rate_spin)
+        params_row.addWidget(self._rate_desc_lbl)
         params_row.addSpacing(12)
         params_row.addWidget(self._dim_label("Depth ±"))
         params_row.addWidget(self._depth_spin)
@@ -521,27 +553,28 @@ class LfoPanel(QFrame):
         return lbl
 
     def _update_preview(self, *_) -> None:
-        wave   = LFO_WAVE_LABELS[self._wave_combo.currentText()]
-        depth  = self._depth_spin.value()
-        center = self._center_spin.value()
-        self._preview.set_params(wave, depth, center)
-        lo = _midi_to_ui(max(0, center - depth))
-        hi = _midi_to_ui(min(127, center + depth))
+        wave         = LFO_WAVE_LABELS[self._wave_combo.currentText()]
+        depth_midi   = _ui_to_midi(self._depth_spin.value())
+        center_midi  = _ui_to_midi(self._center_spin.value())
+        self._preview.set_params(wave, depth_midi, center_midi)
+        lo = _midi_to_ui(max(0,   center_midi - depth_midi))
+        hi = _midi_to_ui(min(127, center_midi + depth_midi))
         self._range_label.setText(f"Range: {lo} – {hi}")
 
     def _on_use_current(self) -> None:
-        track = int(self._track_combo.currentText())
-        param = PARAMETER_LABELS[self._param_combo.currentText()]
-        self._center_spin.setValue(self._get_value(track, param))
+        track     = int(self._track_combo.currentText())
+        param     = PARAMETER_LABELS[self._param_combo.currentText()]
+        midi_val  = self._get_value(track, param)
+        self._center_spin.setValue(_midi_to_ui(midi_val))
 
     def _on_start(self) -> None:
         lfo = LfoClip(
             track        = int(self._track_combo.currentText()),
             parameter    = PARAMETER_LABELS[self._param_combo.currentText()],
             wave         = LFO_WAVE_LABELS[self._wave_combo.currentText()],
-            rate_beats   = int(self._rate_combo.currentText()),
-            depth        = self._depth_spin.value(),
-            center_value = self._center_spin.value(),
+            rate_ticks   = _RATE_TICKS[self._rate_spin.value()],
+            depth        = _ui_to_midi(self._depth_spin.value()),
+            center_value = _ui_to_midi(self._center_spin.value()),
         )
         self._engine.add_lfo(lfo)
         self._active_lfos.append(lfo)
@@ -562,16 +595,22 @@ class LfoPanel(QFrame):
     def _refresh_list(self) -> None:
         self._lfo_list.clear()
         for lfo in self._active_lfos:
-            lo = _midi_to_ui(max(0, lfo.center_value - lfo.depth))
+            lo = _midi_to_ui(max(0,   lfo.center_value - lfo.depth))
             hi = _midi_to_ui(min(127, lfo.center_value + lfo.depth))
+            # Compute human-readable rate from ticks
+            if lfo.rate_ticks >= PPQN:
+                rate_str = f"{lfo.rate_ticks // PPQN}b/cycle"
+            else:
+                rate_str = f"{PPQN // lfo.rate_ticks}×/beat"
             self._lfo_list.addItem(QListWidgetItem(
                 f"T{lfo.track}  {lfo.parameter.value.upper()[:3]}  "
-                f"{lfo.wave.value}  {lo}↔{hi}  {lfo.rate_beats}b/cycle"
+                f"{lfo.wave.value}  {lo}↔{hi}  {rate_str}"
             ))
 
     def on_beat(self, beat_count: int) -> None:
-        rate  = int(self._rate_combo.currentText())
-        phase = ((beat_count - 1) % rate) / rate
+        rate_ticks  = _RATE_TICKS[self._rate_spin.value()]
+        beat_ticks  = (beat_count - 1) * PPQN
+        phase       = (beat_ticks % rate_ticks) / rate_ticks
         self._preview.set_phase(phase)
 
 

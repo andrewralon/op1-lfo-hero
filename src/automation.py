@@ -133,7 +133,7 @@ class LfoClip:
     track: int          # 1–4
     parameter: Parameter
     wave: LfoWave
-    rate_beats: int     # beats per full cycle
+    rate_ticks: int     # ticks per full cycle (PPQN-based)
     depth: int          # oscillation half-amplitude in MIDI units
     center_value: int   # MIDI center (0–127)
 
@@ -310,14 +310,13 @@ class AutomationEngine:
 
     def _evaluate_lfo(self, lfo: LfoClip, tick_count: int) -> None:
         lfo_id = id(lfo)
-        cycle_ticks = lfo.rate_beats * PPQN
         with self._lock:
             if lfo_id not in self._lfo_starts:
                 self._lfo_starts[lfo_id] = tick_count
             start_tick = self._lfo_starts[lfo_id]
 
         elapsed = tick_count - start_tick
-        phase = (elapsed % cycle_ticks) / cycle_ticks
+        phase = (elapsed % lfo.rate_ticks) / lfo.rate_ticks
         value = lfo.value_at(phase)
         self._send_lfo_if_changed(lfo, value)
 
