@@ -1,5 +1,7 @@
 """PyQt6 mixer UI for the OP-1 Field controller."""
 
+import math
+
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QSlider, QDial, QFrame, QSizePolicy,
@@ -93,17 +95,36 @@ class ClockBridge(QObject):
 # ---------------------------------------------------------------------------
 
 class PanDial(QDial):
-    """QDial with a fixed dot at 12 o'clock: gray off-center, accent at center."""
+    """QDial drawn as a dark circle with a line indicator from center to rim."""
     def paintEvent(self, event):
-        super().paintEvent(event)
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        cx = self.width() / 2.0
-        painter.setPen(Qt.PenStyle.NoPen)
-        color = QColor(_ACCENT) if self.value() == 64 else QColor(_DIM)
-        painter.setBrush(color)
-        painter.drawEllipse(QPointF(cx, 4.5), 3.0, 3.0)
-        painter.end()
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        cx, cy = self.width() / 2.0, self.height() / 2.0
+        r = min(cx, cy) - 2.0
+
+        # Knob body
+        p.setPen(QPen(QColor("#555555"), 1.0))
+        p.setBrush(QColor(_PANEL))
+        p.drawEllipse(QPointF(cx, cy), r, r)
+
+        # Indicator line: sweep -135° (min) to +135° (max) from 12 o'clock
+        v = self.value()
+        t = (v - self.minimum()) / max(1, self.maximum() - self.minimum())
+        a = math.radians(-135.0 + t * 270.0)
+        sa, ca = math.sin(a), math.cos(a)
+
+        color = QColor(_ACCENT) if v == 64 else QColor(_TEXT)
+        pen = QPen(color, 2.0)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawLine(
+            QPointF(cx + sa * 3.0,       cy - ca * 3.0),
+            QPointF(cx + sa * (r - 3.0), cy - ca * (r - 3.0)),
+        )
+
+        p.end()
 
 
 # ---------------------------------------------------------------------------
