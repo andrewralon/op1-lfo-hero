@@ -171,11 +171,6 @@ class WaveformPreview(QWidget):
                 p.drawLine(prev_pt, pt)
             prev_pt = pt
 
-        # Beat playhead (first cycle position)
-        phx = self._phase * (float(w) / n_cycles)
-        p.setPen(QPen(QColor(_TEXT), 1, Qt.PenStyle.SolidLine))
-        p.drawLine(QPointF(phx, 2.0), QPointF(phx, float(h) - 2.0))
-
         p.end()
 
 
