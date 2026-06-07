@@ -726,7 +726,7 @@ class MainWindow(QMainWindow):
         bpm_spin.setRange(20.0, 300.0)
         bpm_spin.setDecimals(1)
         bpm_spin.setSingleStep(1.0)
-        bpm_spin.setValue(120.0)
+        bpm_spin.setValue(100.0)
         bpm_spin.setFixedWidth(96)
         bpm_spin.setStyleSheet(
             f"QDoubleSpinBox {{ color: {_TEXT}; background-color: {_BG};"

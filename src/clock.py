@@ -159,7 +159,7 @@ class MidiClockGenerator:
         self._port          = port
         self._tick_callback = tick_callback
         self._beat_callback = beat_callback
-        self._bpm           = 120.0
+        self._bpm           = 100.0
         self._lock          = threading.Lock()
         self._running       = True
         self._has_started   = False
