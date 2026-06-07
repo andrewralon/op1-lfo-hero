@@ -87,6 +87,12 @@ class ClockListener:
         with self._lock:
             return self._bpm
 
+    @property
+    def last_tick_time(self) -> float | None:
+        """Timestamp (time.perf_counter) of the most recent clock tick, or None."""
+        with self._lock:
+            return self._last_tick_time
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
@@ -162,6 +168,7 @@ class MidiClockGenerator:
         self._bpm           = 100.0
         self._lock          = threading.Lock()
         self._running       = True
+        self._clock_enabled = False  # start silent; enabled once MIDI Sync mode is confirmed
         self._has_started   = False
         self._playing       = False
         self._spp_pos       = 0    # MIDI beats (1 beat = 6 ticks); tracks resume position
@@ -183,6 +190,12 @@ class MidiClockGenerator:
     def set_bpm(self, bpm: float) -> None:
         with self._lock:
             self._bpm = max(20.0, min(300.0, float(bpm)))
+
+    def enable_clock(self) -> None:
+        self._clock_enabled = True
+
+    def disable_clock(self) -> None:
+        self._clock_enabled = False
 
     def play(self) -> None:
         """Send Start (0xFA) first time; Continue (0xFB) on subsequent presses."""
@@ -227,18 +240,19 @@ class MidiClockGenerator:
             sleep_time = next_tick - time.perf_counter()
             if sleep_time > 0:
                 time.sleep(sleep_time)
-            self._port.send(mido.Message("clock"))
-            self._tick_count += 1
-            if self._playing:
-                self._spp_tick_rem += 1
-                if self._spp_tick_rem >= 6:
-                    self._spp_tick_rem = 0
-                    self._spp_pos += 1
-            is_beat = self._tick_count % PPQN == 0
-            if is_beat:
-                self._beat_count += 1
-            if self._tick_callback:
-                self._tick_callback(self._tick_count, self._beat_count)
-            if is_beat and self._beat_callback:
-                self._beat_callback(self._beat_count)
+            if self._clock_enabled:
+                self._port.send(mido.Message("clock"))
+                self._tick_count += 1
+                if self._playing:
+                    self._spp_tick_rem += 1
+                    if self._spp_tick_rem >= 6:
+                        self._spp_tick_rem = 0
+                        self._spp_pos += 1
+                is_beat = self._tick_count % PPQN == 0
+                if is_beat:
+                    self._beat_count += 1
+                if self._tick_callback:
+                    self._tick_callback(self._tick_count, self._beat_count)
+                if is_beat and self._beat_callback:
+                    self._beat_callback(self._beat_count)
             last_tick = next_tick

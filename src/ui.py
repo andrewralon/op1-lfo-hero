@@ -1,13 +1,15 @@
 """PyQt6 mixer UI for the OP-1 Field controller."""
 
 import math
+import time
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QSlider, QDial, QFrame, QSizePolicy,
-    QApplication, QComboBox, QSpinBox, QDoubleSpinBox, QListWidget, QListWidgetItem,
+    QApplication, QComboBox, QSpinBox, QDoubleSpinBox, QAbstractSpinBox,
+    QListWidget, QListWidgetItem,
 )
-from PyQt6.QtCore import Qt, QObject, pyqtSignal, QPointF, QSize
+from PyQt6.QtCore import Qt, QObject, pyqtSignal, QPointF, QSize, QTimer
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QPixmap, QIcon
 
 from src.controller import Controller, CC_VOLUME, CC_MUTE, CC_PAN
@@ -662,6 +664,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._controller = controller
         self._clock      = clock
+        self._clock_gen  = clock_gen
         self._strips: dict[int, TrackStrip] = {}
         self._setup_ui(controller, engine, port_name, clock_gen)
 
@@ -743,19 +746,19 @@ class MainWindow(QMainWindow):
         bpm_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         bpm_layout.addWidget(bpm_title)
 
-        bpm_spin = QDoubleSpinBox()
-        bpm_spin.setRange(20.0, 300.0)
-        bpm_spin.setDecimals(1)
-        bpm_spin.setSingleStep(1.0)
-        bpm_spin.setValue(100.0)
-        bpm_spin.setFixedWidth(96)
-        bpm_spin.setStyleSheet(
+        self._bpm_spin = QDoubleSpinBox()
+        self._bpm_spin.setRange(20.0, 300.0)
+        self._bpm_spin.setDecimals(1)
+        self._bpm_spin.setSingleStep(1.0)
+        self._bpm_spin.setValue(100.0)
+        self._bpm_spin.setFixedWidth(96)
+        self._bpm_spin.setStyleSheet(
             f"QDoubleSpinBox {{ color: {_TEXT}; background-color: {_BG};"
             f"  font-size: 18pt; font-weight: bold; }}"
         )
-        bpm_spin.valueChanged.connect(clock_gen.set_bpm)
-        bpm_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        bpm_layout.addWidget(bpm_spin)
+        self._bpm_spin.valueChanged.connect(clock_gen.set_bpm)
+        self._bpm_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        bpm_layout.addWidget(self._bpm_spin)
 
         bpm_layout.addStretch()
         tracks_row.addWidget(bpm_widget)
@@ -774,7 +777,87 @@ class MainWindow(QMainWindow):
         status.setStyleSheet(f"color: {_GREEN}; font-size: 11pt; font-weight: bold;")
         status_row.addWidget(status)
 
+        status_row.addStretch()
+
+        self._mode_btn = QPushButton("Mode: MIDI Sync")
+        self._mode_btn.setStyleSheet(
+            f"QPushButton {{ color: {_DIM}; background-color: transparent;"
+            f"  border: 1px solid #333333; border-radius: 4px;"
+            f"  font-size: 11pt; font-weight: bold; padding: 2px 8px; }}"
+            f"QPushButton:hover {{ border-color: #555555; }}"
+        )
+        self._mode_btn.clicked.connect(self._toggle_mode)
+        status_row.addWidget(self._mode_btn)
+
         root.addLayout(status_row)
+
+        # ── Mode detection timer ──
+        self._beat_match_mode = False
+        self._startup_detection_done = False
+        self._mode_timer = QTimer(self)
+        self._mode_timer.timeout.connect(self._poll_mode)
+        self._mode_timer.start(500)
+
+    # ------------------------------------------------------------------
+    # Mode detection / toggle
+    # ------------------------------------------------------------------
+
+    def _set_mode(self, beat_match: bool) -> None:
+        self._beat_match_mode = beat_match
+        if beat_match:
+            self._clock_gen.disable_clock()
+            self._mode_btn.setText("Mode: Beat Match")
+            self._mode_btn.setStyleSheet(
+                f"QPushButton {{ color: {_ACCENT}; background-color: transparent;"
+                f"  border: 1px solid {_ACCENT}; border-radius: 4px;"
+                f"  font-size: 11pt; font-weight: bold; padding: 2px 8px; }}"
+                f"QPushButton:hover {{ background-color: #2a1510; }}"
+            )
+            self._bpm_spin.setReadOnly(True)
+            self._bpm_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+            self._bpm_spin.setStyleSheet(
+                f"QDoubleSpinBox {{ color: {_DIM}; background-color: {_BG};"
+                f"  font-size: 18pt; font-weight: bold; }}"
+            )
+        else:
+            self._clock_gen.enable_clock()
+            self._mode_btn.setText("Mode: MIDI Sync")
+            self._mode_btn.setStyleSheet(
+                f"QPushButton {{ color: {_DIM}; background-color: transparent;"
+                f"  border: 1px solid #333333; border-radius: 4px;"
+                f"  font-size: 11pt; font-weight: bold; padding: 2px 8px; }}"
+                f"QPushButton:hover {{ border-color: #555555; }}"
+            )
+            self._bpm_spin.setReadOnly(False)
+            self._bpm_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
+            self._bpm_spin.setStyleSheet(
+                f"QDoubleSpinBox {{ color: {_TEXT}; background-color: {_BG};"
+                f"  font-size: 18pt; font-weight: bold; }}"
+            )
+
+    def _toggle_mode(self) -> None:
+        self._startup_detection_done = True  # manual override locks in the choice
+        self._set_mode(not self._beat_match_mode)
+
+    def _poll_mode(self) -> None:
+        last = self._clock.last_tick_time
+        receiving_ticks = last is not None and (time.perf_counter() - last) < 1.0
+
+        if receiving_ticks and not self._beat_match_mode and not self._startup_detection_done:
+            # OP-1 is sending clock: enter Beat Match (disable our clock output)
+            self._startup_detection_done = True
+            self._set_mode(True)
+        elif not self._startup_detection_done:
+            # First poll with no incoming ticks: OP-1 is in MIDI Sync mode
+            self._startup_detection_done = True
+            self._set_mode(False)
+
+        if self._beat_match_mode:
+            bpm = self._clock.bpm
+            if bpm is not None:
+                self._bpm_spin.blockSignals(True)
+                self._bpm_spin.setValue(round(bpm, 1))
+                self._bpm_spin.blockSignals(False)
 
     # ------------------------------------------------------------------
     # Slots
