@@ -13,12 +13,8 @@ This app handles two different MIDI clock tempo modes:
 
 ## Requirements
 
-**Hardware**
 - Teenage Engineering OP-1 Field
-- USB-C cable (data-capable, not charge-only)
-- Mac or PC with a USB-C or USB-A port
-
-**Software**
+- USB-C cable
 - Python 3.11 or newer
 - macOS (tested) or Windows/Linux (untested but should work)
 
@@ -101,20 +97,6 @@ The status bar at the bottom of the window shows the connected port name once MI
 
 ## Using the App
 
-### Window Layout
-
-```
-[ Play  Stop ]  [ Track 1 ] [ Track 2 ] [ Track 3 ] [ Track 4 ]  [ BPM    ]
-[ ←     →    ]                                                     [       ]
-                          ── status bar ──
-```
-
-- **Left column** — transport and tape navigation buttons
-- **Center** — four track strips (one per OP-1 mixer track)
-- **Right column** — BPM control
-
----
-
 ### Transport Controls (left column)
 
 | Button | Action |
@@ -124,7 +106,7 @@ The status bar at the bottom of the window shows the connected port name once MI
 | **←** | Sends CC 82 (tape previous bar) and updates the song position pointer. |
 | **→** | Sends CC 83 (tape next bar) and updates the song position pointer. |
 
-**Note:** The OP-1 must be in MIDI Sync mode for Play/Stop/← /→ to affect the tape. In other modes these buttons have no effect on tape transport.
+**Note:** The OP-1 must be in MIDI Sync mode for Play/Stop/←/→ to affect the tape. In other modes these buttons have no effect on tape transport.
 
 ---
 
