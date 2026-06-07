@@ -15,6 +15,7 @@ import mido
 CC_VOLUME = 7
 CC_MUTE = 9
 CC_PAN = 10
+CC_OCTAVE = 79
 
 PAN_CENTER = 64
 MUTE_ON = 127
@@ -84,6 +85,14 @@ class Controller:
     def stop(self) -> None:
         """Send MIDI Stop (0xFC) to the OP-1."""
         self._port.send(mido.Message("stop"))
+
+    def octave_up(self) -> None:
+        """Shift octave up via CC 79 ≥ 64 on channel 1."""
+        self._port.send(mido.Message("control_change", channel=0, control=CC_OCTAVE, value=127))
+
+    def octave_down(self) -> None:
+        """Shift octave down via CC 79 < 64 on channel 1."""
+        self._port.send(mido.Message("control_change", channel=0, control=CC_OCTAVE, value=0))
 
     def sync_mute_state(self, track: int, muted: bool) -> None:
         """Update internal mute tracking without sending CC — used to sync from OP-1."""

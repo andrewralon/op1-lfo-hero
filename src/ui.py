@@ -670,14 +670,60 @@ class MainWindow(QMainWindow):
         root.setSpacing(12)
         root.setContentsMargins(18, 14, 18, 14)
 
-        # ── Track strips, horizontally centered ──
+        # ── Transport + octave buttons (left of tracks) ──
+        _btn_ss = (
+            f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT};"
+            f"  border: none; border-radius: 5px; font-size: 14pt; }}"
+            f"QPushButton:hover {{ background-color: #3a3a3a; }}"
+            f"QPushButton:pressed {{ background-color: #4a4a4a; }}"
+        )
+
+        def _make_btn(label: str) -> QPushButton:
+            b = QPushButton(label)
+            b.setFixedSize(38, 32)
+            b.setStyleSheet(_btn_ss)
+            return b
+
+        play_btn     = _make_btn("▶")
+        stop_btn     = _make_btn("■")
+        oct_left_btn = _make_btn("←")
+        oct_right_btn = _make_btn("→")
+
+        play_btn.clicked.connect(controller.play)
+        stop_btn.clicked.connect(controller.stop)
+        oct_left_btn.clicked.connect(controller.octave_down)
+        oct_right_btn.clicked.connect(controller.octave_up)
+
+        transport_row = QHBoxLayout()
+        transport_row.setSpacing(4)
+        transport_row.addWidget(play_btn)
+        transport_row.addWidget(stop_btn)
+
+        octave_row = QHBoxLayout()
+        octave_row.setSpacing(4)
+        octave_row.addWidget(oct_left_btn)
+        octave_row.addWidget(oct_right_btn)
+
+        btn_col = QVBoxLayout()
+        btn_col.setSpacing(6)
+        btn_col.addStretch()
+        btn_col.addLayout(transport_row)
+        btn_col.addLayout(octave_row)
+        btn_col.addStretch()
+
+        # ── Track strips, centered as a group with button column ──
         tracks_row = QHBoxLayout()
         tracks_row.setSpacing(10)
         tracks_row.addStretch()
+        tracks_row.addLayout(btn_col)
         for t in (1, 2, 3, 4):
             strip = TrackStrip(t, controller)
             self._strips[t] = strip
             tracks_row.addWidget(strip)
+
+        right_col = QWidget()
+        right_col.setFixedWidth(80)
+        tracks_row.addWidget(right_col)
         tracks_row.addStretch()
         root.addLayout(tracks_row)
 
