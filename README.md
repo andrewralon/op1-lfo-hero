@@ -1,6 +1,6 @@
 # op1-midi
 
-A desktop app for controlling the Teenage Engineering OP-1 Field synthesizer over USB-C MIDI. Acts as the MIDI clock master — generating tempo, transport, and tape navigation — while providing per-track volume, pan, and mute controls with optional automation curves.
+A desktop app for controlling the Teenage Engineering OP-1 Field synthesizer over USB-C MIDI with LFOs (low frequency oscillators). Acts as the MIDI clock master — generating tempo, transport, and tape navigation — while providing per-track volume, pan, and mute controls with optional automation curves.
 
 ---
 
