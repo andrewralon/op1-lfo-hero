@@ -5,9 +5,9 @@ Custom MIDI LFOs (low frequency oscillators) for the Teenage Engineering OP-1 Fi
 ![beat match](images/ss-beat-match.png)
 ![sync mode](images/ss-midi-sync.png)
 
-This app handles two different MIDI clock tempo modes:
-1. `Beat Match` -> OP1 sends clock to app: used to sync the LFOs
-2. `Midi Sync` -> app sends clock to OP1: generates tempo, transport, and tape navigation commands
+This app handles these OP-1 MIDI clock modes:
+1. `Beat Match` (ext clock) -> OP1 sends clock to app: used to sync the LFOs
+2. `Midi Sync` (int clock) -> app sends clock to OP1: generates tempo, transport, and tape navigation commands
 
 ---
 
@@ -180,6 +180,10 @@ This installs:
 - Make sure the OP-1 is powered on and connected via USB-C before launching
 - Try a different USB-C cable (some are charge-only)
 - On macOS, check **System Settings → Privacy & Security** if any MIDI access prompt was dismissed
+
+**Controls send but OP-1 doesn't respond (volume, pan, mute, transport all ignored)**
+- macOS CoreMIDI can get into a bad state where the port appears available but no data flows
+- Fix: `sudo pkill -9 coremidi` in the terminal, then unplug and replug the OP-1 — no restart needed
 
 **OP-1 tape doesn't respond to Play/Stop**
 - Confirm the OP-1 is in MIDI Sync mode (COM → MIDI → SYNC: MIDI)
