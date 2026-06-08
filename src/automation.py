@@ -17,8 +17,9 @@ methods acquire a lock and are safe to call from the Qt main thread.
 """
 
 import math
+import random
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Callable
 
@@ -143,10 +144,19 @@ class LfoClip:
     depth: int          # oscillation half-amplitude in MIDI units
     center_value: int   # MIDI center (0–127)
     inverted: bool = False
+    _random_prev_phase: float = field(default=-1.0, init=False, repr=False)
+    _random_value: float = field(default=0.0, init=False, repr=False)
 
     def value_at(self, phase: float) -> int:
         """phase: 0.0–1.0 position within one cycle."""
-        y = lfo_wave_value(phase, self.wave)
+        if self.wave is LfoWave.RANDOM:
+            p = phase % 1.0
+            if self._random_prev_phase < 0.0 or p < self._random_prev_phase:
+                self._random_value = random.uniform(-1.0, 1.0)
+            self._random_prev_phase = p
+            y = self._random_value
+        else:
+            y = lfo_wave_value(phase, self.wave)
         if self.inverted:
             y = -y
         return max(0, min(127, round(self.center_value + y * self.depth)))
