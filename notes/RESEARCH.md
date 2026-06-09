@@ -40,7 +40,7 @@ Goal: detect which of the OP-1 Field's 6 tempo modes is active at launch so the 
 ```
 _Identical to FREE — confirmed indistinguishable via MIDI._
 
-### BEAT MATCH (tape playing, ~78 BPM)
+### BEAT MATCH
 ```
 [startup] 160 total messages — counts by type: {'clock': 156, 'sysex': 4}
 [startup] Clock jitter: mean=32.049ms  stddev=3.652ms  BPM≈78.0
@@ -154,6 +154,12 @@ All three ranges overlap completely (1/16 take 2 is the lowest reading overall a
 
 **Beat Match / PO Sync / 1/16 are indistinguishable via MIDI.** Functionally identical from the app's perspective: OP-1 is clock master, app follows.
 
-## Remaining open question
+## Resolved: tape state does not affect clock output
 
-Does the OP-1 only send clock ticks when the tape is actively rolling? One stopped-tape test showed nothing; rolling-tape tests showed ticks. If true, a Beat Match / PO Sync / 1/16 OP-1 with stopped tape would be misdetected as FREE/MIDI Sync until the user hits play.
+Beat Match with tape stopped:
+```
+[startup] 160 total messages — counts by type: {'sysex': 4, 'clock': 156}
+[startup] Clock jitter: mean=31.792ms  stddev=3.836ms  BPM≈78.6
+```
+
+156 clock ticks received with tape fully stopped, and again with tape playing — identical counts and jitter in both cases. The OP-1 sends MIDI clock continuously in Beat Match mode regardless of tape state. The earlier zero-result was from a cold/unresponsive device, not from the tape being stopped. By extension, PO Sync and 1/16 (which showed the same tick counts in all tests) are expected to behave the same way.
