@@ -46,30 +46,17 @@ TRACK_COLORS = {
 # ---------------------------------------------------------------------------
 
 class TempoMode(Enum):
-    APP_CLOCK     = auto()  # auto-detected: OP-1 silent (FREE or MIDI SYNC)
-    BEAT_MATCH    = auto()  # auto-detected: OP-1 sending clock (BEAT MATCH, PO SYNC, or 1/16)
-    MIDI_SYNC     = auto()  # manual sub-mode
-    FREE          = auto()  # manual sub-mode
-    PO_SYNC       = auto()  # manual sub-mode
-    ONE_SIXTEENTH = auto()  # manual sub-mode
+    APP_CLOCK = auto()  # auto-detected: OP-1 silent (FREE or MIDI SYNC)
+    OP1_CLOCK = auto()  # auto-detected: OP-1 sending clock (BEAT MATCH, PO SYNC, or 1/16)
 
 _MODE_LABEL: dict[TempoMode, str] = {
-    TempoMode.APP_CLOCK:     "app (FREE or MIDI SYNC)",
-    TempoMode.BEAT_MATCH:    "op1 (BEAT MATCH, PO SYNC, or 1/16 SYNC)",
-    TempoMode.MIDI_SYNC:     "MIDI SYNC",
-    TempoMode.FREE:          "FREE",
-    TempoMode.PO_SYNC:       "PO SYNC",
-    TempoMode.ONE_SIXTEENTH: "1/16 SYNC",
+    TempoMode.APP_CLOCK: "app (FREE or MIDI SYNC)",
+    TempoMode.OP1_CLOCK: "op1 (BEAT MATCH, PO SYNC, or 1/16 SYNC)",
 }
 
-# Full cycle for the mode button — all modes reachable manually
 _MANUAL_CYCLE: list[TempoMode] = [
     TempoMode.APP_CLOCK,
-    TempoMode.MIDI_SYNC,
-    TempoMode.FREE,
-    TempoMode.PO_SYNC,
-    TempoMode.ONE_SIXTEENTH,
-    TempoMode.BEAT_MATCH, 
+    TempoMode.OP1_CLOCK,
 ]
 
 
@@ -902,52 +889,29 @@ class MainWindow(QMainWindow):
         self._tempo_mode = mode
         label = _MODE_LABEL[mode]
 
-        if mode == TempoMode.BEAT_MATCH:
+        self._mode_btn.setText(label)
+        self._mode_btn.setStyleSheet(
+            f"QPushButton {{ color: {_GREEN}; background-color: transparent;"
+            f"  border: 1px solid {_GREEN}; border-radius: 4px;"
+            f"  font-size: 11pt; font-weight: bold; padding: 2px 8px; }}"
+            f"QPushButton:hover {{ background-color: #0f2a0f; }}"
+        )
+        if mode == TempoMode.OP1_CLOCK:
             # OP-1 is clock master — disable our clock output, BPM is read-only
             self._clock_gen.disable_clock()
-            self._mode_btn.setText(label)
-            self._mode_btn.setStyleSheet(
-                f"QPushButton {{ color: {_GREEN}; background-color: transparent;"
-                f"  border: 1px solid {_GREEN}; border-radius: 4px;"
-                f"  font-size: 11pt; font-weight: bold; padding: 2px 8px; }}"
-                f"QPushButton:hover {{ background-color: #0f2a0f; }}"
-            )
             self._bpm_spin.setReadOnly(True)
             self._bpm_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
             self._bpm_spin.setStyleSheet(
                 f"QDoubleSpinBox {{ color: {_DIM}; background-color: {_BG};"
                 f"  font-size: 18pt; font-weight: bold; }}"
             )
-        elif mode in (TempoMode.APP_CLOCK, TempoMode.MIDI_SYNC):
+        else:
             # App is clock master — enable our clock output, BPM is editable
             self._clock_gen.enable_clock()
-            self._mode_btn.setText(label)
-            self._mode_btn.setStyleSheet(
-                f"QPushButton {{ color: {_GREEN}; background-color: transparent;"
-                f"  border: 1px solid {_GREEN}; border-radius: 4px;"
-                f"  font-size: 11pt; font-weight: bold; padding: 2px 8px; }}"
-                f"QPushButton:hover {{ background-color: #0f2a0f; }}"
-            )
             self._bpm_spin.setReadOnly(False)
             self._bpm_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
             self._bpm_spin.setStyleSheet(
                 f"QDoubleSpinBox {{ color: {_TEXT}; background-color: {_BG};"
-                f"  font-size: 18pt; font-weight: bold; }}"
-            )
-        else:
-            # FREE / PO_SYNC / ONE_SIXTEENTH — no clock output
-            self._clock_gen.disable_clock()
-            self._mode_btn.setText(label)
-            self._mode_btn.setStyleSheet(
-                f"QPushButton {{ color: {_DIM}; background-color: transparent;"
-                f"  border: 1px solid #333333; border-radius: 4px;"
-                f"  font-size: 11pt; font-weight: bold; padding: 2px 8px; }}"
-                f"QPushButton:hover {{ border-color: #555555; }}"
-            )
-            self._bpm_spin.setReadOnly(False)
-            self._bpm_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
-            self._bpm_spin.setStyleSheet(
-                f"QDoubleSpinBox {{ color: {_DIM}; background-color: {_BG};"
                 f"  font-size: 18pt; font-weight: bold; }}"
             )
 
@@ -961,10 +925,10 @@ class MainWindow(QMainWindow):
         last = self._clock.last_tick_time
         receiving_ticks = last is not None and (time.perf_counter() - last) < 1.0
 
-        if receiving_ticks and self._tempo_mode != TempoMode.BEAT_MATCH and not self._startup_detection_done:
+        if receiving_ticks and self._tempo_mode != TempoMode.OP1_CLOCK and not self._startup_detection_done:
             # OP-1 is sending clock → auto-detect as Beat Match
             self._startup_detection_done = True
-            self._set_mode(TempoMode.BEAT_MATCH)
+            self._set_mode(TempoMode.OP1_CLOCK)
             QTimer.singleShot(5500, self._print_startup_log)
         elif not self._startup_detection_done:
             # First poll with no incoming ticks → OP-1 is in APP_CLOCK group
@@ -972,7 +936,7 @@ class MainWindow(QMainWindow):
             self._set_mode(TempoMode.APP_CLOCK)
             QTimer.singleShot(5500, self._print_startup_log)
 
-        if self._tempo_mode == TempoMode.BEAT_MATCH:
+        if self._tempo_mode == TempoMode.OP1_CLOCK:
             bpm = self._clock.bpm
             if bpm is not None:
                 self._bpm_spin.blockSignals(True)
