@@ -30,10 +30,10 @@ _ACCENT     = "#4ec94e"
 _MUTE_OFF   = "#2a2a2a"
 _TEXT       = "#d8d8d8"
 _DIM        = "#aaaaaa"
-_BLUE_1     = "#4477bb"
-_OCHRE_2    = "#bb9933"
-_GRAY_3     = "#848C94"
-_ORANGE_4   = "#ff6a00"
+_BLUE_1     = "#4477bb" # button 1
+_OCHRE_2    = "#bb9933" # button 2
+_GRAY_3     = "#848C94" # button 3
+_ORANGE_4   = "#ff6a00" # button 4
 _STEELBLUE2 = "#132542"
 _OCHRE2     = "#fddf28"
 _OCHRE3     = "#b68e5a"
@@ -41,7 +41,7 @@ _BLUEGRAY2  = "#5c5c74"
 _ORANGE2    = "#ff5349"
 _GRAY       = "#555555"
 _GREEN      = "#4ec94e"
-_RED        = "#e03535"
+_RED        = "#ff4444"
 
 # OP-1 Field per-track colors, matched from the device's mixer screen
 TRACK_COLORS = {
