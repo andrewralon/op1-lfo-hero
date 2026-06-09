@@ -212,6 +212,10 @@ class MidiClockGenerator:
     def disable_clock(self) -> None:
         self._clock_enabled = False
 
+    @property
+    def clock_enabled(self) -> bool:
+        return self._clock_enabled
+
     def play(self) -> None:
         """Send Start (0xFA) first time; Continue (0xFB) on subsequent presses."""
         self._playing = True

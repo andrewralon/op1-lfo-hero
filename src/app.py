@@ -47,19 +47,27 @@ def main() -> None:
         # Runs on the clock daemon thread — emit signal only.
         bridge.cc_received.emit(channel, control, value)
 
-    clock = ClockListener(
-        in_port,
-        beat_callback=on_beat,
-        tick_callback=engine.on_tick,
-        cc_callback=on_cc,
-    )
-    clock.start()
-
     clock_gen = MidiClockGenerator(
         out_port,
         tick_callback=engine.on_tick,
         beat_callback=on_beat,
     )
+
+    def on_slave_tick(tick_count: int, beat_count: int) -> None:
+        # Only drive the engine from the slave clock when the master clock is
+        # inactive. If both were active (e.g. OP-1 echoes received ticks back
+        # via MIDI thru), the LFO would receive two different tick_counts per
+        # period and flicker between two CC values on the device.
+        if not clock_gen.clock_enabled:
+            engine.on_tick(tick_count, beat_count)
+
+    clock = ClockListener(
+        in_port,
+        beat_callback=on_beat,
+        tick_callback=on_slave_tick,
+        cc_callback=on_cc,
+    )
+    clock.start()
 
     window = MainWindow(controller, clock, engine, bridge, port_name, clock_gen)
     window.show()
