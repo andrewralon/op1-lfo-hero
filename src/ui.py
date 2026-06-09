@@ -2,6 +2,7 @@
 
 import logging
 import math
+import os
 import time
 from enum import Enum, auto
 
@@ -51,6 +52,8 @@ _GRAY       = "#555555"
 _GREEN      = "#4ec94e"
 _DARKGREEN  = "#1e4a1e"
 _RED        = "#ff4444"
+
+_CHECKMARK_SVG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "checkmark.svg").replace("\\", "/")
 
 # OP-1 Field per-track colors, matched from the device's mixer screen
 TRACK_COLORS = {
@@ -148,7 +151,7 @@ class PanDial(QDial):
 
         # Knob body
         p.setPen(QPen(QColor(_KNOB_RIM), 1.0))
-        p.setBrush(QColor(_GRAY))
+        p.setBrush(QColor(_GROOVE))
         p.drawEllipse(QPointF(cx, cy), r, r)
 
         # Indicator line: sweep -135° (min) to +135° (max) from 12 o'clock
@@ -214,7 +217,7 @@ class WaveformPreview(QWidget):
         amplitude = h / 2.0 - pad
 
         # Center dashed line
-        p.setPen(QPen(QColor(_GROOVE), 1, Qt.PenStyle.DashLine))
+        p.setPen(QPen(QColor(_KNOB_RIM), 1, Qt.PenStyle.DashLine))
         p.drawLine(QPointF(0.0, cy), QPointF(float(w), cy))
 
         # Cycles visible = how many full cycles fit in one beat at this rate
@@ -336,11 +339,12 @@ class TrackStrip(QFrame):
             "}"
             "QSlider::handle:vertical {"
             f"  background-color: {_FADER}; border: none;"
-            "  width: 20px; height: 8px;"
-            "  margin: 0 -8px; border-radius: 3px;"
+            "  width: 28px; height: 10px;"
+            "  margin: 0 -12px; border-radius: 3px;"
             "}"
         )
         self._vol_slider.valueChanged.connect(self._on_volume_changed)
+        fader_row.addSpacing(10)
         fader_row.addWidget(self._vol_slider)
 
         self._vol_val = QLabel(str(_midi_to_ui(115)))
@@ -470,7 +474,7 @@ class LfoPanel(QFrame):
 
         title = QLabel("LFO")
         tf = QFont()
-        tf.setPointSize(10)
+        tf.setPointSize(14)
         tf.setBold(True)
         tf.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 2.0)
         title.setFont(tf)
@@ -503,8 +507,12 @@ class LfoPanel(QFrame):
 
         hdr.addSpacing(12)
         self._invert_check = QCheckBox("Invert 2nd+")
-        self._invert_check.setStyleSheet(f"QCheckBox {{ color: {_TEXT}; font-size: 10pt; }}")
-        self._invert_check.setEnabled(False)
+        self._invert_check.setStyleSheet(
+            f"QCheckBox {{ color: {_TEXT}; font-size: 10pt; }}"
+            f"QCheckBox::indicator {{ border: 1px solid {_KNOB_RIM}; border-radius: 3px;"
+            f"  background-color: {_PANEL}; width: 13px; height: 13px; }}"
+            f"QCheckBox::indicator:checked {{ background-color: {_PANEL}; border-color: {_KNOB_RIM}; image: url({_CHECKMARK_SVG}); }}"
+        )
         hdr.addWidget(self._invert_check)
 
         hdr.addStretch()
@@ -586,7 +594,7 @@ class LfoPanel(QFrame):
         start_btn.setFixedHeight(28)
         start_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_DARKGREEN}; color: {_TEXT};"
-            f"  border: none; border-radius: 4px; font-size: 11pt; }}"
+            f"  border: none; border-radius: 4px; font-size: 11pt; padding: 0px 14px; }}"
             f"QPushButton:hover {{ background-color: #2a6a2a; }}"
         )
         start_btn.clicked.connect(self._on_start)
@@ -595,7 +603,7 @@ class LfoPanel(QFrame):
         stop_sel_btn.setFixedHeight(28)
         stop_sel_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_TEXT};"
-            f"  border: none; border-radius: 4px; font-size: 11pt; }}"
+            f"  border: none; border-radius: 4px; font-size: 11pt; padding: 0px 14px; }}"
             f"QPushButton:hover {{ background-color: {_HOVER}; }}"
         )
         stop_sel_btn.clicked.connect(self._on_stop_selected)
@@ -604,7 +612,7 @@ class LfoPanel(QFrame):
         stop_all_btn.setFixedHeight(28)
         stop_all_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_MUTE_OFF}; color: {_DIM};"
-            f"  border: none; border-radius: 4px; font-size: 11pt; }}"
+            f"  border: none; border-radius: 4px; font-size: 11pt; padding: 0px 14px; }}"
             f"QPushButton:hover {{ background-color: {_HOVER}; color: {_TEXT}; }}"
         )
         stop_all_btn.clicked.connect(self._on_stop_all)
@@ -666,7 +674,6 @@ class LfoPanel(QFrame):
                     f"QPushButton:hover {{ background-color: {_HOVER}; }}"
                 )
             btn.setStyleSheet(style)
-        self._invert_check.setEnabled(selected_count >= 2)
 
     def _update_preview(self, *_) -> None:
         wave        = LFO_WAVE_LABELS[self._wave_combo.currentText()]
