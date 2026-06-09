@@ -3,9 +3,10 @@ Entry point for the OP-1 MIDI Controller desktop app.
 
 Run with:
     python -m src.app
-    venv/bin/python -m src.app
+    python -m src.app -debug
 """
 
+import logging
 import signal
 import sys
 
@@ -21,6 +22,9 @@ from src.ui import MainWindow, ClockBridge, apply_dark_theme
 
 
 def main() -> None:
+    level = logging.DEBUG if "-debug" in sys.argv else logging.WARNING
+    logging.basicConfig(level=level, format="%(message)s")
+
     app = QApplication(sys.argv)
     apply_dark_theme(app)
 

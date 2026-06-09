@@ -2,22 +2,22 @@
 
 Goal: detect which of the OP-1 Field's 6 tempo modes is active at launch so the UI can set itself accordingly.
 
-## Modes
+## Tempo Modes
 
 | Mode | OP-1 role |
 |---|---|
 | FREE | Internal clock, no MIDI sync |
-| MIDI Sync | Slave — follows incoming MIDI clock |
-| Beat Match | Master — sends MIDI clock |
-| PO Sync | Master — sends PO audio sync (and MIDI clock) |
-| 1/16 | Master — sends 1/16 audio sync (and MIDI clock) |
+| MIDI SYNC | Slave — follows incoming MIDI clock |
+| BEAT MATCH | Master — sends MIDI clock |
+| PO SYNC | Master — sends PO audio sync (and MIDI clock) |
+| 1/16 SYNC | Master — sends 1/16 audio sync (and MIDI clock) |
 | UNKNOWN | App default before detection resolves |
 
 ## Method
 
 `ClockListener` captures all raw MIDI messages (including types normally ignored: `stop`, `continue`, `sysex`, `active_sensing`) for 5 seconds after launch. A Universal SysEx Identity Request (`F0 7E 7F 06 01 F7`) is sent to the OP-1 immediately after `clock.start()`. Results are printed to console 5.5 seconds after launch via `_print_startup_log()`.
 
-## Results
+## Results by Tempo Mode
 
 ### FREE
 ```

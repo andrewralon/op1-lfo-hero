@@ -1,5 +1,6 @@
 """PyQt6 mixer UI for the OP-1 Field controller."""
 
+import logging
 import math
 import time
 from enum import Enum, auto
@@ -969,12 +970,12 @@ class MainWindow(QMainWindow):
                 self._bpm_spin.blockSignals(False)
 
     def _print_startup_log(self) -> None:
-        """Print captured startup MIDI messages to console grouped by type."""
+        """Log captured startup MIDI messages grouped by type (DEBUG level only)."""
         import math as _math
         from collections import Counter
         msgs = self._clock.startup_messages
         if not msgs:
-            print("[startup] No MIDI messages received during startup window.")
+            logging.debug("[startup] No MIDI messages received during startup window.")
             return
         counts: Counter[str] = Counter()
         clock_times: list[float] = []
@@ -990,17 +991,18 @@ class MainWindow(QMainWindow):
                 clock_times.append(elapsed)
             else:
                 non_clock.append((elapsed, rep))
-        print(f"[startup] {len(msgs)} total messages — counts by type: {dict(counts)}")
+        logging.debug("[startup] %d total messages — counts by type: %s", len(msgs), dict(counts))
         if len(clock_times) >= 4:
             intervals = [clock_times[i+1] - clock_times[i] for i in range(len(clock_times) - 1)]
             mean = sum(intervals) / len(intervals)
             stddev = _math.sqrt(sum((x - mean) ** 2 for x in intervals) / len(intervals))
             bpm = 60.0 / (mean * 24)
-            print(f"[startup] Clock jitter: mean={mean*1000:.3f}ms  stddev={stddev*1000:.3f}ms  BPM≈{bpm:.1f}")
+            logging.debug("[startup] Clock jitter: mean=%.3fms  stddev=%.3fms  BPM≈%.1f",
+                          mean * 1000, stddev * 1000, bpm)
         if non_clock:
-            print("[startup] Non-clock messages:")
+            logging.debug("[startup] Non-clock messages:")
             for elapsed, rep in non_clock:
-                print(f"  +{elapsed:.3f}s  {rep}")
+                logging.debug("  +%.3fs  %s", elapsed, rep)
 
     # ------------------------------------------------------------------
     # Slots
