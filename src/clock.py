@@ -33,19 +33,24 @@ class ClockListener:
         beat_callback: Callable[[int], None] | None = None,
         tick_callback: Callable[[int, int], None] | None = None,
         cc_callback: Callable[[int, int, int], None] | None = None,
+        startup_log_seconds: float = 5.0,
     ) -> None:
         """
         Args:
-            in_port:        Shared mido input port (already open).
-            beat_callback:  Called with beat number (1-based) every 24 ticks.
-            tick_callback:  Called with (tick_count, beat_count) on every tick.
-            cc_callback:    Called with (channel, control, value) for every CC
-                            message received — used to sync UI from OP-1 knobs.
+            in_port:               Shared mido input port (already open).
+            beat_callback:         Called with beat number (1-based) every 24 ticks.
+            tick_callback:         Called with (tick_count, beat_count) on every tick.
+            cc_callback:           Called with (channel, control, value) for every CC
+                                   message received — used to sync UI from OP-1 knobs.
+            startup_log_seconds:   Capture all raw MIDI messages for this many seconds
+                                   after start() to help identify per-mode signatures.
+                                   Set to 0 to disable.
         """
         self._port = in_port
         self._beat_callback = beat_callback
         self._tick_callback = tick_callback
         self._cc_callback = cc_callback
+        self._startup_log_seconds = startup_log_seconds
 
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -58,6 +63,11 @@ class ClockListener:
         self._intervals: deque[float] = deque(maxlen=SMOOTH_N)
         self._last_tick_time: float | None = None
 
+        # Startup message log: records (elapsed_s, msg_repr) for all raw messages
+        # received during the first startup_log_seconds after start().
+        self._startup_log: list[tuple[float, str]] = []
+        self._startup_begin: float | None = None
+
         self._thread = threading.Thread(target=self._run, daemon=True, name="ClockListener")
 
     # ------------------------------------------------------------------
@@ -65,6 +75,7 @@ class ClockListener:
     # ------------------------------------------------------------------
 
     def start(self) -> None:
+        self._startup_begin = time.perf_counter()
         self._thread.start()
 
     def stop(self) -> None:
@@ -93,6 +104,12 @@ class ClockListener:
         with self._lock:
             return self._last_tick_time
 
+    @property
+    def startup_messages(self) -> list[tuple[float, str]]:
+        """Copy of (elapsed_s, msg_repr) pairs logged during the startup window."""
+        with self._lock:
+            return list(self._startup_log)
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
@@ -102,6 +119,7 @@ class ClockListener:
         # blocking, so we interleave it with stop_event checks.
         while not self._stop_event.is_set():
             for msg in self._port.iter_pending():
+                self._log_startup_message(msg)
                 if msg.type == "clock":
                     self._handle_tick()
                 elif msg.type == "start":
@@ -113,6 +131,15 @@ class ClockListener:
             # Yield the GIL briefly rather than busy-spinning
             # (Event.wait with a short timeout replaces time.sleep)
             self._stop_event.wait(timeout=0.001)
+
+    def _log_startup_message(self, msg: object) -> None:
+        if not self._startup_log_seconds or self._startup_begin is None:
+            return
+        elapsed = time.perf_counter() - self._startup_begin
+        if elapsed > self._startup_log_seconds:
+            return
+        with self._lock:
+            self._startup_log.append((elapsed, repr(msg)))
 
     def _handle_tick(self) -> None:
         now = time.perf_counter()  # high-resolution monotonic timer

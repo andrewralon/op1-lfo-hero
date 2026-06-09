@@ -2,6 +2,7 @@
 
 import math
 import time
+from enum import Enum, auto
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
@@ -37,6 +38,37 @@ TRACK_COLORS = {
     3: "#8899aa",   # blue-gray
     4: "#cc4422",   # brick orange-red
 }
+
+
+# ---------------------------------------------------------------------------
+# Tempo mode
+# ---------------------------------------------------------------------------
+
+class TempoMode(Enum):
+    UNKNOWN       = auto()
+    BEAT_MATCH    = auto()
+    MIDI_SYNC     = auto()
+    FREE          = auto()
+    PO_SYNC       = auto()
+    ONE_SIXTEENTH = auto()
+
+_MODE_LABEL: dict[TempoMode, str] = {
+    TempoMode.UNKNOWN:       "UNKNOWN",
+    TempoMode.BEAT_MATCH:    "BEAT MATCH",
+    TempoMode.MIDI_SYNC:     "MIDI SYNC",
+    TempoMode.FREE:          "FREE",
+    TempoMode.PO_SYNC:       "PO SYNC",
+    TempoMode.ONE_SIXTEENTH: "1/16",
+}
+
+# Modes the user can cycle through manually (Beat Match is auto-detected only)
+_MANUAL_CYCLE: list[TempoMode] = [
+    TempoMode.MIDI_SYNC,
+    TempoMode.FREE,
+    TempoMode.PO_SYNC,
+    TempoMode.ONE_SIXTEENTH,
+    TempoMode.UNKNOWN,
+]
 
 
 def _midi_to_ui(v: int) -> int:
@@ -832,7 +864,7 @@ class MainWindow(QMainWindow):
 
         status_row.addStretch()
 
-        self._mode_btn = QPushButton("Mode: MIDI Sync")
+        self._mode_btn = QPushButton("Beat Mode: " + _MODE_LABEL[TempoMode.UNKNOWN])
         self._mode_btn.setStyleSheet(
             f"QPushButton {{ color: {_DIM}; background-color: transparent;"
             f"  border: 1px solid #333333; border-radius: 4px;"
@@ -845,7 +877,7 @@ class MainWindow(QMainWindow):
         root.addLayout(status_row)
 
         # ── Mode detection timer ──
-        self._beat_match_mode = False
+        self._tempo_mode = TempoMode.UNKNOWN
         self._startup_detection_done = False
         self._mode_timer = QTimer(self)
         self._mode_timer.timeout.connect(self._poll_mode)
@@ -855,11 +887,13 @@ class MainWindow(QMainWindow):
     # Mode detection / toggle
     # ------------------------------------------------------------------
 
-    def _set_mode(self, beat_match: bool) -> None:
-        self._beat_match_mode = beat_match
-        if beat_match:
+    def _set_mode(self, mode: TempoMode) -> None:
+        self._tempo_mode = mode
+        label = "Tempo Mode: " + _MODE_LABEL[mode]
+
+        if mode == TempoMode.BEAT_MATCH:
             self._clock_gen.disable_clock()
-            self._mode_btn.setText("Mode: Beat Match")
+            self._mode_btn.setText(label)
             self._mode_btn.setStyleSheet(
                 f"QPushButton {{ color: {_ACCENT}; background-color: transparent;"
                 f"  border: 1px solid {_ACCENT}; border-radius: 4px;"
@@ -872,9 +906,25 @@ class MainWindow(QMainWindow):
                 f"QDoubleSpinBox {{ color: {_DIM}; background-color: {_BG};"
                 f"  font-size: 18pt; font-weight: bold; }}"
             )
-        else:
+        elif mode == TempoMode.MIDI_SYNC:
             self._clock_gen.enable_clock()
-            self._mode_btn.setText("Mode: MIDI Sync")
+            self._mode_btn.setText(label)
+            self._mode_btn.setStyleSheet(
+                f"QPushButton {{ color: {_TEXT}; background-color: transparent;"
+                f"  border: 1px solid #555555; border-radius: 4px;"
+                f"  font-size: 11pt; font-weight: bold; padding: 2px 8px; }}"
+                f"QPushButton:hover {{ border-color: #888888; }}"
+            )
+            self._bpm_spin.setReadOnly(False)
+            self._bpm_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
+            self._bpm_spin.setStyleSheet(
+                f"QDoubleSpinBox {{ color: {_TEXT}; background-color: {_BG};"
+                f"  font-size: 18pt; font-weight: bold; }}"
+            )
+        else:
+            # UNKNOWN / FREE / PO_SYNC / ONE_SIXTEENTH — no clock output
+            self._clock_gen.disable_clock()
+            self._mode_btn.setText(label)
             self._mode_btn.setStyleSheet(
                 f"QPushButton {{ color: {_DIM}; background-color: transparent;"
                 f"  border: 1px solid #333333; border-radius: 4px;"
@@ -884,33 +934,73 @@ class MainWindow(QMainWindow):
             self._bpm_spin.setReadOnly(False)
             self._bpm_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
             self._bpm_spin.setStyleSheet(
-                f"QDoubleSpinBox {{ color: {_TEXT}; background-color: {_BG};"
+                f"QDoubleSpinBox {{ color: {_DIM}; background-color: {_BG};"
                 f"  font-size: 18pt; font-weight: bold; }}"
             )
 
     def _toggle_mode(self) -> None:
         self._startup_detection_done = True  # manual override locks in the choice
-        self._set_mode(not self._beat_match_mode)
+        current = self._tempo_mode
+        if current in _MANUAL_CYCLE:
+            idx = (_MANUAL_CYCLE.index(current) + 1) % len(_MANUAL_CYCLE)
+        else:
+            idx = 0  # Beat Match → cycle back to Unknown
+        self._set_mode(_MANUAL_CYCLE[idx])
 
     def _poll_mode(self) -> None:
         last = self._clock.last_tick_time
         receiving_ticks = last is not None and (time.perf_counter() - last) < 1.0
 
-        if receiving_ticks and not self._beat_match_mode and not self._startup_detection_done:
-            # OP-1 is sending clock: enter Beat Match (disable our clock output)
+        if receiving_ticks and self._tempo_mode != TempoMode.BEAT_MATCH and not self._startup_detection_done:
+            # OP-1 is sending clock → auto-detect as Beat Match
             self._startup_detection_done = True
-            self._set_mode(True)
+            self._set_mode(TempoMode.BEAT_MATCH)
+            QTimer.singleShot(5500, self._print_startup_log)
         elif not self._startup_detection_done:
-            # First poll with no incoming ticks: OP-1 is in MIDI Sync mode
+            # First poll with no incoming ticks — mode stays UNKNOWN until user picks
             self._startup_detection_done = True
-            self._set_mode(False)
+            QTimer.singleShot(5500, self._print_startup_log)
 
-        if self._beat_match_mode:
+        if self._tempo_mode == TempoMode.BEAT_MATCH:
             bpm = self._clock.bpm
             if bpm is not None:
                 self._bpm_spin.blockSignals(True)
                 self._bpm_spin.setValue(round(bpm, 1))
                 self._bpm_spin.blockSignals(False)
+
+    def _print_startup_log(self) -> None:
+        """Print captured startup MIDI messages to console grouped by type."""
+        import math as _math
+        from collections import Counter
+        msgs = self._clock.startup_messages
+        if not msgs:
+            print("[startup] No MIDI messages received during startup window.")
+            return
+        counts: Counter[str] = Counter()
+        clock_times: list[float] = []
+        non_clock: list[tuple[float, str]] = []
+        for elapsed, rep in msgs:
+            # repr format: Message('clock', time=0)
+            try:
+                msg_type = rep.split("'")[1]
+            except IndexError:
+                msg_type = "unknown"
+            counts[msg_type] += 1
+            if msg_type == "clock":
+                clock_times.append(elapsed)
+            else:
+                non_clock.append((elapsed, rep))
+        print(f"[startup] {len(msgs)} total messages — counts by type: {dict(counts)}")
+        if len(clock_times) >= 4:
+            intervals = [clock_times[i+1] - clock_times[i] for i in range(len(clock_times) - 1)]
+            mean = sum(intervals) / len(intervals)
+            stddev = _math.sqrt(sum((x - mean) ** 2 for x in intervals) / len(intervals))
+            bpm = 60.0 / (mean * 24)
+            print(f"[startup] Clock jitter: mean={mean*1000:.3f}ms  stddev={stddev*1000:.3f}ms  BPM≈{bpm:.1f}")
+        if non_clock:
+            print("[startup] Non-clock messages:")
+            for elapsed, rep in non_clock:
+                print(f"  +{elapsed:.3f}s  {rep}")
 
     # ------------------------------------------------------------------
     # Slots

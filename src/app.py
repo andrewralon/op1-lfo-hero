@@ -6,8 +6,11 @@ Run with:
     venv/bin/python -m src.app
 """
 
+import signal
 import sys
 
+import mido
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from src.midi_connection import connect
@@ -20,6 +23,14 @@ from src.ui import MainWindow, ClockBridge, apply_dark_theme
 def main() -> None:
     app = QApplication(sys.argv)
     apply_dark_theme(app)
+
+    # Qt's C++ event loop blocks Python from handling SIGINT until a Python
+    # callback fires. Install a handler that calls app.quit() and use a timer
+    # to periodically yield to Python so the signal is caught promptly.
+    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    sigint_timer = QTimer()
+    sigint_timer.start(200)
+    sigint_timer.timeout.connect(lambda: None)
 
     try:
         in_port, out_port = connect()
@@ -68,6 +79,10 @@ def main() -> None:
         cc_callback=on_cc,
     )
     clock.start()
+
+    # Probe: Universal SysEx Identity Request (F0 7E 7F 06 01 F7)
+    # Any response will be captured in the startup log for mode detection research.
+    out_port.send(mido.Message("sysex", data=[0x7E, 0x7F, 0x06, 0x01]))
 
     window = MainWindow(controller, clock, engine, bridge, port_name, clock_gen)
     window.show()
