@@ -47,18 +47,18 @@ class Parameter(Enum):
 
 # Displayed names for the UI combo box, in order
 CURVE_LABELS: dict[str, CurveShape] = {
-    "Linear":   CurveShape.LINEAR,
-    "Sine":     CurveShape.SINE,
-    "Ease In":  CurveShape.EASE_IN,
-    "Ease Out": CurveShape.EASE_OUT,
-    "Hold":     CurveShape.HOLD,
+    "linear":   CurveShape.LINEAR,
+    "sine":     CurveShape.SINE,
+    "ease in":  CurveShape.EASE_IN,
+    "ease out": CurveShape.EASE_OUT,
+    "hold":     CurveShape.HOLD,
 }
 
 PARAMETER_LABELS: dict[str, Parameter] = {
-    "Volume": Parameter.VOLUME,
-    "Pan":    Parameter.PAN,
-    "Mute":   Parameter.MUTE,
-    "Tempo":  Parameter.TEMPO,
+    "volume": Parameter.VOLUME,
+    "pan":    Parameter.PAN,
+    "mute":   Parameter.MUTE,
+    "tempo":  Parameter.TEMPO,
 }
 
 
@@ -96,16 +96,16 @@ class Clip:
 
 
 class LfoWave(Enum):
-    SINE     = "Sine"
-    TRIANGLE = "Triangle"
-    SAW_UP   = "Saw Up"
-    SAW_DOWN = "Saw Down"
-    SQUARE   = "Square"
-    LOG      = "Log"
-    RANDOM   = "Random"
+    SINE     = "sine"
+    TRIANGLE = "triangle"
+    SAW_UP   = "saw up"
+    SAW_DOWN = "saw down"
+    SQUARE   = "square"
+    LOG      = "log"
+    RANDOM   = "random"
 
 
-LFO_WAVE_LABELS: dict[str, LfoWave] = {w.value: w for w in LfoWave}
+LFO_WAVE_LABELS: dict[str, LfoWave] = {w.value.lower(): w for w in LfoWave}
 
 
 def lfo_wave_value(phase: float, wave: LfoWave) -> float:

@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QPushButton, QSlider, QDial, QFrame, QSizePolicy,
     QApplication, QComboBox, QSpinBox, QDoubleSpinBox, QAbstractSpinBox,
-    QListWidget, QListWidgetItem, QCheckBox,
+    QListWidget, QListWidgetItem,
 )
 from PyQt6.QtCore import Qt, QObject, pyqtSignal, QPointF, QSize, QTimer
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QPixmap, QIcon
@@ -63,7 +63,6 @@ TRACK_COLORS = {
 }
 
 # OTHER - UI ASSETS
-_CHECKMARK_SVG  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "checkmark.svg").replace("\\", "/")
 _ARROW_UP_SVG   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "arrow_up.svg").replace("\\", "/")
 _ARROW_DOWN_SVG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "arrow_down.svg").replace("\\", "/")
 
@@ -217,11 +216,11 @@ class WaveformPreview(QWidget):
         self.update()
 
     def set_colors(self, normal_colors: list[str], inverted_colors: list[str]) -> None:
-        self._normal_colors   = normal_colors if normal_colors else [_ACCENT]
+        self._normal_colors   = normal_colors
         self._inverted_colors = inverted_colors
         self.update()
 
-    _SEGMENT_PX = 16  # pixels per color alternation segment when multiple tracks are selected
+    _SEGMENT_PX = 20  # pixels per color alternation segment when multiple tracks are selected
 
     def paintEvent(self, event) -> None:
         p = QPainter(self)
@@ -244,7 +243,8 @@ class WaveformPreview(QWidget):
         n_cycles = 8.0 * PPQN / self._rate_ticks
         steps    = w * 2
 
-        self._draw_curve(p, steps, w, cy, amplitude, n_cycles, self._normal_colors, inverted=False)
+        if self._normal_colors:
+            self._draw_curve(p, steps, w, cy, amplitude, n_cycles, self._normal_colors, inverted=False)
         if self._inverted_colors:
             self._draw_curve(p, steps, w, cy, amplitude, n_cycles, self._inverted_colors, inverted=True)
 
@@ -485,6 +485,63 @@ class TrackStrip(QFrame):
 
 
 # ---------------------------------------------------------------------------
+# LFO track selector button (3-state: off / normal / inverted)
+# ---------------------------------------------------------------------------
+
+class TrackBtn(QPushButton):
+    state_changed = pyqtSignal(int)
+
+    def __init__(self, label: str, track: int, initial_state: int = 0, parent=None):
+        super().__init__(label, parent)
+        self._track = track
+        self._state = initial_state
+        self.setFlat(True)
+        f = QFont()
+        f.setPointSize(14)
+        f.setBold(True)
+        self.setFont(f)
+        self.clicked.connect(self._cycle)
+
+    @property
+    def state(self) -> int:
+        return self._state
+
+    def set_state(self, state: int) -> None:
+        if state != self._state:
+            self._state = state
+            self.update()
+            self.state_changed.emit(state)
+
+    def _cycle(self) -> None:
+        self.set_state((self._state + 1) % 3)
+
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        if not self.isEnabled():
+            p.setOpacity(0.3)
+        rect = self.rect().adjusted(0, 0, -1, -1)
+        color = QColor(TRACK_COLORS[self._track])
+        if self._state == 0:
+            bg, fg = QColor(_BLACK), color
+        else:
+            bg, fg = color, QColor(_BLACK)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(bg)
+        p.drawRoundedRect(rect, 4, 4)
+        p.setPen(fg)
+        p.setFont(self.font())
+        if self._state == 2:
+            cx = (rect.width() + 1) / 2.0
+            cy = (rect.height() + 1) / 2.0
+            p.translate(cx, cy)
+            p.rotate(180)
+            p.translate(-cx, -cy)
+        p.drawText(rect, Qt.AlignmentFlag.AlignCenter, self.text())
+        p.end()
+
+
+# ---------------------------------------------------------------------------
 # LFO modulator panel
 # ---------------------------------------------------------------------------
 
@@ -528,11 +585,9 @@ class LfoPanel(QFrame):
         # Track toggle buttons — create before wiring signals to avoid premature callbacks
         hdr.addWidget(self._dim_label("Tracks"))
         hdr.addSpacing(6)
-        self._track_btns: dict[int, QPushButton] = {}
+        self._track_btns: dict[int, TrackBtn] = {}
         for t in (1, 2, 3, 4):
-            btn = QPushButton(str(t))
-            btn.setCheckable(True)
-            btn.setChecked(t == 1)
+            btn = TrackBtn(str(t), t, initial_state=1 if t == 1 else 0)
             btn.setFixedSize(28, 28)
             self._track_btns[t] = btn
             hdr.addWidget(btn)
@@ -552,21 +607,7 @@ class LfoPanel(QFrame):
         hdr.addSpacing(_LABEL_GAP)
         hdr.addWidget(self._wave_combo)
 
-        hdr.addStretch(1)
-        self._invert_check = QCheckBox("Invert 2nd+")
-        self._invert_check.setStyleSheet(
-            f"QCheckBox {{ color: {_TEXT}; font-size: 12pt; }}"
-            f"QCheckBox::indicator {{ border: 1px solid {_KNOB_RIM}; border-radius: 3px;"
-            f"  background-color: {_PANEL}; width: 13px; height: 13px; }}"
-            f"QCheckBox::indicator:checked {{ background-color: {_PANEL}; border-color: {_KNOB_RIM}; image: url({_CHECKMARK_SVG}); }}"
-        )
-        hdr.addWidget(self._invert_check)
         root.addLayout(hdr)
-
-        # Wire track buttons and set initial styles now that invert_check exists
-        for btn in self._track_btns.values():
-            btn.toggled.connect(lambda _: self._update_track_btn_styles())
-        self._update_track_btn_styles()
 
         # ── Row 2: waveform preview ──
         self._preview = WaveformPreview()
@@ -709,9 +750,8 @@ class LfoPanel(QFrame):
         self._wave_combo.currentTextChanged.connect(self._update_preview)
         self._depth_spin.valueChanged.connect(self._update_preview)
         self._center_spin.valueChanged.connect(self._update_preview)
-        self._invert_check.toggled.connect(self._update_preview)
         for btn in self._track_btns.values():
-            btn.toggled.connect(self._update_preview)
+            btn.state_changed.connect(self._update_preview)
         self._update_preview()
 
     # ------------------------------------------------------------------
@@ -732,33 +772,12 @@ class LfoPanel(QFrame):
         lbl.setStyleSheet(f"color: {_DIM}; font-size: 12pt; font-weight: bold;")
         return lbl
 
-    def _update_track_btn_styles(self) -> None:
-        for t, btn in self._track_btns.items():
-            if not btn.isEnabled():
-                continue
-            color = TRACK_COLORS[t]
-            if btn.isChecked():
-                style = (
-                    f"QPushButton {{ background-color: {color}; color: {_BLACK};"
-                    f"  border: none; border-radius: 4px; font-size: 14pt; font-weight: bold; }}"
-                    f"QPushButton:hover {{ background-color: {color}; }}"
-                )
-            else:
-                style = (
-                    f"QPushButton {{ background-color: {_HOVER}; color: {_TEXT};"
-                    f"  border: none; border-radius: 4px; font-size: 14pt; font-weight: bold; }}"
-                    f"QPushButton:hover {{ background-color: {_KNOB_RIM}; }}"
-                )
-            btn.setStyleSheet(style)
-
     def _on_param_changed(self, text: str) -> None:
         param = PARAMETER_LABELS.get(text)
         is_tempo = param is Parameter.TEMPO
 
         for btn in self._track_btns.values():
             btn.setEnabled(not is_tempo)
-        self._invert_check.setEnabled(not is_tempo)
-        self._update_track_btn_styles()
 
         self._depth_spin.blockSignals(True)
         self._center_spin.blockSignals(True)
@@ -786,16 +805,14 @@ class LfoPanel(QFrame):
             normal_colors   = [_ACCENT]
             inverted_colors = []
         else:
-            selected = [t for t, btn in self._track_btns.items() if btn.isChecked()]
-            if not selected:
+            normal_tracks   = [t for t, btn in self._track_btns.items() if btn.state == 1]
+            inverted_tracks = [t for t, btn in self._track_btns.items() if btn.state == 2]
+            if not normal_tracks and not inverted_tracks:
                 normal_colors   = [_ACCENT]
                 inverted_colors = []
-            elif len(selected) == 1 or not self._invert_check.isChecked():
-                normal_colors   = [TRACK_COLORS[t] for t in selected]
-                inverted_colors = []
             else:
-                normal_colors   = [TRACK_COLORS[selected[0]]]
-                inverted_colors = [TRACK_COLORS[t] for t in selected[1:]]
+                normal_colors   = [TRACK_COLORS[t] for t in normal_tracks]
+                inverted_colors = [TRACK_COLORS[t] for t in inverted_tracks]
         self._preview.set_colors(normal_colors, inverted_colors)
 
         if param is Parameter.TEMPO:
@@ -819,7 +836,7 @@ class LfoPanel(QFrame):
             if self._get_bpm:
                 self._center_spin.setValue(self._get_bpm())
             return
-        selected = [t for t, btn in self._track_btns.items() if btn.isChecked()]
+        selected = [t for t, btn in self._track_btns.items() if btn.state != 0]
         if not selected:
             return
         midi_val = self._get_value(selected[0], param)
@@ -851,21 +868,20 @@ class LfoPanel(QFrame):
             self._refresh_list()
             return
 
-        selected = [t for t, btn in self._track_btns.items() if btn.isChecked()]
-        if not selected:
+        active = [(t, btn) for t, btn in self._track_btns.items() if btn.state != 0]
+        if not active:
             return
-        depth            = _ui_to_midi(self._depth_spin.value())
-        center_value     = _ui_to_midi(self._center_spin.value())
-        invert_secondary = self._invert_check.isChecked()
-        for i, track in enumerate(selected):
+        depth        = _ui_to_midi(self._depth_spin.value())
+        center_value = _ui_to_midi(self._center_spin.value())
+        for t, btn in active:
             lfo = LfoClip(
-                track        = track,
+                track        = t,
                 parameter    = param,
                 wave         = wave,
                 rate_ticks   = rate_ticks,
                 depth        = depth,
                 center_value = center_value,
-                inverted     = invert_secondary and i > 0,
+                inverted     = btn.state == 2,
             )
             self._engine.add_lfo(lfo)
             self._active_lfos.append(lfo)
