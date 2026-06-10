@@ -52,11 +52,6 @@ _GRAY       = "#555555"
 _GREEN      = "#4ec94e"
 _DARKGREEN  = "#1e4a1e"
 _RED        = "#ff4444"
-
-_CHECKMARK_SVG  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "checkmark.svg").replace("\\", "/")
-_ARROW_UP_SVG   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "arrow_up.svg").replace("\\", "/")
-_ARROW_DOWN_SVG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "arrow_down.svg").replace("\\", "/")
-
 # OP-1 Field per-track colors, matched from the device's mixer screen
 TRACK_COLORS = {
     1: _BLUE_1,    # steel blue
@@ -64,6 +59,14 @@ TRACK_COLORS = {
     3: _GRAY_3,    # blue gray
     4: _ORANGE_4,  # orange
 }
+
+# OTHER - UI ASSETS
+_CHECKMARK_SVG  = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "checkmark.svg").replace("\\", "/")
+_ARROW_UP_SVG   = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "arrow_up.svg").replace("\\", "/")
+_ARROW_DOWN_SVG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "arrow_down.svg").replace("\\", "/")
+
+# OTHER - UI CONSTRAINTS
+_LABEL_GAP = 6  # px between a label and its paired control (dropdown, spinbox, etc.)
 
 
 # ---------------------------------------------------------------------------
@@ -508,12 +511,12 @@ class LfoPanel(QFrame):
         self._wave_combo  = self._make_combo(list(LFO_WAVE_LABELS))
 
         hdr.addWidget(self._dim_label("Param"))
-        hdr.addSpacing(6)
+        hdr.addSpacing(_LABEL_GAP)
         hdr.addWidget(self._param_combo)
 
         hdr.addStretch(1)
         hdr.addWidget(self._dim_label("Wave"))
-        hdr.addSpacing(6)
+        hdr.addSpacing(_LABEL_GAP)
         hdr.addWidget(self._wave_combo)
 
         hdr.addStretch(1)
@@ -542,7 +545,7 @@ class LfoPanel(QFrame):
 
         # ── Row 3: Rate / Depth / Center ──
         params_row = QHBoxLayout()
-        params_row.setSpacing(6)
+        params_row.setSpacing(0)
 
         _spin_style = (
             f"QSpinBox {{ color: {_TEXT}; background-color: {_BG};"
@@ -566,7 +569,7 @@ class LfoPanel(QFrame):
         self._rate_spin.setStyleSheet(_spin_style)
 
         self._rate_desc_lbl = QLabel(_RATE_DESC[3])
-        self._rate_desc_lbl.setStyleSheet(f"color: {_DIM}; font-size: 11pt;")
+        self._rate_desc_lbl.setStyleSheet(f"color: {_DIM}; font-size: 12pt;")
         self._rate_spin.valueChanged.connect(
             lambda v: self._rate_desc_lbl.setText(_RATE_DESC[v])
         )
@@ -588,7 +591,7 @@ class LfoPanel(QFrame):
         self._center_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._center_spin.setStyleSheet(_double_spin_style)
 
-        use_cur_btn = QPushButton("Use current")
+        use_cur_btn = QPushButton("Current")
         use_cur_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_HOVER}; color: {_TEXT};"
             f"  border: none; border-radius: 4px; font-size: 12pt;"
@@ -598,17 +601,21 @@ class LfoPanel(QFrame):
         use_cur_btn.clicked.connect(self._on_use_current)
 
         params_row.addWidget(self._dim_label("Rate"))
+        params_row.addSpacing(_LABEL_GAP)
         params_row.addWidget(self._rate_spin)
+        params_row.addSpacing(_LABEL_GAP)
         params_row.addWidget(self._rate_desc_lbl)
-        params_row.addSpacing(12)
-        params_row.addWidget(self._dim_label("Depth ±"))
+        params_row.addStretch(1)
+        params_row.addWidget(self._dim_label("Depth"))
+        params_row.addSpacing(_LABEL_GAP)
         params_row.addWidget(self._depth_spin)
-        params_row.addSpacing(12)
+        params_row.addStretch(1)
         params_row.addWidget(self._dim_label("Center"))
+        params_row.addSpacing(_LABEL_GAP)
         params_row.addWidget(self._center_spin)
-        params_row.addSpacing(6)
+        params_row.addStretch(1)
         params_row.addWidget(use_cur_btn)
-        params_row.addStretch()
+        params_row.addStretch(1)
         params_row.addWidget(self._range_label)
         root.addLayout(params_row)
 
@@ -743,16 +750,16 @@ class LfoPanel(QFrame):
             center = self._center_spin.value()
             depth  = self._depth_spin.value()
             self._preview.set_params(wave, depth, center, rate_ticks)
-            lo = max(20.0,  center - depth)
+            lo = max(0.0,  center - depth)
             hi = min(300.0, center + depth)
-            self._range_label.setText(f"Range: {lo:.1f} – {hi:.1f} BPM")
+            self._range_label.setText(f"{lo:.1f}–{hi:.1f}")
         else:
             depth_midi  = _ui_to_midi(self._depth_spin.value())
             center_midi = _ui_to_midi(self._center_spin.value())
             self._preview.set_params(wave, depth_midi, center_midi, rate_ticks)
             lo = _midi_to_ui(max(0,   center_midi - depth_midi))
             hi = _midi_to_ui(min(127, center_midi + depth_midi))
-            self._range_label.setText(f"Range: {lo} – {hi}")
+            self._range_label.setText(f"{lo:.1f}–{hi:.1f}")
 
     def _on_use_current(self) -> None:
         param = PARAMETER_LABELS[self._param_combo.currentText()]
