@@ -971,6 +971,20 @@ class LfoPanel(QFrame):
         self._lfo_list.focusInEvent  = _lfo_focus_in
         self._lfo_list.focusOutEvent = _lfo_focus_out
 
+        _orig_mouse_press = self._lfo_list.mousePressEvent
+        def _lfo_mouse_press(event):
+            item = self._lfo_list.itemAt(event.pos())
+            no_mod = not (event.modifiers() & (
+                Qt.KeyboardModifier.ShiftModifier |
+                Qt.KeyboardModifier.ControlModifier |
+                Qt.KeyboardModifier.MetaModifier
+            ))
+            if item is not None and item.isSelected() and no_mod:
+                item.setSelected(False)
+            else:
+                _orig_mouse_press(event)
+        self._lfo_list.mousePressEvent = _lfo_mouse_press
+
         self._update_preview()
 
     # ------------------------------------------------------------------

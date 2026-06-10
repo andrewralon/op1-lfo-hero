@@ -1,7 +1,6 @@
 # Features
 
 ## To do
-- [ ] Show selected LFOs in waveform view: when running, display selected active LFOs in the waveform preview (fall back to all active LFOs if none are selected)
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
 - [ ] Preset saving: save/load slider positions and automation clips as JSON
 - [ ] Per-track FX + LFO params: add OP-1 MIDI CC params for per-track FX controls and per-track LFO settings (see OP-1 MIDI spec)
@@ -38,3 +37,4 @@
 - [x] Color palette refactor: variables reorganized into three groups (UI elements, OP-1 track colors, extras) with semantic names (`_BLUE_1`, `_OCHRE_2`, `_GRAY_3`, `_ORANGE_4`, `_FADER`, `_GROOVE`, `_KNOB_RIM`, etc.)
 - [x] show_palette.py: dev script that opens a PyQt6 window showing all color swatches and hex values from the current palette
 - [x] LFO curve colors match tracks: waveform preview draws in each selected track's color; multiple non-inverted tracks alternate colors in 16px segments; inverted tracks draw a second mirrored curve in their own colors; Tempo LFO uses accent green
+- [x] Active LFO waveform view: selecting rows in the active LFOs list shows each selected LFO as its own curve (correct wave shape, rate, track color); deselects on click-away within app; persists when app goes to background; click selected row again to deselect
