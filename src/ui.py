@@ -365,7 +365,7 @@ class VolumeSlider(QSlider):
 
         # Inactive groove: handle to top
         if cy > pad:
-            p.setBrush(QColor(_GROOVE))
+            p.setBrush(QColor(_KNOB_RIM))
             p.drawRoundedRect(gx, pad, gw, cy - pad, 2, 2)
 
         # Diamond handle: wide 4-point rhombus
@@ -553,8 +553,8 @@ class TrackStrip(QFrame):
         outer.addWidget(self._mute_btn)
 
         body = QVBoxLayout()
-        body.setSpacing(8)
-        body.setContentsMargins(6, 8, 6, 8)
+        body.setSpacing(14)
+        body.setContentsMargins(6, 14, 6, 4)
 
         self._pan_dial = PanDial()
         self._pan_dial.setRange(0, 128)
@@ -714,7 +714,7 @@ class TrackBtn(QPushButton):
         self._state = initial_state
         self.setFlat(True)
         f = QFont()
-        f.setPointSize(16)
+        f.setPointSize(20)
         f.setBold(True)
         self.setFont(f)
         self.clicked.connect(self._cycle)
@@ -821,11 +821,6 @@ class LfoPanel(QFrame):
         self._preview = WaveformPreview()
         root.addWidget(self._preview)
 
-        self._range_label = QLabel()
-        self._range_label.setStyleSheet(f"color: {_DIM}; font-size: 12pt;")
-        self._range_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        self._range_label.setFixedWidth(110)
-
         # ── Row 3: Rate / Depth / Center ──
         params_row = QHBoxLayout()
         params_row.setSpacing(0)
@@ -855,7 +850,7 @@ class LfoPanel(QFrame):
 
         self._depth_spin = QDoubleSpinBox()
         self._depth_spin.setDecimals(1)
-        self._depth_spin.setSingleStep(0.1)
+        self._depth_spin.setSingleStep(1.0)
         self._depth_spin.setRange(0.0, 49.0)
         self._depth_spin.setValue(25.0)
         self._depth_spin.setFixedWidth(78)
@@ -864,7 +859,7 @@ class LfoPanel(QFrame):
 
         self._center_spin = QDoubleSpinBox()
         self._center_spin.setDecimals(1)
-        self._center_spin.setSingleStep(0.1)
+        self._center_spin.setSingleStep(1.0)
         self._center_spin.setRange(0.0, 99.0)
         self._center_spin.setValue(50.0)  # ≈ MIDI 64 (center)
         self._center_spin.setFixedWidth(78)
@@ -880,6 +875,7 @@ class LfoPanel(QFrame):
         )
         use_cur_btn.clicked.connect(self._on_use_current)
 
+        params_row.addStretch(1)
         params_row.addWidget(self._dim_label("⏱", _ICON_PT))
         params_row.addSpacing(_LABEL_GAP)
         params_row.addWidget(self._rate_spin)
@@ -894,7 +890,6 @@ class LfoPanel(QFrame):
         params_row.addStretch(1)
         params_row.addWidget(use_cur_btn)
         params_row.addStretch(1)
-        params_row.addWidget(self._range_label)
         root.addLayout(params_row)
 
         # ── Rows 5+6: action buttons (left) + Active LFOs (right) ──
@@ -915,15 +910,6 @@ class LfoPanel(QFrame):
         )
         start_btn.clicked.connect(self._on_start)
 
-        stop_btn = QPushButton("■  Stop")
-        stop_btn.setFixedHeight(28)
-        stop_btn.setStyleSheet(
-            f"QPushButton {{ background-color: {_HOVER}; color: {_TEXT};"
-            f"  border: none; border-radius: 4px; font-size: 11pt; padding: 0px 14px; }}"
-            f"QPushButton:hover {{ background-color: {_KNOB_RIM}; }}"
-        )
-        stop_btn.clicked.connect(self._on_stop_selected)
-
         clear_btn = QPushButton("✕  Clear")
         clear_btn.setFixedHeight(28)
         clear_btn.setStyleSheet(
@@ -934,18 +920,19 @@ class LfoPanel(QFrame):
         clear_btn.clicked.connect(self._on_stop_all)
 
         btn_col.addWidget(start_btn)
-        btn_col.addWidget(stop_btn)
         btn_col.addWidget(clear_btn)
 
         self._lfo_list = QListWidget()
+        self._lfo_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self._lfo_list.keyPressEvent = self._lfo_list_key_press
         self._lfo_list.setStyleSheet(
             f"QListWidget {{ background-color: {_BG}; color: {_TEXT};"
-            f"  border: 1px solid {_BORDER}; border-radius: 4px; font-size: 10pt; }}"
+            f"  border: 1px solid {_BORDER}; border-radius: 4px; font-size: 13pt; }}"
+            f"QListWidget::item:selected {{ background-color: {_BORDER}; color: {_TEXT}; }}"
         )
-        self._lfo_list.setFixedHeight(96)  # 3×28px buttons + 2×6px gaps
+        self._lfo_list.setFixedHeight(96)
 
         bottom_row.addLayout(btn_col)
-        bottom_row.addWidget(self._dim_label("Active LFOs"), alignment=Qt.AlignmentFlag.AlignTop)
         bottom_row.addWidget(self._lfo_list, stretch=1)
         root.addLayout(bottom_row)
 
@@ -956,6 +943,15 @@ class LfoPanel(QFrame):
         self._center_spin.valueChanged.connect(self._update_preview)
         for btn in self._track_btns.values():
             btn.state_changed.connect(self._update_preview)
+        self._lfo_list.itemSelectionChanged.connect(self._update_preview)
+
+        _orig_focus_in  = self._lfo_list.focusInEvent
+        _orig_focus_out = self._lfo_list.focusOutEvent
+        def _lfo_focus_in(e):  _orig_focus_in(e);  self._update_preview()
+        def _lfo_focus_out(e): _orig_focus_out(e); self._update_preview()
+        self._lfo_list.focusInEvent  = _lfo_focus_in
+        self._lfo_list.focusOutEvent = _lfo_focus_out
+
         self._update_preview()
 
     # ------------------------------------------------------------------
@@ -1001,7 +997,33 @@ class LfoPanel(QFrame):
         self._center_spin.blockSignals(False)
         self._update_preview()
 
+    def _preview_lfos(self, lfos: list) -> None:
+        lfo = lfos[0]
+        if lfo.parameter is Parameter.TEMPO:
+            normal_colors, inverted_colors = [_ACCENT], []
+        else:
+            normal_colors   = [TRACK_COLORS[l.track] for l in lfos if not l.inverted]
+            inverted_colors = [TRACK_COLORS[l.track] for l in lfos if     l.inverted]
+            if not normal_colors and not inverted_colors:
+                normal_colors = [_ACCENT]
+        self._preview.set_colors(normal_colors, inverted_colors)
+        self._preview.set_params(lfo.wave, lfo.depth, lfo.center_value, lfo.rate_ticks)
+
     def _update_preview(self, *_) -> None:
+        # List has focus + rows selected → show only those LFOs
+        if self._lfo_list.hasFocus():
+            selected_rows = sorted({self._lfo_list.row(item) for item in self._lfo_list.selectedItems()})
+            lfos = [self._active_lfos[r] for r in selected_rows if 0 <= r < len(self._active_lfos)]
+            if lfos:
+                self._preview_lfos(lfos)
+                return
+
+        # List doesn't have focus (or nothing selected) → show all active LFOs
+        if self._active_lfos:
+            self._preview_lfos(self._active_lfos)
+            return
+
+        # No active LFOs → edit panel settings
         wave       = LFO_WAVE_LABELS[self._wave_combo.currentText()]
         rate_ticks = _RATE_TICKS[self._rate_spin.value()]
         param      = PARAMETER_LABELS[self._param_combo.currentText()]
@@ -1024,16 +1046,10 @@ class LfoPanel(QFrame):
             center = self._center_spin.value()
             depth  = self._depth_spin.value()
             self._preview.set_params(wave, depth, center, rate_ticks)
-            lo = max(0.0,  center - depth)
-            hi = min(300.0, center + depth)
-            self._range_label.setText(f"{lo:.1f}–{hi:.1f}")
         else:
             depth_midi  = _ui_to_midi(self._depth_spin.value())
             center_midi = _ui_to_midi(self._center_spin.value())
             self._preview.set_params(wave, depth_midi, center_midi, rate_ticks)
-            lo = _midi_to_ui(max(0,   center_midi - depth_midi))
-            hi = _midi_to_ui(min(127, center_midi + depth_midi))
-            self._range_label.setText(f"{lo:.1f}–{hi:.1f}")
 
     def _on_use_current(self) -> None:
         param = PARAMETER_LABELS[self._param_combo.currentText()]
@@ -1092,13 +1108,23 @@ class LfoPanel(QFrame):
             self._active_lfos.append(lfo)
         self._refresh_list()
 
-    def _on_stop_selected(self) -> None:
-        row = self._lfo_list.currentRow()
-        if 0 <= row < len(self._active_lfos):
-            lfo = self._active_lfos.pop(row)
-            self._engine.remove_lfo(lfo)
-            self._refresh_list()
-            self._maybe_restore_bpm()
+    def _lfo_list_key_press(self, event) -> None:
+        if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            self._on_delete_selected()
+        else:
+            QListWidget.keyPressEvent(self._lfo_list, event)
+
+    def _on_delete_selected(self) -> None:
+        rows = sorted(
+            {self._lfo_list.row(item) for item in self._lfo_list.selectedItems()},
+            reverse=True,
+        )
+        for row in rows:
+            if 0 <= row < len(self._active_lfos):
+                lfo = self._active_lfos.pop(row)
+                self._engine.remove_lfo(lfo)
+        self._refresh_list()
+        self._maybe_restore_bpm()
 
     def _on_stop_all(self) -> None:
         self._engine.clear_lfos()
@@ -1297,7 +1323,13 @@ class MainWindow(QMainWindow):
         bpm_layout.addStretch()
         tracks_row.addWidget(bpm_widget)
         tracks_row.addStretch()
-        root.addLayout(tracks_row)
+
+        tracks_widget = QWidget()
+        tracks_widget.setMaximumHeight(220)
+        _tw_layout = QVBoxLayout(tracks_widget)
+        _tw_layout.setContentsMargins(0, 0, 0, 0)
+        _tw_layout.addLayout(tracks_row)
+        root.addWidget(tracks_widget)
 
         # ── LFO panel ──
         self._lfo_panel = LfoPanel(
@@ -1305,7 +1337,7 @@ class MainWindow(QMainWindow):
             get_bpm_fn=lambda: self._bpm_spin.value(),
             set_bpm_fn=self._set_bpm_from_lfo,
         )
-        root.addWidget(self._lfo_panel)
+        root.addWidget(self._lfo_panel, 1)
 
         # ── Status bar ──
         status_row = QHBoxLayout()
