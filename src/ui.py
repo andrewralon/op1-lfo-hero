@@ -426,6 +426,7 @@ class WaveformPreview(QWidget):
         self._rate_ticks      = PPQN   # default: 1 cycle per beat
         self._normal_colors: list[str]   = [_ACCENT]
         self._inverted_colors: list[str] = []
+        self._lfos_override: list | None = None
         self.setFixedHeight(65)
         self.setStyleSheet(
             f"background-color: {_BG};"
@@ -434,10 +435,15 @@ class WaveformPreview(QWidget):
         )
 
     def set_params(self, wave: LfoWave, depth: int, center: int, rate_ticks: int = PPQN) -> None:
+        self._lfos_override = None
         self._wave       = wave
         self._depth      = depth
         self._center     = center
         self._rate_ticks = rate_ticks
+        self.update()
+
+    def set_lfos(self, lfos: list) -> None:
+        self._lfos_override = list(lfos) if lfos else None
         self.update()
 
     def set_phase(self, phase: float) -> None:
@@ -468,27 +474,32 @@ class WaveformPreview(QWidget):
         p.setPen(_dash_pen)
         p.drawLine(QPointF(0.0, cy), QPointF(float(w), cy))
 
-        # Cycles visible = how many full cycles fit in one beat at this rate
-        n_cycles = 8.0 * PPQN / self._rate_ticks
-        steps    = w * 2
+        steps = w * 2
 
-        if self._normal_colors:
-            self._draw_curve(p, steps, w, cy, amplitude, n_cycles, self._normal_colors, inverted=False)
-        if self._inverted_colors:
-            self._draw_curve(p, steps, w, cy, amplitude, n_cycles, self._inverted_colors, inverted=True)
+        if self._lfos_override:
+            for lfo in self._lfos_override:
+                n_cyc = 8.0 * PPQN / lfo.rate_ticks
+                color = _ACCENT if lfo.parameter is Parameter.TEMPO else TRACK_COLORS.get(lfo.track, _ACCENT)
+                self._draw_curve(p, steps, w, cy, amplitude, n_cyc, [color], wave=lfo.wave, inverted=lfo.inverted)
+        else:
+            n_cycles = 8.0 * PPQN / self._rate_ticks
+            if self._normal_colors:
+                self._draw_curve(p, steps, w, cy, amplitude, n_cycles, self._normal_colors, wave=self._wave, inverted=False)
+            if self._inverted_colors:
+                self._draw_curve(p, steps, w, cy, amplitude, n_cycles, self._inverted_colors, wave=self._wave, inverted=True)
 
         p.end()
 
     def _draw_curve(
         self, p: QPainter, steps: int, w: int, cy: float, amplitude: float,
-        n_cycles: float, colors: list[str], *, inverted: bool,
+        n_cycles: float, colors: list[str], *, wave: LfoWave, inverted: bool,
     ) -> None:
         single     = len(colors) == 1
         prev_pt    = None
         prev_color = None
         for i in range(steps + 1):
             phase  = (i / steps) * n_cycles
-            y_norm = lfo_wave_value(phase % 1.0, self._wave)
+            y_norm = lfo_wave_value(phase % 1.0, wave)
             if inverted:
                 y_norm = -y_norm
             px = float(i) * w / steps
@@ -947,8 +958,16 @@ class LfoPanel(QFrame):
 
         _orig_focus_in  = self._lfo_list.focusInEvent
         _orig_focus_out = self._lfo_list.focusOutEvent
-        def _lfo_focus_in(e):  _orig_focus_in(e);  self._update_preview()
-        def _lfo_focus_out(e): _orig_focus_out(e); self._update_preview()
+        def _lfo_focus_in(e):
+            _orig_focus_in(e)
+            self._update_preview()
+        def _lfo_focus_out(e):
+            _orig_focus_out(e)
+            # Clear selection only when focus moved to another widget within the app.
+            # When the whole app goes to background, focusWidget() is None — keep selection.
+            if QApplication.focusWidget() is not None:
+                self._lfo_list.clearSelection()
+            self._update_preview()
         self._lfo_list.focusInEvent  = _lfo_focus_in
         self._lfo_list.focusOutEvent = _lfo_focus_out
 
@@ -998,32 +1017,17 @@ class LfoPanel(QFrame):
         self._update_preview()
 
     def _preview_lfos(self, lfos: list) -> None:
-        lfo = lfos[0]
-        if lfo.parameter is Parameter.TEMPO:
-            normal_colors, inverted_colors = [_ACCENT], []
-        else:
-            normal_colors   = [TRACK_COLORS[l.track] for l in lfos if not l.inverted]
-            inverted_colors = [TRACK_COLORS[l.track] for l in lfos if     l.inverted]
-            if not normal_colors and not inverted_colors:
-                normal_colors = [_ACCENT]
-        self._preview.set_colors(normal_colors, inverted_colors)
-        self._preview.set_params(lfo.wave, lfo.depth, lfo.center_value, lfo.rate_ticks)
+        self._preview.set_lfos(lfos)
 
     def _update_preview(self, *_) -> None:
-        # List has focus + rows selected → show only those LFOs
-        if self._lfo_list.hasFocus():
-            selected_rows = sorted({self._lfo_list.row(item) for item in self._lfo_list.selectedItems()})
-            lfos = [self._active_lfos[r] for r in selected_rows if 0 <= r < len(self._active_lfos)]
-            if lfos:
-                self._preview_lfos(lfos)
-                return
-
-        # List doesn't have focus (or nothing selected) → show all active LFOs
-        if self._active_lfos:
-            self._preview_lfos(self._active_lfos)
+        # Rows selected in list → show only those LFOs (persists even when app is in background)
+        selected_rows = sorted({self._lfo_list.row(item) for item in self._lfo_list.selectedItems()})
+        lfos = [self._active_lfos[r] for r in selected_rows if 0 <= r < len(self._active_lfos)]
+        if lfos:
+            self._preview_lfos(lfos)
             return
 
-        # No active LFOs → edit panel settings
+        # Edit panel settings
         wave       = LFO_WAVE_LABELS[self._wave_combo.currentText()]
         rate_ticks = _RATE_TICKS[self._rate_spin.value()]
         param      = PARAMETER_LABELS[self._param_combo.currentText()]
