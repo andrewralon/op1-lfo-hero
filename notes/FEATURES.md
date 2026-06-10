@@ -1,6 +1,10 @@
 # Features
 
 ## To do
+- [ ] Ease In curve: add `ease in` LFO waveform — the complement of `log`; each half-cycle lingers at the extreme then accelerates through the transition (slow start, sharp arrival). Completes the ease-in / ease-out pair.
+- [ ] Sweep curves: add `sweep up` and `sweep down` LFO waveforms — a chirp/frequency-sweep shape where the oscillation rate accelerates (or decelerates) across the cycle. Naturally one-shot; a sweep-up starts at the minimum rate and reaches the maximum rate by the end of one cycle.
+- [ ] One-shot LFOs: add a `loop` flag to `LfoClip` (default true). When false, the engine auto-removes the LFO after one full cycle. UI needs a "Start once" trigger or a 1× toggle alongside Start. Sweep curves should default to one-shot. The active LFOs list would show them disappearing automatically on completion.
+- [ ] Master LFO support (tempo, volume, compression, etc.): add an **M** track button (same 3-state style as the 1–4 buttons, colored `_ACCENT` / green) for targeting master/global parameters. Selecting M with a master-capable param (e.g. Tempo) routes the LFO to that master target; clicking M a second time inverts the curve, just like the per-track invert already works. Generalizes to future master params (master volume, master compression) without further UI changes.
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
 - [ ] Preset saving: save/load slider positions and automation clips as JSON
 - [ ] Per-track FX + LFO params: add OP-1 MIDI CC params for per-track FX controls and per-track LFO settings (see OP-1 MIDI spec)
