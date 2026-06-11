@@ -98,8 +98,7 @@ class Clip:
 class LfoWave(Enum):
     SINE     = "sine"
     TRIANGLE = "triangle"
-    SAW_UP   = "saw up"
-    SAW_DOWN = "saw down"
+    SAW      = "saw"
     SQUARE   = "square"
     LOG      = "log"
     EASE_IN  = "ease in"
@@ -120,10 +119,8 @@ def lfo_wave_value(phase: float, wave: LfoWave) -> float:
         if phase < 0.75:
             return 2.0 - 4.0 * phase
         return 4.0 * phase - 4.0
-    if wave is LfoWave.SAW_UP:
+    if wave is LfoWave.SAW:
         return 2.0 * phase - 1.0
-    if wave is LfoWave.SAW_DOWN:
-        return 1.0 - 2.0 * phase
     if wave is LfoWave.SQUARE:
         return 1.0 if phase < 0.5 else -1.0
     if wave is LfoWave.LOG:
