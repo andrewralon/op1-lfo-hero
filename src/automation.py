@@ -7,7 +7,7 @@ Curve math:
 
   LINEAR   — constant rate of change
   SINE     — smooth S-curve: slow at both ends, fastest at midpoint
-  EASE_IN  — accelerates from the start (quadratic)
+  EXP      — accelerates from the start (quadratic)
   EASE_OUT — decelerates toward the end (quadratic)
   HOLD     — stays at start_value, snaps to end_value at the last tick
 
@@ -33,7 +33,7 @@ from src.controller import Controller
 class CurveShape(Enum):
     LINEAR   = auto()
     SINE     = auto()
-    EASE_IN  = auto()
+    EXP      = auto()
     EASE_OUT = auto()
     HOLD     = auto()
 
@@ -49,7 +49,7 @@ class Parameter(Enum):
 CURVE_LABELS: dict[str, CurveShape] = {
     "linear":   CurveShape.LINEAR,
     "sine":     CurveShape.SINE,
-    "ease in":  CurveShape.EASE_IN,
+    "exp":      CurveShape.EXP,
     "ease out": CurveShape.EASE_OUT,
     "hold":     CurveShape.HOLD,
 }
@@ -70,7 +70,7 @@ def _apply_curve(t: float, shape: CurveShape) -> float:
     if shape is CurveShape.SINE:
         # Classic cosine ease: slow→fast→slow
         return (1.0 - math.cos(math.pi * t)) / 2.0
-    if shape is CurveShape.EASE_IN:
+    if shape is CurveShape.EXP:
         return t * t
     if shape is CurveShape.EASE_OUT:
         return 1.0 - (1.0 - t) ** 2
@@ -101,7 +101,7 @@ class LfoWave(Enum):
     SAW      = "saw"
     SQUARE   = "square"
     LOG      = "log"
-    EASE_IN  = "ease in"
+    EXP      = "exp"
     RANDOM   = "random"
 
 
@@ -129,7 +129,7 @@ def lfo_wave_value(phase: float, wave: LfoWave) -> float:
             return 2.0 * math.log1p(t * 9.0) / math.log(10.0) - 1.0
         t = (phase - 0.5) * 2.0
         return 1.0 - 2.0 * math.log1p(t * 9.0) / math.log(10.0)
-    if wave is LfoWave.EASE_IN:
+    if wave is LfoWave.EXP:
         # Complement of log: slow start, fast arrival (exponential); inverse of log1p mapping
         if phase < 0.5:
             t = phase * 2.0
