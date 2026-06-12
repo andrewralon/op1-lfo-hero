@@ -12,10 +12,12 @@ Tracks 1-4 map to MIDI channels 1-4 (mido uses 0-indexed channels internally).
 import threading
 import mido
 
-CC_VOLUME = 7
-CC_MUTE = 9
-CC_PAN = 10
-CC_OCTAVE = 79
+CC_VOLUME    = 7
+CC_MUTE      = 9
+CC_PAN       = 10
+CC_OCTAVE    = 79
+CC_FX_BASE   = 54   # CC 54-57: Patch FX params 1-4
+CC_LFO_BASE  = 58   # CC 58-61: Patch LFO params 1-4
 
 PAN_CENTER = 64
 MUTE_ON = 127
@@ -50,6 +52,18 @@ class Controller:
         self._validate_track(track)
         self._validate_value(value, "pan")
         self._send_cc(track, CC_PAN, value)
+
+    def set_fx(self, track: int, param: int, value: int) -> None:
+        """Set patch FX parameter. track 1-4, param 1-4, value 0-127."""
+        self._validate_track(track)
+        self._validate_value(value, f"fx {param}")
+        self._send_cc(track, CC_FX_BASE + param - 1, value)
+
+    def set_patch_lfo(self, track: int, param: int, value: int) -> None:
+        """Set patch LFO parameter. track 1-4, param 1-4, value 0-127."""
+        self._validate_track(track)
+        self._validate_value(value, f"lfo {param}")
+        self._send_cc(track, CC_LFO_BASE + param - 1, value)
 
     def mute(self, track: int) -> None:
         """Mute a track. Idempotent — safe to call if already muted."""

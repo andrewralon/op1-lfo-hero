@@ -43,6 +43,14 @@ class Parameter(Enum):
     PAN    = "pan"
     MUTE   = "mute"
     TEMPO  = "tempo"
+    FX_1   = "fx 1"
+    FX_2   = "fx 2"
+    FX_3   = "fx 3"
+    FX_4   = "fx 4"
+    LFO_1  = "lfo 1"
+    LFO_2  = "lfo 2"
+    LFO_3  = "lfo 3"
+    LFO_4  = "lfo 4"
 
 
 # Displayed names for the UI combo box, in order
@@ -59,6 +67,14 @@ PARAMETER_LABELS: dict[str, Parameter] = {
     "pan":    Parameter.PAN,
     "mute":   Parameter.MUTE,
     "tempo":  Parameter.TEMPO,
+    "fx 1":   Parameter.FX_1,
+    "fx 2":   Parameter.FX_2,
+    "fx 3":   Parameter.FX_3,
+    "fx 4":   Parameter.FX_4,
+    "lfo 1":  Parameter.LFO_1,
+    "lfo 2":  Parameter.LFO_2,
+    "lfo 3":  Parameter.LFO_3,
+    "lfo 4":  Parameter.LFO_4,
 }
 
 
@@ -346,6 +362,12 @@ class AutomationEngine:
                 self._ctrl.mute(clip.track)
             else:
                 self._ctrl.unmute(clip.track)
+        elif clip.parameter in (Parameter.FX_1, Parameter.FX_2, Parameter.FX_3, Parameter.FX_4):
+            n = int(clip.parameter.value.split()[1])
+            self._ctrl.set_fx(clip.track, n, value)
+        elif clip.parameter in (Parameter.LFO_1, Parameter.LFO_2, Parameter.LFO_3, Parameter.LFO_4):
+            n = int(clip.parameter.value.split()[1])
+            self._ctrl.set_patch_lfo(clip.track, n, value)
 
         if self._update_cb:
             self._update_cb(clip.track, clip.parameter, value)
@@ -375,6 +397,12 @@ class AutomationEngine:
                 self._ctrl.mute(lfo.track)
             else:
                 self._ctrl.unmute(lfo.track)
+        elif lfo.parameter in (Parameter.FX_1, Parameter.FX_2, Parameter.FX_3, Parameter.FX_4):
+            n = int(lfo.parameter.value.split()[1])
+            self._ctrl.set_fx(lfo.track, n, value)
+        elif lfo.parameter in (Parameter.LFO_1, Parameter.LFO_2, Parameter.LFO_3, Parameter.LFO_4):
+            n = int(lfo.parameter.value.split()[1])
+            self._ctrl.set_patch_lfo(lfo.track, n, value)
 
         if self._update_cb:
             self._update_cb(lfo.track, lfo.parameter, value)

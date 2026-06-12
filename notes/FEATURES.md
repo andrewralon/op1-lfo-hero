@@ -5,7 +5,6 @@
 - [ ] Master LFO support (tempo, volume, compression, etc.): add an **M** track button (same 3-state style as the 1-4 buttons, colored `_ACCENT` / green) for targeting master/global parameters. Selecting M with a master-capable param (e.g. Tempo) routes the LFO to that master target; clicking M a second time inverts the curve, just like the per-track invert already works. Generalizes to future master params (master volume, master compression) without further UI changes.
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
 - [ ] Preset saving: save/load slider positions and automation clips as JSON
-- [ ] Per-track FX + LFO params: add OP-1 MIDI CC params for per-track FX controls and per-track LFO settings (see OP-1 MIDI spec)
 - [ ] Master FX params: add OP-1 MIDI CC params for master FX controls (see OP-1 MIDI spec)
 - [ ] Master volume + compression params: add OP-1 MIDI CC params for master volume and master compression (see OP-1 MIDI spec)
 
@@ -45,3 +44,4 @@
 - [x] No-device mode: run the app without a MIDI device — `--no-device` flag, auto-activates when no MIDI ports are found, `[0] no device` option during manual port selection; status bar shows **● no device** in gold; mixed real+no-device connections show both port names
 - [x] Bluetooth MIDI: auto-detects BLE-MIDI ports alongside USB (same `op-1` keyword matches both); BLE detected when port name lacks the 'MIDI N' suffix (macOS/CoreMIDI heuristic); status bar appends **(bt)** with tooltip; BPM smoothing doubles (48 ticks) to absorb BLE jitter
 - [x] Volume display accuracy: app and OP-1 now show identical values across all 100 steps. OP-1 uses `v * 99 // 127`; app uses ceiling inverse `(v * 127 + 98) // 99` for a perfect round-trip with no off-by-one mismatches.
+- [x] Per-track FX + LFO params: CC 54-57 (patch FX 1-4) and CC 58-61 (patch LFO 1-4) exposed as LFO targets in the automation panel; sent on track channels 1-4 matching the volume/pan/mute pattern.
