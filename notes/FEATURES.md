@@ -5,6 +5,7 @@
 - [ ] Desktop executables: package the app as a standalone binary for macOS and Windows using PyInstaller (or similar), so users can run it without a Python environment.
 - [ ] GitHub Actions release workflow: on GitHub release publish, automatically build the macOS and Windows executables and upload them as release artifacts. Triggered by the `release: published` event; one job per platform using hosted runners.
 - [ ] iOS port: refactor the UI layer to run on iOS (e.g. via Kivy, BeeWare/Toga, or a web-based frontend). Keep the existing PyQt6 desktop path intact so the app can still be launched from Python; the iOS target should share the core engine (`automation.py`, `clock.py`, `controller.py`) and add a separate UI entry point.
+- [ ] Responsive layout: allow the window to be freely resized (width and height). Keep icon-like controls fixed (pan dial, transport buttons, LFO track buttons, spinbox widths). Let track strips, waveform preview, LFO list, and volume faders scale to fill available space.
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
 - [ ] Preset saving: save/load slider positions and automation clips as JSON
 
