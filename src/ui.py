@@ -906,14 +906,14 @@ class LfoPanel(QFrame):
         self._center_spin.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._center_spin.setStyleSheet(_double_spin_style)
 
-        use_cur_btn = QPushButton("current")
-        use_cur_btn.setStyleSheet(
+        snap_btn = QPushButton("⊙")
+        snap_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_HOVER}; color: {_TEXT};"
             f"  border: none; border-radius: 4px; font-size: 12pt;"
             f"  padding: 4px 10px; }}"
             f"QPushButton:hover {{ background-color: {_KNOB_RIM}; }}"
         )
-        use_cur_btn.clicked.connect(self._on_use_current)
+        snap_btn.clicked.connect(self._on_use_current)
 
         params_row.addStretch(1)
         params_row.addWidget(self._dim_label("⏱", _ICON_PT))
@@ -928,7 +928,7 @@ class LfoPanel(QFrame):
         params_row.addSpacing(_LABEL_GAP)
         params_row.addWidget(self._center_spin)
         params_row.addStretch(1)
-        params_row.addWidget(use_cur_btn)
+        params_row.addWidget(snap_btn)
         params_row.addStretch(1)
         root.addLayout(params_row)
 
