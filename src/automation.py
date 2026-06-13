@@ -112,15 +112,15 @@ class Clip:
 
 
 class LfoWave(Enum):
-    SINE      = "sine"
-    TRIANGLE  = "triangle"
-    SAW       = "saw"
-    SQUARE    = "square"
-    LOG       = "log"
-    EXP       = "exp"
-    SWEEP_UP  = "sweep up"
-    SWEEP_DOWN = "sweep down"
-    RANDOM    = "random"
+    SINE       = "sine"
+    TRIANGLE   = "triangle"
+    SAW        = "saw"
+    SQUARE     = "square"
+    LOG        = "log"
+    EXP        = "exp"
+    SWEEP_UP   = "sweep up"
+    SWEEP_DN   = "sweep dn"
+    RANDOM     = "random"
 
 
 LFO_WAVE_LABELS: dict[str, LfoWave] = {w.value.lower(): w for w in LfoWave}
@@ -129,7 +129,7 @@ LFO_WAVE_LABELS: dict[str, LfoWave] = {w.value.lower(): w for w in LfoWave}
 # Add an entry here to make a waveform span more beats per cycle.
 LFO_RATE_MULTIPLIERS: dict[LfoWave, int] = {
     LfoWave.SWEEP_UP:   1,
-    LfoWave.SWEEP_DOWN: 1,
+    LfoWave.SWEEP_DN: 1,
 }
 
 
@@ -164,7 +164,7 @@ def lfo_wave_value(phase: float, wave: LfoWave) -> float:
     if wave is LfoWave.SWEEP_UP:
         # Chirp: frequency increases linearly 0→max; 4 cycles total; phase² integrates linear freq
         return math.sin(2.0 * math.pi * 8.0 * phase * phase)
-    if wave is LfoWave.SWEEP_DOWN:
+    if wave is LfoWave.SWEEP_DN:
         # Chirp: frequency decreases linearly max→0; integral of (1-t) gives (2t - t²)
         return math.sin(2.0 * math.pi * 8.0 * (2.0 * phase - phase * phase))
     if wave is LfoWave.RANDOM:
