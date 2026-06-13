@@ -576,8 +576,8 @@ class TrackStrip(QFrame):
         outer.addWidget(self._mute_btn)
 
         body = QVBoxLayout()
-        body.setSpacing(14)
-        body.setContentsMargins(3, 14, 3, 4)
+        body.setSpacing(8)
+        body.setContentsMargins(3, 8, 3, 8)
 
         self._pan_dial = PanDial()
         self._pan_dial.setRange(0, 128)
@@ -826,15 +826,15 @@ class LfoPanel(QFrame):
         self._track_btns: dict[int, TrackBtn] = {}
         for t in (1, 2, 3, 4):
             btn = TrackBtn(str(t), t, initial_state=1 if t == 1 else 0)
-            btn.setFixedSize(30, 30)
+            btn.setFixedSize(36, 36)
             self._track_btns[t] = btn
             hdr.addWidget(btn)
             if t < 4:
-                hdr.addSpacing(4)
+                hdr.addSpacing(6)
 
         hdr.addSpacing(_LABEL_GAP)
         self._master_btn = TrackBtn("m", 0, initial_state=0, color=_ACCENT, min_state=0)
-        self._master_btn.setFixedSize(30, 30)
+        self._master_btn.setFixedSize(36, 36)
         self._master_btn.setEnabled(False)  # enabled only for master params (e.g. tempo)
         hdr.addWidget(self._master_btn)
         hdr.addStretch(1)
@@ -857,11 +857,8 @@ class LfoPanel(QFrame):
         pw_row.addStretch(1)
         root.addLayout(pw_row)
 
-        # ── Row 3: waveform preview ──
-        self._preview = WaveformPreview()
-        root.addWidget(self._preview)
-
         # ── Row 3: Rate / Depth / Center ──
+        self._preview = WaveformPreview()
         params_row = QHBoxLayout()
         params_row.setSpacing(0)
 
@@ -906,7 +903,7 @@ class LfoPanel(QFrame):
         snap_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_HOVER}; color: {_TEXT};"
             f"  border: none; border-radius: 4px; font-size: 18pt;"
-            f"  padding: 4px 10px; }}"
+            f"  padding: 4px 6px; }}"
             f"QPushButton:hover {{ background-color: {_KNOB_RIM}; }}"
         )
         snap_btn.clicked.connect(self._on_use_current)
@@ -928,17 +925,20 @@ class LfoPanel(QFrame):
         params_row.addStretch(1)
         root.addLayout(params_row)
 
+        # ── Row 4: waveform preview ──
+        root.addWidget(self._preview)
+
         # ── Rows 5+6: action buttons (left) + Active LFOs (right) ──
         bottom_row = QHBoxLayout()
         bottom_row.setSpacing(8)
         bottom_row.setContentsMargins(0, 0, 0, 0)
 
         btn_col = QVBoxLayout()
-        btn_col.setSpacing(6)
+        btn_col.setSpacing(4)
         btn_col.setContentsMargins(0, 0, 0, 0)
 
         loop_btn = QPushButton("∞")
-        loop_btn.setFixedHeight(28)
+        loop_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         loop_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_DARKGREEN}; color: {_TEXT};"
             f"  border: none; border-radius: 4px; font-size: 18pt; padding: 0px 10px; }}"
@@ -947,7 +947,7 @@ class LfoPanel(QFrame):
         loop_btn.clicked.connect(self._on_start)
 
         oneshot_btn = QPushButton("1×")
-        oneshot_btn.setFixedHeight(28)
+        oneshot_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         oneshot_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_DARKGREEN}; color: {_TEXT};"
             f"  border: none; border-radius: 4px; font-size: 18pt; padding: 0px 10px; }}"
@@ -956,7 +956,7 @@ class LfoPanel(QFrame):
         oneshot_btn.clicked.connect(self._on_start_oneshot)
 
         clear_btn = QPushButton("⌫")
-        clear_btn.setFixedHeight(28)
+        clear_btn.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         clear_btn.setStyleSheet(
             f"QPushButton {{ background-color: {_HOVER}; color: {_TEXT};"
             f"  border: none; border-radius: 4px; font-size: 18pt; padding: 0px 10px; }}"
