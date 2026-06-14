@@ -88,8 +88,8 @@ class TempoMode(Enum):
     OP1_CLOCK = auto()  # auto-detected: OP-1 sending clock (BEAT MATCH, PO SYNC, or 1/16)
 
 _MODE_LABEL: dict[TempoMode, str] = {
-    TempoMode.APP_CLOCK: "app (MIDI SYNC)",
-    TempoMode.OP1_CLOCK: "op1 (BEAT MATCH)",
+    TempoMode.APP_CLOCK: "app (midi sync)",
+    TempoMode.OP1_CLOCK: "op1 (beat match)",
 }
 
 _MANUAL_CYCLE: list[TempoMode] = [
@@ -1525,9 +1525,6 @@ class MainWindow(QMainWindow):
         root.addWidget(self._lfo_panel, 2)
 
         # ── Status bar ──
-        status_row = QHBoxLayout()
-        status_row.setContentsMargins(2, 4, 2, 0)
-
         self._conn_label = QLabel(self._conn_text(in_port_name, out_port_name, self._ble))
         color = self._conn_color(in_port_name, out_port_name, self._ble)
         self._conn_label.setStyleSheet(f"color: {color}; font-size: 11pt; font-weight: bold;")
@@ -1535,9 +1532,6 @@ class MainWindow(QMainWindow):
             self._conn_label.setToolTip("Bluetooth LE MIDI — expect ~15ms additional latency vs USB")
         self._conn_in_port_name  = in_port_name
         self._conn_out_port_name = out_port_name
-        status_row.addWidget(self._conn_label)
-
-        status_row.addStretch()
 
         mode_lbl = QLabel("tempo mode:")
         mode_lbl.setStyleSheet(f"color: {_DIM}; font-size: 11pt; font-weight: bold;")
@@ -1551,14 +1545,24 @@ class MainWindow(QMainWindow):
         )
         self._mode_btn.clicked.connect(self._toggle_mode)
 
+        conn_row = QHBoxLayout()
+        conn_row.setContentsMargins(2, 0, 2, 0)
+        conn_row.addWidget(self._conn_label)
+        conn_row.addStretch()
+
         mode_row = QHBoxLayout()
         mode_row.setSpacing(4)
-        mode_row.setContentsMargins(0, 0, 0, 0)
+        mode_row.setContentsMargins(2, 0, 2, 0)
         mode_row.addWidget(mode_lbl)
         mode_row.addWidget(self._mode_btn)
-        status_row.addLayout(mode_row)
+        mode_row.addStretch()
 
-        root.addLayout(status_row)
+        status_col = QVBoxLayout()
+        status_col.setSpacing(2)
+        status_col.setContentsMargins(0, 0, 0, 0)
+        status_col.addLayout(conn_row)
+        status_col.addLayout(mode_row)
+        root.addLayout(status_col)
 
         # ── Mode detection timer ──
         self._tempo_mode = TempoMode.APP_CLOCK
