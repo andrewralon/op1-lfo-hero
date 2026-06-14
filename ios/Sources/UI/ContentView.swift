@@ -9,26 +9,25 @@ struct ContentView: View {
         VStack(spacing: 0) {
             // Status bar
             StatusBarView(showPicker: $showDevicePicker)
-                .frame(height: 34)
+                .frame(height: 30)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
-            // Transport column + 4 track strips (expands to fill available space)
-            HStack(spacing: 0) {
-                TransportView()
-                    .frame(width: 52)
-
-                Rectangle().fill(C.bg3).frame(width: 1)
-
-                TracksView()
-            }
-            .frame(maxHeight: .infinity)
+            // 4 track strips — fixed height so fader doesn't dominate
+            TracksView()
+                .frame(height: 280)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
-            // LFO panel — fixed height, scrollable content
+            // Horizontal transport row below tracks (matches desktop layout)
+            TransportBarView()
+                .frame(height: 50)
+
+            Rectangle().fill(C.bg3).frame(height: 1)
+
+            // LFO panel fills the remaining space
             LFOPanelView()
-                .frame(height: 310)
+                .frame(maxHeight: .infinity)
         }
         .background(C.bg)
         .preferredColorScheme(.dark)
@@ -46,10 +45,7 @@ struct StatusBarView: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            // Connection indicator — tap to open picker
-            Button {
-                showPicker = true
-            } label: {
+            Button { showPicker = true } label: {
                 HStack(spacing: 4) {
                     Circle()
                         .fill(app.isConnected ? C.green : C.dim)
@@ -63,16 +59,6 @@ struct StatusBarView: View {
             .buttonStyle(.plain)
 
             Spacer()
-
-            // BPM pill
-            HStack(spacing: 2) {
-                Text("BPM")
-                    .font(.system(size: 8, weight: .medium, design: .monospaced))
-                    .foregroundColor(C.dim)
-                Text(String(format: "%.1f", app.bpm))
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(C.text)
-            }
         }
         .padding(.horizontal, 10)
         .frame(maxHeight: .infinity)
@@ -111,7 +97,6 @@ struct DevicePickerView: View {
                         }
                     }
                 }
-
                 Section {
                     Button("Disconnect") {
                         app.ble.disconnect()

@@ -19,9 +19,9 @@ struct VolumeFaderView: View {
             let thumbY  = CGFloat(1.0 - display / 99.0) * travel
 
             ZStack(alignment: .top) {
-                // Dark track above thumb
+                // Dark track above thumb — slightly lighter than card bg so it's visible
                 Capsule()
-                    .fill(C.bg3)
+                    .fill(Color(hex: "#484848"))
                     .frame(width: trackW, height: max(2, thumbY + thumbH / 2))
                     .frame(maxWidth: .infinity)
 

@@ -26,21 +26,11 @@ struct TrackStripView: View {
             }
             .buttonStyle(.plain)
 
-            // ── Pan knob (large, prominent) ───────────────────────────────
+            // ── Pan knob (capped at 62pt so fader area gets more space) ────
             PanKnobView(value: pan) { app.setPan(track: track, value: $0) }
-                .padding(.horizontal, 5)
-                .padding(.top, 8)
-                .frame(maxWidth: .infinity)
-
-            // L / R tick labels
-            HStack {
-                Text("L").font(.system(size: 7, weight: .medium)).foregroundColor(C.dim)
-                Spacer()
-                Text("R").font(.system(size: 7, weight: .medium)).foregroundColor(C.dim)
-            }
-            .padding(.horizontal, 10)
-            .padding(.top, 2)
-            .padding(.bottom, 6)
+                .padding(.horizontal, 12)
+                .frame(height: 62)
+                .padding(.vertical, 6)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -57,12 +47,12 @@ struct TrackStripView: View {
                         .font(.system(size: 34, weight: .bold, design: .monospaced))
                         .foregroundColor(C.text)
                         .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(.trailing, 7)
+                        .padding(.trailing, 2)
                     Text(unitsStr(v))
                         .font(.system(size: 34, weight: .bold, design: .monospaced))
                         .foregroundColor(C.text)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 7)
+                        .padding(.leading, 2)
                 }
                 .padding(.bottom, 8)
                 .allowsHitTesting(false)   // pass touch events through to fader
