@@ -1,36 +1,35 @@
 import SwiftUI
 
-// Horizontal transport bar — matches Python desktop layout
-// Fixed buttons: 44+44+sep+44+44+sep+44+sep+30+52+30 = 339pt; Spacer fills rest
+// Horizontal transport bar — buttons use maxHeight: .infinity so ContentView controls height
 struct TransportBarView: View {
     @EnvironmentObject var app: AppState
 
     var body: some View {
         HStack(spacing: 0) {
 
-            // Play / Stop
             TransBtn(symbol: "play.fill",  active: app.isPlaying) { app.play() }
             TransBtn(symbol: "stop.fill",  active: false)          { app.stop() }
 
             Sep()
 
-            // Tape navigation
             TransBtn(symbol: "backward.end.fill", active: false) { app.tapePrev() }
             TransBtn(symbol: "forward.end.fill",  active: false) { app.tapeNext() }
 
             Sep()
 
-            // Clock master/slave toggle
+            // Clock master/slave toggle — metronome icon skinnier+taller via scaleEffect
             Button {
                 if app.isClockMaster { app.disableClock() } else { app.enableClock() }
             } label: {
                 VStack(spacing: 1) {
                     Image(systemName: "metronome")
-                        .font(.system(size: 24, weight: .regular))
+                        .font(.system(size: 26, weight: .regular))
+                        .scaleEffect(x: 0.68, y: 1.18, anchor: .center)
                     Text(app.isClockMaster ? "app" : "op1")
                         .font(.system(size: 8, weight: .semibold, design: .monospaced))
                 }
-                .frame(width: 54, height: 50)
+                .frame(width: 54)
+                .frame(maxHeight: .infinity)
                 .background(app.isClockMaster ? C.green.opacity(0.18) : Color.clear)
                 .foregroundColor(app.isClockMaster ? C.green : C.dim)
             }
@@ -42,7 +41,8 @@ struct TransportBarView: View {
             Button { app.setBpm(app.bpm - 1) } label: {
                 Image(systemName: "minus")
                     .font(.system(size: 12))
-                    .frame(width: 30, height: 50)
+                    .frame(width: 30)
+                    .frame(maxHeight: .infinity)
                     .background(C.bg3)
                     .foregroundColor(C.text)
             }
@@ -51,14 +51,16 @@ struct TransportBarView: View {
             Text(String(format: "%.1f", app.bpm))
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
                 .foregroundColor(C.text)
-                .frame(width: 52, height: 50)
+                .frame(width: 52)
+                .frame(maxHeight: .infinity)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
             Button { app.setBpm(app.bpm + 1) } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 12))
-                    .frame(width: 30, height: 50)
+                    .frame(width: 30)
+                    .frame(maxHeight: .infinity)
                     .background(C.bg3)
                     .foregroundColor(C.text)
             }
@@ -79,7 +81,8 @@ private struct TransBtn: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 15))
-                .frame(width: 44, height: 50)
+                .frame(width: 44)
+                .frame(maxHeight: .infinity)
                 .background(active ? C.green.opacity(0.18) : Color.clear)
                 .foregroundColor(active ? C.green : C.text)
         }

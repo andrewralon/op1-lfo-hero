@@ -10,7 +10,7 @@ struct ContentView: View {
             Rectangle().fill(C.bg3).frame(height: 1)
 
             TransportBarView()
-                .frame(height: 50)
+                .frame(height: 58)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 

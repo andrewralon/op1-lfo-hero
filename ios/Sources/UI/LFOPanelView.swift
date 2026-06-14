@@ -29,8 +29,8 @@ struct LFOPanelView: View {
                     app.cycleMaster()
                 }
             }
-            .frame(maxWidth: .infinity)   // centers the fixed-width HStack
-            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -39,7 +39,8 @@ struct LFOPanelView: View {
                 Spacer()
                 Image(systemName: "umbrella").font(.system(size: 16)).foregroundColor(C.dim)
                 Menu {
-                    ForEach(Parameter.allCases) { p in
+                    // Reversed so most-used params appear at top of the menu
+                    ForEach(Parameter.allCases.reversed()) { p in
                         Button(p.rawValue) { app.lfoParam = p }
                     }
                 } label: {
@@ -60,13 +61,14 @@ struct LFOPanelView: View {
 
                 Image(systemName: "waveform.path").font(.system(size: 16)).foregroundColor(C.dim)
                 Menu {
-                    ForEach(LfoWave.allCases) { w in
+                    ForEach(LfoWave.allCases.reversed()) { w in
                         Button(w.rawValue) { app.lfoWave = w }
                     }
                 } label: {
                     HStack(spacing: 4) {
                         Text(app.lfoWave.rawValue)
                             .font(.system(size: 13, weight: .medium))
+                            .frame(minWidth: 68, alignment: .leading)  // wide enough for "triangle"
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(size: 9))
                     }
@@ -79,7 +81,7 @@ struct LFOPanelView: View {
 
                 Spacer()
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 10)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -136,7 +138,7 @@ struct LFOPanelView: View {
                 Spacer()
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.vertical, 10)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
