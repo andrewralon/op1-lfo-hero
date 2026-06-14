@@ -21,8 +21,8 @@ from PyQt6.QtSvg import QSvgRenderer
 from src.controller import Controller, CC_VOLUME, CC_MUTE, CC_PAN
 from src.clock import PPQN
 from src.automation import (
-    AutomationEngine, Parameter, PARAMETER_LABELS,
-    LfoWave, LfoClip, lfo_wave_value, LFO_WAVE_LABELS,
+    AutomationEngine, Parameter, PARAMETER_LABELS, PARAMETER_ABBREVS,
+    LfoWave, LfoClip, lfo_wave_value, LFO_WAVE_LABELS, LFO_WAVE_ABBREVS,
 )
 
 # ---------------------------------------------------------------------------
@@ -483,7 +483,7 @@ class WaveformPreview(QWidget):
         self._depth      = 20
         self._center     = 64
         self._phase      = 0.0
-        self._rate_ticks      = PPQN   # default: 1 cycle per beat
+        self._rate_ticks = PPQN   # default: 1 cycle per beat
         self._normal_colors: list[str]   = [_ACCENT]
         self._inverted_colors: list[str] = []
         self._lfos_override: list | None = None
@@ -1318,24 +1318,24 @@ class LfoPanel(QFrame):
         self._lfo_list.clear()
         for lfo in self._active_lfos:
             if lfo.rate_ticks >= PPQN:
-                rate_str = f"{lfo.rate_ticks // PPQN}b/cycle"
+                rate_str = f"{lfo.rate_ticks // PPQN}b/c"
             else:
                 rate_str = f"{PPQN // lfo.rate_ticks}x/beat"
-            loop_str = "" if lfo.loop else " [1×]"
+            loop_str = "" if lfo.loop else " 1×"
+            param_abbrev = PARAMETER_ABBREVS[lfo.parameter]
+            track_str = "m" if lfo.track == 0 else f"t{lfo.track}"
+            inv_str = " inv" if lfo.inverted else ""
             if lfo.parameter is Parameter.TEMPO:
                 lo = max(20,  lfo.center_value - lfo.depth)
                 hi = min(300, lfo.center_value + lfo.depth)
                 self._lfo_list.addItem(QListWidgetItem(
-                    f"tempo  {lfo.wave.value}  {lo:.1f}↔{hi:.1f}bpm  {rate_str}{loop_str}"
+                    f"{track_str} {param_abbrev} {LFO_WAVE_ABBREVS[lfo.wave]} {lo:.1f}↔{hi:.1f} {rate_str}{inv_str}{loop_str}"
                 ))
             else:
                 lo = _midi_to_ui(max(0,   lfo.center_value - lfo.depth))
                 hi = _midi_to_ui(min(127, lfo.center_value + lfo.depth))
-                inv_str = " [inv]" if lfo.inverted else ""
-                track_str = "m" if lfo.track == 0 else f"t{lfo.track}"
                 self._lfo_list.addItem(QListWidgetItem(
-                    f"{track_str}  {lfo.parameter.value.upper()[:3]}  "
-                    f"{lfo.wave.value}  {lo:.1f}↔{hi:.1f}  {rate_str}{inv_str}{loop_str}"
+                    f"{track_str} {param_abbrev} {LFO_WAVE_ABBREVS[lfo.wave]} {lo:.1f}↔{hi:.1f} {rate_str}{inv_str}{loop_str}"
                 ))
 
     def set_tempo_available(self, available: bool) -> None:

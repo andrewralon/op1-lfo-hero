@@ -77,6 +77,21 @@ PARAMETER_LABELS: dict[str, Parameter] = {
     "lfo 4":  Parameter.LFO_4,
 }
 
+PARAMETER_ABBREVS: dict[Parameter, str] = {
+    Parameter.VOLUME: "vol",
+    Parameter.PAN:    "pan",
+    Parameter.MUTE:   "mute",
+    Parameter.TEMPO:  "tmp",
+    Parameter.FX_1:   "fx1",
+    Parameter.FX_2:   "fx2",
+    Parameter.FX_3:   "fx3",
+    Parameter.FX_4:   "fx4",
+    Parameter.LFO_1:  "lfo1",
+    Parameter.LFO_2:  "lfo2",
+    Parameter.LFO_3:  "lfo3",
+    Parameter.LFO_4:  "lfo4",
+}
+
 
 def _apply_curve(t: float, shape: CurveShape) -> float:
     """Map t ∈ [0, 1] through a curve shape, returning a value in [0, 1]."""
@@ -113,17 +128,29 @@ class Clip:
 
 class LfoWave(Enum):
     SINE       = "sine"
-    TRIANGLE   = "triangle"
+    TRIANGLE   = "tri"
     SAW        = "saw"
     SQUARE     = "square"
     LOG        = "log"
     EXP        = "exp"
-    SWEEP_UP   = "sweep up"
-    SWEEP_DN   = "sweep dn"
+    SWEEP_UP   = "sweepup"
+    SWEEP_DN   = "sweepdn"
     RANDOM     = "random"
 
 
 LFO_WAVE_LABELS: dict[str, LfoWave] = {w.value.lower(): w for w in LfoWave}
+
+LFO_WAVE_ABBREVS: dict[LfoWave, str] = {
+    LfoWave.SINE:     "sin",
+    LfoWave.TRIANGLE: "tri",
+    LfoWave.SAW:      "saw",
+    LfoWave.SQUARE:   "sqr",
+    LfoWave.LOG:      "log",
+    LfoWave.EXP:      "exp",
+    LfoWave.SWEEP_UP: "swup",
+    LfoWave.SWEEP_DN: "swdn",
+    LfoWave.RANDOM:   "rnd",
+}
 
 # Multiply rate_ticks by this factor before computing phase for a given wave.
 # Add an entry here to make a waveform span more beats per cycle.
