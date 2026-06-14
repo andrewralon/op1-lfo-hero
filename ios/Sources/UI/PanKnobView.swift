@@ -9,32 +9,45 @@ struct PanKnobView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let size = min(geo.size.width, geo.size.height)
-            ZStack {
-                // Knob body
-                Circle()
-                    .fill(C.bg2)
-                    .overlay(Circle().stroke(C.groove, lineWidth: 1))
+            let sz = min(geo.size.width, geo.size.height)
+            let cx = sz / 2
+            let cy = sz / 2
+            let r  = sz / 2 - 1
 
-                // Indicator line: orange at center, white off-center
-                let angle = Double(value) / 63.0 * 135.0  // ±135° from 12 o'clock
-                let rad   = (angle - 90) * .pi / 180
-                let r     = size / 2 * 0.62
-                let cx    = size / 2 + CGFloat(cos(rad)) * r
-                let cy    = size / 2 + CGFloat(sin(rad)) * r
+            let liveVal  = max(-63, min(63, base + Int(-drag / 1.4)))
+            let angleDeg = Double(liveVal) / 63.0 * 130.0
+            let rad      = (angleDeg - 90) * Double.pi / 180
+            let tipX     = cx + CGFloat(cos(rad)) * r * 0.66
+            let tipY     = cy + CGFloat(sin(rad)) * r * 0.66
+
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "#1c1c1e"))
+
+                Circle()
+                    .stroke(Color(hex: "#484848"), lineWidth: 1)
+
+                // L/R limit ticks at ±130° from 12 o'clock
+                limitTick(cx: cx, cy: cy, r: r, deg: -90 - 130)
+                    .stroke(Color.white.opacity(0.22), lineWidth: 1.5)
+                limitTick(cx: cx, cy: cy, r: r, deg: -90 + 130)
+                    .stroke(Color.white.opacity(0.22), lineWidth: 1.5)
+
+                // Indicator — green at center (matches desktop), white off-center
                 Path { p in
-                    p.move(to: CGPoint(x: size / 2, y: size / 2))
-                    p.addLine(to: CGPoint(x: cx, y: cy))
+                    p.move(to: CGPoint(x: cx, y: cy))
+                    p.addLine(to: CGPoint(x: tipX, y: tipY))
                 }
-                .stroke(value == 0 ? C.orange : C.text, lineWidth: 2)
+                .stroke(liveVal == 0 ? C.green : C.text,
+                        style: StrokeStyle(lineWidth: 2, lineCap: .round))
             }
-            .frame(width: size, height: size)
+            .frame(width: sz, height: sz)
             .contentShape(Circle())
             .gesture(
                 DragGesture(minimumDistance: 1)
                     .updating($drag) { g, state, _ in state = g.translation.height }
                     .onEnded { g in
-                        let delta = Int(-g.translation.height / 1.2)
+                        let delta = Int(-g.translation.height / 1.4)
                         let newVal = max(-63, min(63, base + delta))
                         base = newVal
                         value = newVal
@@ -42,10 +55,18 @@ struct PanKnobView: View {
                     }
             )
             .onAppear { base = value }
-            .onChange(of: value) { newVal in
-                if drag == 0 { base = newVal }
-            }
+            .onChange(of: value) { _, v in if drag == 0 { base = v } }
         }
         .aspectRatio(1, contentMode: .fit)
+    }
+
+    private func limitTick(cx: CGFloat, cy: CGFloat, r: CGFloat, deg: Double) -> Path {
+        let rad = deg * Double.pi / 180
+        var p = Path()
+        p.move(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 0.96,
+                           y: cy + CGFloat(sin(rad)) * r * 0.96))
+        p.addLine(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 0.74,
+                              y: cy + CGFloat(sin(rad)) * r * 0.74))
+        return p
     }
 }

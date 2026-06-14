@@ -4,21 +4,22 @@ struct VolumeFaderView: View {
     @Binding var value: Double  // 0-99
     let onChange: (Double) -> Void
 
-    private let thumbH: CGFloat = 20
-    private let trackW: CGFloat = 13
+    private let trackW: CGFloat  = 2
+    private let thumbW: CGFloat  = 16
+    private let thumbH: CGFloat  = 10
 
     @GestureState private var drag: CGFloat = 0
     @State private var base: Double = 0
 
     var body: some View {
         GeometryReader { geo in
-            let h = geo.size.height
+            let h      = geo.size.height
             let travel = max(1, h - thumbH)
             let display = max(0, min(99, base - Double(drag / travel * 99)))
             let thumbY  = CGFloat(1.0 - display / 99.0) * travel
 
             ZStack(alignment: .top) {
-                // Track above thumb (dark)
+                // Dark track above thumb
                 Capsule()
                     .fill(C.bg3)
                     .frame(width: trackW, height: max(2, thumbY + thumbH / 2))
@@ -34,11 +35,12 @@ struct VolumeFaderView: View {
                         .frame(maxWidth: .infinity)
                 }
 
-                // Thumb
-                RoundedRectangle(cornerRadius: 3)
+                // Diamond thumb — rotated rectangle (matches desktop ◇ shape)
+                Rectangle()
                     .fill(Color.white.opacity(0.88))
-                    .frame(width: trackW + 8, height: thumbH)
-                    .shadow(color: .black.opacity(0.4), radius: 2, y: 1)
+                    .frame(width: thumbW, height: thumbH)
+                    .rotationEffect(.degrees(45))
+                    .shadow(color: .black.opacity(0.5), radius: 1.5, y: 1)
                     .offset(y: thumbY)
                     .frame(maxWidth: .infinity)
             }
@@ -55,9 +57,7 @@ struct VolumeFaderView: View {
                     }
             )
             .onAppear { base = value }
-            .onChange(of: value) { newVal in
-                if drag == 0 { base = newVal }
-            }
+            .onChange(of: value) { _, newVal in if drag == 0 { base = newVal } }
         }
     }
 }

@@ -355,7 +355,7 @@ private struct CompactSlider: View {
                     }
             )
             .onAppear { base = value }
-            .onChange(of: value) { newVal in if drag == 0 { base = newVal } }
+            .onChange(of: value) { _, newVal in if drag == 0 { base = newVal } }
         }
         .frame(height: 26)
     }
