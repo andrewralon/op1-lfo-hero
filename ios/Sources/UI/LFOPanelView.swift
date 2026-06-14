@@ -30,7 +30,7 @@ struct LFOPanelView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
+            .padding(.vertical, 7)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -46,12 +46,12 @@ struct LFOPanelView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text(app.lfoParam.rawValue)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 15, weight: .medium))
                         Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 9))
+                            .font(.system(size: 10))
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 8)
                     .background(C.bg3)
                     .cornerRadius(5)
                 }
@@ -67,13 +67,13 @@ struct LFOPanelView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text(app.lfoWave.rawValue)
-                            .font(.system(size: 13, weight: .medium))
-                            .frame(minWidth: 68, alignment: .leading)  // wide enough for "triangle"
+                            .font(.system(size: 15, weight: .medium))
+                            .frame(minWidth: 72, alignment: .leading)  // wide enough for "triangle"
                         Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 9))
+                            .font(.system(size: 10))
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 8)
                     .background(C.bg3)
                     .cornerRadius(5)
                 }
@@ -81,64 +81,66 @@ struct LFOPanelView: View {
 
                 Spacer()
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 6)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
-            // ── 3. Rate / depth / center ──────────────────────────────────────
-            // Rate: stepper (discrete 1-8 with named labels)
-            // Depth + Center: scrubable numbers — drag left/right to change
+            // ── 3. Rate / depth / center — centered as a group ────────────────
             HStack(spacing: 0) {
-                // Rate
-                Image(systemName: "timer")
-                    .font(.system(size: 16))
-                    .foregroundColor(C.dim)
-                    .frame(width: 26)
+                Spacer(minLength: 0)
 
-                HStack(spacing: 0) {
-                    Button { app.lfoRate = max(1, app.lfoRate - 1) } label: {
-                        Image(systemName: "minus").frame(width: 24, height: 30)
+                // Rate stepper
+                HStack(spacing: 6) {
+                    Image(systemName: "timer")
+                        .font(.system(size: 17))
+                        .foregroundColor(C.dim)
+
+                    HStack(spacing: 0) {
+                        Button { app.lfoRate = max(1, app.lfoRate - 1) } label: {
+                            Image(systemName: "minus").frame(width: 28, height: 36)
+                        }
+                        .buttonStyle(.plain).foregroundColor(C.dim)
+
+                        Text(RATE_LABELS[app.lfoRate - 1])
+                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                            .foregroundColor(C.text)
+                            .frame(width: 32)
+
+                        Button { app.lfoRate = min(8, app.lfoRate + 1) } label: {
+                            Image(systemName: "plus").frame(width: 28, height: 36)
+                        }
+                        .buttonStyle(.plain).foregroundColor(C.dim)
                     }
-                    .buttonStyle(.plain).foregroundColor(C.dim)
-
-                    Text(RATE_LABELS[app.lfoRate - 1])
-                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(C.text)
-                        .frame(width: 30)
-
-                    Button { app.lfoRate = min(8, app.lfoRate + 1) } label: {
-                        Image(systemName: "plus").frame(width: 24, height: 30)
-                    }
-                    .buttonStyle(.plain).foregroundColor(C.dim)
+                    .background(C.bg3).cornerRadius(4)
                 }
-                .background(C.bg3).cornerRadius(4)
 
-                Spacer()
+                Spacer(minLength: 20)
 
-                // Depth (scrub left/right to change)
-                Image(systemName: "arrow.up.and.down")
-                    .font(.system(size: 16))
-                    .foregroundColor(C.dim)
-                    .frame(width: 26)
+                // Depth
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.and.down")
+                        .font(.system(size: 17))
+                        .foregroundColor(C.dim)
 
-                ScrubValue(value: $app.lfoDepth, range: 0...99)
-                    .frame(width: 52)
+                    ScrubValue(value: $app.lfoDepth, range: 0...99)
+                        .frame(width: 58)
+                }
 
-                Spacer()
+                Spacer(minLength: 20)
 
-                // Center (scrub left/right to change)
-                Image(systemName: "arrow.up.and.down.circle")
-                    .font(.system(size: 16))
-                    .foregroundColor(C.dim)
-                    .frame(width: 26)
+                // Center
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.and.down.circle")
+                        .font(.system(size: 17))
+                        .foregroundColor(C.dim)
 
-                ScrubValue(value: $app.lfoCenter, range: 0...99)
-                    .frame(width: 52)
+                    ScrubValue(value: $app.lfoCenter, range: 0...99)
+                        .frame(width: 58)
+                }
 
-                Spacer()
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 10)
+            .padding(.vertical, 7)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -260,7 +262,7 @@ private struct ScrubValue: View {
                     RoundedRectangle(cornerRadius: 3)
                         .stroke(drag != 0 ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
                 )
-                .frame(height: 30)
+                .frame(height: 36)
             Text(String(Int(live)))
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
                 .foregroundColor(drag != 0 ? C.green : C.text)
@@ -325,12 +327,12 @@ private struct TrackToggleButton: View {
     var body: some View {
         Button(action: action) {
             Text("\(track)")
-                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                .font(.system(size: 18, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: 40, height: 32)
+                .frame(width: 42, height: 42)
                 .background(state == 0 ? C.bg3 : color)
                 .foregroundColor(state == 0 ? color : .black)
-                .cornerRadius(5)
+                .cornerRadius(7)
         }
         .buttonStyle(.plain)
         .opacity(disabled ? 0.35 : 1)
@@ -349,12 +351,12 @@ private struct MasterToggleButton: View {
     var body: some View {
         Button(action: action) {
             Text("m")
-                .font(.system(size: 16, weight: .bold, design: .monospaced))
+                .font(.system(size: 18, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: 40, height: 32)
+                .frame(width: 42, height: 42)
                 .background(state == 0 ? C.bg3 : C.green)
                 .foregroundColor(state == 0 ? C.green : .black)
-                .cornerRadius(5)
+                .cornerRadius(7)
         }
         .buttonStyle(.plain)
         .opacity(disabled ? 0.35 : 1)

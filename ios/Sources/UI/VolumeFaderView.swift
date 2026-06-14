@@ -24,11 +24,13 @@ struct VolumeFaderView: View {
 
                 // ── Fader track + thumb (top-anchored positioning) ──────────
                 ZStack(alignment: .top) {
+                    // Gray track — always exactly full height, never changes
                     Capsule()
                         .fill(Color(hex: "#484848"))
-                        .frame(width: trackW, height: max(2, center))
+                        .frame(width: trackW, height: h)
                         .frame(maxWidth: .infinity)
 
+                    // Red fill from thumb center down to bottom
                     let fillH = max(0, h - center)
                     if fillH > 0 {
                         Capsule()

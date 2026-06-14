@@ -21,14 +21,14 @@ struct TransportBarView: View {
             Button {
                 if app.isClockMaster { app.disableClock() } else { app.enableClock() }
             } label: {
-                VStack(spacing: 1) {
+                VStack(spacing: 0) {
                     Image(systemName: "metronome")
-                        .font(.system(size: 26, weight: .regular))
-                        .scaleEffect(x: 0.68, y: 1.18, anchor: .center)
+                        .font(.system(size: 32, weight: .regular))
+                        .scaleEffect(x: 0.65, y: 1.22, anchor: .center)
                     Text(app.isClockMaster ? "app" : "op1")
                         .font(.system(size: 8, weight: .semibold, design: .monospaced))
                 }
-                .frame(width: 54)
+                .frame(width: 48)
                 .frame(maxHeight: .infinity)
                 .background(app.isClockMaster ? C.green.opacity(0.18) : Color.clear)
                 .foregroundColor(app.isClockMaster ? C.green : C.dim)
