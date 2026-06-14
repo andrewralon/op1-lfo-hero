@@ -15,8 +15,8 @@ final class BLEMidi: NSObject, ObservableObject {
             case .off:                 return "Bluetooth off"
             case .scanning:            return "Scanning…"
             case .connecting(let n):   return "Connecting to \(n)…"
-            case .connected(let n):    return "● \(n) (bt)"
-            case .disconnected(let n): return "● \(n) disconnected"
+            case .connected(let n):    return "\(n) (bt)"
+            case .disconnected(let n): return "\(n) disconnected"
             }
         }
 

@@ -37,7 +37,7 @@ struct LFOPanelView: View {
             // ── 2. Param + wave dropdowns — fitted width, centered ────────────
             HStack(spacing: 12) {
                 Spacer()
-                Image(systemName: "umbrella").font(.system(size: 11)).foregroundColor(C.dim)
+                Image(systemName: "umbrella").font(.system(size: 16)).foregroundColor(C.dim)
                 Menu {
                     ForEach(Parameter.allCases) { p in
                         Button(p.rawValue) { app.lfoParam = p }
@@ -58,7 +58,7 @@ struct LFOPanelView: View {
 
                 Spacer()
 
-                Image(systemName: "waveform.path").font(.system(size: 11)).foregroundColor(C.dim)
+                Image(systemName: "waveform.path").font(.system(size: 16)).foregroundColor(C.dim)
                 Menu {
                     ForEach(LfoWave.allCases) { w in
                         Button(w.rawValue) { app.lfoWave = w }
@@ -89,9 +89,9 @@ struct LFOPanelView: View {
             HStack(spacing: 0) {
                 // Rate
                 Image(systemName: "timer")
-                    .font(.system(size: 12))
+                    .font(.system(size: 16))
                     .foregroundColor(C.dim)
-                    .frame(width: 22)
+                    .frame(width: 26)
 
                 HStack(spacing: 0) {
                     Button { app.lfoRate = max(1, app.lfoRate - 1) } label: {
@@ -115,47 +115,25 @@ struct LFOPanelView: View {
 
                 // Depth (scrub left/right to change)
                 Image(systemName: "arrow.up.and.down")
-                    .font(.system(size: 12))
+                    .font(.system(size: 16))
                     .foregroundColor(C.dim)
-                    .frame(width: 22)
+                    .frame(width: 26)
 
-                VStack(spacing: 2) {
-                    ScrubValue(value: $app.lfoDepth, range: 0...99)
-                        .frame(width: 52)
-                    Text("depth")
-                        .font(.system(size: 7, design: .monospaced))
-                        .foregroundColor(C.dim)
-                }
+                ScrubValue(value: $app.lfoDepth, range: 0...99)
+                    .frame(width: 52)
 
                 Spacer()
 
                 // Center (scrub left/right to change)
                 Image(systemName: "arrow.up.and.down.circle")
-                    .font(.system(size: 12))
+                    .font(.system(size: 16))
                     .foregroundColor(C.dim)
-                    .frame(width: 22)
+                    .frame(width: 26)
 
-                VStack(spacing: 2) {
-                    ScrubValue(value: $app.lfoCenter, range: 0...99)
-                        .frame(width: 52)
-                    Text("center")
-                        .font(.system(size: 7, design: .monospaced))
-                        .foregroundColor(C.dim)
-                }
+                ScrubValue(value: $app.lfoCenter, range: 0...99)
+                    .frame(width: 52)
 
                 Spacer()
-
-                // Range (readonly)
-                VStack(spacing: 2) {
-                    Text(app.lfoRange)
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundColor(C.dim)
-                        .frame(height: 30)
-                    Text("range")
-                        .font(.system(size: 7, design: .monospaced))
-                        .foregroundColor(C.dim)
-                }
-                .frame(width: 44)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -330,9 +308,9 @@ private struct ActiveLfoChip: View {
 }
 
 // MARK: - Track toggle button
-// OFF = track-color text on dark bg
-// ON  = solid track-color fill, black text
-// INV = dark bg, track-color text, rotated 180°
+// OFF (0): track-color text, dark bg
+// ON  (1): track-color bg, black text
+// INV (2): same as ON but text rotated 180°
 
 private struct TrackToggleButton: View {
     let track: Int
@@ -345,11 +323,11 @@ private struct TrackToggleButton: View {
     var body: some View {
         Button(action: action) {
             Text("\(track)")
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .font(.system(size: 16, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: 38, height: 32)
-                .background(state == 1 ? color : C.bg3)
-                .foregroundColor(state == 1 ? .black : (state == 0 ? C.dim : color))
+                .frame(width: 40, height: 32)
+                .background(state == 0 ? C.bg3 : color)
+                .foregroundColor(state == 0 ? color : .black)
                 .cornerRadius(5)
         }
         .buttonStyle(.plain)
@@ -359,6 +337,7 @@ private struct TrackToggleButton: View {
 }
 
 // MARK: - Master toggle button
+// Same state logic, green instead of track color
 
 private struct MasterToggleButton: View {
     let state: Int
@@ -368,11 +347,11 @@ private struct MasterToggleButton: View {
     var body: some View {
         Button(action: action) {
             Text("m")
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .font(.system(size: 16, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: 38, height: 32)
-                .background(state == 1 ? C.green : C.bg3)
-                .foregroundColor(state == 1 ? .black : (state == 0 ? C.dim : C.green))
+                .frame(width: 40, height: 32)
+                .background(state == 0 ? C.bg3 : C.green)
+                .foregroundColor(state == 0 ? C.green : .black)
                 .cornerRadius(5)
         }
         .buttonStyle(.plain)

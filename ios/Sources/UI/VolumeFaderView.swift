@@ -4,9 +4,8 @@ struct VolumeFaderView: View {
     @Binding var value: Double  // 0-99
     let onChange: (Double) -> Void
 
-    private let trackW: CGFloat  = 3
-    private let thumbW: CGFloat  = 18
-    private let thumbH: CGFloat  = 11
+    private let trackW: CGFloat    = 3
+    private let thumbSize: CGFloat = 14  // square rotated 45° = perfect symmetric ◇
 
     @GestureState private var drag: CGFloat = 0
     @State private var base: Double = 0
@@ -14,33 +13,34 @@ struct VolumeFaderView: View {
     var body: some View {
         GeometryReader { geo in
             let h      = geo.size.height
-            let travel = max(1, h - thumbH)
+            let travel = max(1, h - thumbSize)
             let display = max(0, min(99, base - Double(drag / travel * 99)))
             let thumbY  = CGFloat(1.0 - display / 99.0) * travel
+            let center  = thumbY + thumbSize / 2
 
             ZStack(alignment: .top) {
-                // Dark track above thumb — slightly lighter than card bg so it's visible
+                // Dark track above thumb center
                 Capsule()
                     .fill(Color(hex: "#484848"))
-                    .frame(width: trackW, height: max(2, thumbY + thumbH / 2))
+                    .frame(width: trackW, height: max(2, center))
                     .frame(maxWidth: .infinity)
 
-                // Red fill below thumb
-                let fillH = max(0, h - thumbY - thumbH / 2)
+                // Red fill below thumb center
+                let fillH = max(0, h - center)
                 if fillH > 0 {
                     Capsule()
                         .fill(C.red)
                         .frame(width: trackW, height: fillH)
-                        .offset(y: thumbY + thumbH / 2)
+                        .offset(y: center)
                         .frame(maxWidth: .infinity)
                 }
 
-                // Diamond thumb — rotated rectangle (matches desktop ◇ shape)
+                // Perfect ◇ diamond: square rotated 45° (equal w & h = symmetric)
                 Rectangle()
-                    .fill(Color.white.opacity(0.88))
-                    .frame(width: thumbW, height: thumbH)
+                    .fill(Color.white.opacity(0.90))
+                    .frame(width: thumbSize, height: thumbSize)
                     .rotationEffect(.degrees(45))
-                    .shadow(color: .black.opacity(0.5), radius: 1.5, y: 1)
+                    .shadow(color: .black.opacity(0.45), radius: 1.5, y: 1)
                     .offset(y: thumbY)
                     .frame(maxWidth: .infinity)
             }

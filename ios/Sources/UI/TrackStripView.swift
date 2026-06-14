@@ -15,10 +15,10 @@ struct TrackStripView: View {
 
         VStack(spacing: 0) {
 
-            // ── Mute button (colored header) ──────────────────────────────
+            // ── Mute button (colored header) ──────────────────────────────────
             Button { app.toggleMute(track: track) } label: {
                 Text("\(track)")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: 16, weight: .bold, design: .monospaced))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 7)
                     .background(muted ? color.opacity(0.2) : color)
@@ -26,40 +26,36 @@ struct TrackStripView: View {
             }
             .buttonStyle(.plain)
 
-            // ── Pan knob (capped at 62pt so fader area gets more space) ────
+            // ── Pan knob ──────────────────────────────────────────────────────
             PanKnobView(value: pan) { app.setPan(track: track, value: $0) }
                 .padding(.horizontal, 12)
                 .frame(height: 62)
                 .padding(.vertical, 6)
 
-            Rectangle().fill(C.bg3).frame(height: 1)
+            // No divider here — pan knob flows directly into fader area
 
-            // ── Fader + split digit volume display ────────────────────────
-            ZStack(alignment: .bottom) {
-                // Thin fader (red line + diamond thumb) fills full height
+            // ── Fader + 2-digit volume display (digits at center of fader) ────
+            ZStack(alignment: .center) {
                 VolumeFaderView(value: vol) { app.setVolume(track: track, value: $0) }
                     .padding(.vertical, 8)
 
-                // Split digits: "9" | red line | "0"  (desktop-style)
-                // Wide gap so the fader line is clearly visible between the two digits
+                // Always 2 digits: "09", "90", "00"
                 HStack(alignment: .bottom, spacing: 0) {
-                    Text(tensStr(v))
+                    Text(tensDigit(v))
                         .font(.system(size: 34, weight: .bold, design: .monospaced))
                         .foregroundColor(C.text)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .padding(.trailing, 7)
-                    Text(unitsStr(v))
+                    Text(unitsDigit(v))
                         .font(.system(size: 34, weight: .bold, design: .monospaced))
                         .foregroundColor(C.text)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.leading, 7)
                 }
-                .padding(.bottom, 8)
-                .allowsHitTesting(false)   // pass touch events through to fader
+                .allowsHitTesting(false)
             }
             .frame(maxHeight: .infinity)
         }
-        // Card background matching the desktop track strip style
         .clipShape(RoundedRectangle(cornerRadius: 7))
         .background(
             RoundedRectangle(cornerRadius: 7)
@@ -70,10 +66,9 @@ struct TrackStripView: View {
         .padding(.horizontal, 2)
     }
 
-    // "90" → tens = "9", units = "0"
-    // " 5" → tens = " ", units = "5"
-    private func tensStr(_ v: Int) -> String { v >= 10 ? String(v / 10) : " " }
-    private func unitsStr(_ v: Int) -> String { String(v % 10) }
+    // Always render two digits: 5 → "0" + "5", 90 → "9" + "0"
+    private func tensDigit(_ v: Int) -> String { String(v / 10) }
+    private func unitsDigit(_ v: Int) -> String { String(v % 10) }
 }
 
 struct TracksView: View {
