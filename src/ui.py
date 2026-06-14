@@ -1408,8 +1408,8 @@ class MainWindow(QMainWindow):
 
     def _setup_ui(self, controller: Controller, engine: AutomationEngine, in_port_name: str, out_port_name: str, clock_gen) -> None:
         self.setWindowTitle("op1 lfo hero")
-        self.setMinimumWidth(338)
-        self.setMinimumHeight(600)
+        self.setMinimumSize(338, 700)
+        self.resize(338, 700)
         self.setStyleSheet(f"QMainWindow {{ background-color: {_BG}; }}")
 
         central = QWidget()
