@@ -4,9 +4,9 @@ struct VolumeFaderView: View {
     @Binding var value: Double  // 0-99
     let onChange: (Double) -> Void
 
-    private let trackW: CGFloat  = 2
-    private let thumbW: CGFloat  = 16
-    private let thumbH: CGFloat  = 10
+    private let trackW: CGFloat  = 3
+    private let thumbW: CGFloat  = 18
+    private let thumbH: CGFloat  = 11
 
     @GestureState private var drag: CGFloat = 0
     @State private var base: Double = 0

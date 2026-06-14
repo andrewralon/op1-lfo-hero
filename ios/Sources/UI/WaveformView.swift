@@ -12,7 +12,8 @@ struct WaveformView: View {
             let w = size.width
             let h = size.height
             let midY = h / 2
-            let amplitude = midY * 0.82 * (depth / 99.0)
+            // Show at generous amplitude regardless of depth so the shape is always clear
+            let amplitude = midY * 0.88
             let steps = Int(w * 1.5)
 
             var path = Path()
@@ -90,7 +91,7 @@ struct MultiWaveformView: View {
 
     private func buildPath(lfo: LfoClip, size: CGSize) -> Path {
         let nCycles = Double(8 * PPQN) / Double(lfo.rateTicks)
-        let amplitude = size.height / 2 * 0.82
+        let amplitude = size.height / 2 * 0.88
         let steps = Int(size.width * 1.5)
         var path = Path()
         var prevStep = -1; var stepY = 0.0

@@ -47,12 +47,12 @@ struct TrackStripView: View {
                         .font(.system(size: 34, weight: .bold, design: .monospaced))
                         .foregroundColor(C.text)
                         .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(.trailing, 2)
+                        .padding(.trailing, 7)
                     Text(unitsStr(v))
                         .font(.system(size: 34, weight: .bold, design: .monospaced))
                         .foregroundColor(C.text)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 2)
+                        .padding(.leading, 7)
                 }
                 .padding(.bottom, 8)
                 .allowsHitTesting(false)   // pass touch events through to fader

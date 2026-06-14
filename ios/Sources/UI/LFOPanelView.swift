@@ -3,6 +3,7 @@ import SwiftUI
 struct LFOPanelView: View {
     @EnvironmentObject var app: AppState
     @State private var selectedLfoID: UUID? = nil
+    @State private var showDevicePicker = false
 
     private var previewLfos: [LfoClip] {
         if let id = selectedLfoID, let lfo = app.activeLfos.first(where: { $0.id == id }) {
@@ -14,8 +15,8 @@ struct LFOPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
 
-            // ── 1. Track selection buttons — FIRST, right under transport ─────
-            HStack(spacing: 6) {
+            // ── 1. Track + master buttons — centered row ──────────────────────
+            HStack(spacing: 8) {
                 ForEach(1...4, id: \.self) { t in
                     TrackToggleButton(track: t,
                                       state: app.trackOn[t] ?? 0,
@@ -27,108 +28,141 @@ struct LFOPanelView: View {
                                    disabled: !app.lfoParam.isMasterCapable) {
                     app.cycleMaster()
                 }
-                Spacer()
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity)   // centers the fixed-width HStack
+            .padding(.vertical, 8)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
-            // ── 2. Param + wave pickers ────────────────────────────────────────
-            HStack(spacing: 8) {
-                Image(systemName: "umbrella")
-                    .font(.system(size: 11))
-                    .foregroundColor(C.dim)
-                    .frame(width: 16)
-
-                Picker("Param", selection: $app.lfoParam) {
+            // ── 2. Param + wave dropdowns — fitted width, centered ────────────
+            HStack(spacing: 12) {
+                Spacer()
+                Image(systemName: "umbrella").font(.system(size: 11)).foregroundColor(C.dim)
+                Menu {
                     ForEach(Parameter.allCases) { p in
-                        Text(p.rawValue).tag(p)
+                        Button(p.rawValue) { app.lfoParam = p }
                     }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(app.lfoParam.rawValue)
+                            .font(.system(size: 13, weight: .medium))
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(C.bg3)
+                    .cornerRadius(5)
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(maxWidth: .infinity)
-                .background(C.bg3)
-                .cornerRadius(4)
+                .foregroundColor(.accentColor)
 
-                Image(systemName: "waveform.path")
-                    .font(.system(size: 11))
-                    .foregroundColor(C.dim)
-                    .frame(width: 16)
+                Spacer()
 
-                Picker("Wave", selection: $app.lfoWave) {
+                Image(systemName: "waveform.path").font(.system(size: 11)).foregroundColor(C.dim)
+                Menu {
                     ForEach(LfoWave.allCases) { w in
-                        Text(w.rawValue).tag(w)
+                        Button(w.rawValue) { app.lfoWave = w }
                     }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(app.lfoWave.rawValue)
+                            .font(.system(size: 13, weight: .medium))
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(C.bg3)
+                    .cornerRadius(5)
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(maxWidth: .infinity)
-                .background(C.bg3)
-                .cornerRadius(4)
-            }
-            .foregroundColor(C.text)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
+                .foregroundColor(.accentColor)
 
-            // ── 3. Rate / depth / center ───────────────────────────────────────
-            HStack(spacing: 6) {
+                Spacer()
+            }
+            .padding(.vertical, 6)
+
+            Rectangle().fill(C.bg3).frame(height: 1)
+
+            // ── 3. Rate / depth / center ──────────────────────────────────────
+            // Rate: stepper (discrete 1-8 with named labels)
+            // Depth + Center: scrubable numbers — drag left/right to change
+            HStack(spacing: 0) {
                 // Rate
                 Image(systemName: "timer")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(C.dim)
+                    .frame(width: 22)
 
                 HStack(spacing: 0) {
                     Button { app.lfoRate = max(1, app.lfoRate - 1) } label: {
-                        Image(systemName: "minus").frame(width: 22, height: 28)
+                        Image(systemName: "minus").frame(width: 24, height: 30)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain).foregroundColor(C.dim)
+
                     Text(RATE_LABELS[app.lfoRate - 1])
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
                         .foregroundColor(C.text)
-                        .frame(width: 26)
+                        .frame(width: 30)
+
                     Button { app.lfoRate = min(8, app.lfoRate + 1) } label: {
-                        Image(systemName: "plus").frame(width: 22, height: 28)
+                        Image(systemName: "plus").frame(width: 24, height: 30)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.plain).foregroundColor(C.dim)
                 }
-                .background(C.bg3)
-                .cornerRadius(4)
-                .foregroundColor(C.dim)
+                .background(C.bg3).cornerRadius(4)
 
-                // Depth
+                Spacer()
+
+                // Depth (scrub left/right to change)
                 Image(systemName: "arrow.up.and.down")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(C.dim)
+                    .frame(width: 22)
 
-                LabeledControl(label: "depth") {
-                    CompactSlider(value: $app.lfoDepth, range: 0...99, step: 1)
+                VStack(spacing: 2) {
+                    ScrubValue(value: $app.lfoDepth, range: 0...99)
+                        .frame(width: 52)
+                    Text("depth")
+                        .font(.system(size: 7, design: .monospaced))
+                        .foregroundColor(C.dim)
                 }
-                .frame(maxWidth: .infinity)
 
-                // Center
+                Spacer()
+
+                // Center (scrub left/right to change)
                 Image(systemName: "arrow.up.and.down.circle")
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(C.dim)
+                    .frame(width: 22)
 
-                LabeledControl(label: "center") {
-                    CompactSlider(value: $app.lfoCenter, range: 0...99, step: 1)
+                VStack(spacing: 2) {
+                    ScrubValue(value: $app.lfoCenter, range: 0...99)
+                        .frame(width: 52)
+                    Text("center")
+                        .font(.system(size: 7, design: .monospaced))
+                        .foregroundColor(C.dim)
                 }
-                .frame(maxWidth: .infinity)
 
-                // Range readout
-                Text(app.lfoRange)
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundColor(C.dim)
-                    .frame(width: 34)
+                Spacer()
+
+                // Range (readonly)
+                VStack(spacing: 2) {
+                    Text(app.lfoRange)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(C.dim)
+                        .frame(height: 30)
+                    Text("range")
+                        .font(.system(size: 7, design: .monospaced))
+                        .foregroundColor(C.dim)
+                }
+                .frame(width: 44)
             }
-            .padding(.horizontal, 8)
+            .padding(.horizontal, 10)
             .padding(.vertical, 5)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
-            // ── 4. Waveform preview — FULL WIDTH ──────────────────────────────
+            // ── 4. Waveform preview — full width ──────────────────────────────
             MultiWaveformView(
                 lfos: previewLfos,
                 wave: app.lfoWave,
@@ -136,13 +170,11 @@ struct LFOPanelView: View {
                 depth: app.lfoDepth
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(8)
 
-            Rectangle().fill(C.bg3).frame(height: 1)
-
-            // ── 5. Active LFO list (compact, only when non-empty) ─────────────
+            // Active LFO chips (only when running)
             if !app.activeLfos.isEmpty {
+                Rectangle().fill(C.bg3).frame(height: 1)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(app.activeLfos) { lfo in
@@ -154,14 +186,13 @@ struct LFOPanelView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8).padding(.vertical, 4)
                 }
-
-                Rectangle().fill(C.bg3).frame(height: 1)
             }
 
-            // ── 6. Start buttons ───────────────────────────────────────────────
+            Rectangle().fill(C.bg3).frame(height: 1)
+
+            // ── 5. Start buttons ──────────────────────────────────────────────
             HStack(spacing: 8) {
                 Button { app.lfoStart(loop: true) } label: {
                     Label("∞ Loop", systemImage: "repeat")
@@ -197,13 +228,80 @@ struct LFOPanelView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 8)
+            .padding(.vertical, 7)
+
+            Rectangle().fill(C.bg3).frame(height: 1)
+
+            // ── 6. Status bar — at the bottom (matches Python layout) ─────────
+            Button { showDevicePicker = true } label: {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(app.isConnected ? C.green : C.orange)
+                        .frame(width: 7, height: 7)
+                    Text(app.connectionLabel)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(app.isConnected ? C.text : C.orange)
+                        .lineLimit(1)
+                    Spacer()
+                    Text("tempo: \(app.isClockMaster ? "app (midi sync)" : "op-1")")
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundColor(C.dim)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
+            .background(C.bg2)
         }
         .background(C.bg)
+        .sheet(isPresented: $showDevicePicker) { DevicePickerView() }
     }
 }
 
-// MARK: - Sub-components
+// MARK: - Scrubable number control
+// Drag left to decrease, right to increase — 1pt of drag = 0.5 units
+
+private struct ScrubValue: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+
+    @GestureState private var drag: CGFloat = 0
+    @State private var base: Double = 0
+
+    private var live: Double {
+        max(range.lowerBound, min(range.upperBound, base + Double(drag) * 0.5))
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(C.bg3)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(drag != 0 ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
+                )
+                .frame(height: 30)
+            Text(String(Int(live)))
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundColor(drag != 0 ? C.green : C.text)
+        }
+        .gesture(
+            DragGesture(minimumDistance: 2)
+                .updating($drag) { g, state, _ in state = g.translation.width }
+                .onEnded { g in
+                    let newVal = max(range.lowerBound,
+                                    min(range.upperBound,
+                                        (base + Double(g.translation.width) * 0.5).rounded()))
+                    base = newVal
+                    value = newVal
+                }
+        )
+        .onAppear { base = value }
+        .onChange(of: value) { _, v in if drag == 0 { base = v } }
+    }
+}
+
+// MARK: - Active LFO chip
 
 private struct ActiveLfoChip: View {
     let lfo: LfoClip
@@ -220,19 +318,21 @@ private struct ActiveLfoChip: View {
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundColor(selected ? C.text : C.dim)
             Button { onStop() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 7))
-                    .foregroundColor(C.dim)
+                Image(systemName: "xmark").font(.system(size: 7)).foregroundColor(C.dim)
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 3)
+        .padding(.horizontal, 6).padding(.vertical, 3)
         .background(selected ? C.bg3 : C.bg2)
         .cornerRadius(3)
         .onTapGesture { onSelect() }
     }
 }
+
+// MARK: - Track toggle button
+// OFF = track-color text on dark bg
+// ON  = solid track-color fill, black text
+// INV = dark bg, track-color text, rotated 180°
 
 private struct TrackToggleButton: View {
     let track: Int
@@ -241,29 +341,15 @@ private struct TrackToggleButton: View {
     let action: () -> Void
 
     private var color: Color { C.track(track) }
-    private var bg: Color {
-        switch state {
-        case 1: return color
-        case 2: return color.opacity(0.35)
-        default: return C.bg3
-        }
-    }
-    private var fg: Color {
-        switch state {
-        case 0: return C.dim
-        case 1: return .black
-        default: return color
-        }
-    }
-    private var label: String { state == 2 ? "[\(track)]" : "\(track)" }
 
     var body: some View {
         Button(action: action) {
-            Text(label)
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .frame(width: 36, height: 30)
-                .background(bg)
-                .foregroundColor(fg)
+            Text("\(track)")
+                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
+                .frame(width: 38, height: 32)
+                .background(state == 1 ? color : C.bg3)
+                .foregroundColor(state == 1 ? .black : (state == 0 ? C.dim : color))
                 .cornerRadius(5)
         }
         .buttonStyle(.plain)
@@ -271,99 +357,26 @@ private struct TrackToggleButton: View {
         .disabled(disabled)
     }
 }
+
+// MARK: - Master toggle button
 
 private struct MasterToggleButton: View {
     let state: Int
     let disabled: Bool
     let action: () -> Void
 
-    private var bg: Color {
-        switch state {
-        case 1: return C.green
-        case 2: return C.green.opacity(0.35)
-        default: return C.bg3
-        }
-    }
-    private var fg: Color {
-        switch state {
-        case 0: return C.dim
-        case 1: return .black
-        default: return C.green
-        }
-    }
-    private var label: String { state == 2 ? "[m]" : "m" }
-
     var body: some View {
         Button(action: action) {
-            Text(label)
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .frame(width: 36, height: 30)
-                .background(bg)
-                .foregroundColor(fg)
+            Text("m")
+                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
+                .frame(width: 38, height: 32)
+                .background(state == 1 ? C.green : C.bg3)
+                .foregroundColor(state == 1 ? .black : (state == 0 ? C.dim : C.green))
                 .cornerRadius(5)
         }
         .buttonStyle(.plain)
         .opacity(disabled ? 0.35 : 1)
         .disabled(disabled)
-    }
-}
-
-private struct LabeledControl<Content: View>: View {
-    let label: String
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        VStack(alignment: .center, spacing: 2) {
-            content()
-            Text(label)
-                .font(.system(size: 7, weight: .medium, design: .monospaced))
-                .foregroundColor(C.dim)
-        }
-    }
-}
-
-private struct CompactSlider: View {
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let step: Double
-
-    @GestureState private var drag: CGFloat = 0
-    @State private var base: Double = 0
-
-    var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let span = range.upperBound - range.lowerBound
-            let display = max(range.lowerBound, min(range.upperBound,
-                                                    base + Double(drag / w) * span))
-            let fraction = (display - range.lowerBound) / span
-
-            ZStack(alignment: .leading) {
-                Capsule().fill(C.bg3).frame(height: 4)
-                Capsule().fill(C.green)
-                    .frame(width: max(0, CGFloat(fraction) * w), height: 4)
-                Circle()
-                    .fill(C.text)
-                    .frame(width: 14, height: 14)
-                    .offset(x: max(0, CGFloat(fraction) * w - 7))
-            }
-            .frame(height: 26)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 1)
-                    .updating($drag) { g, state, _ in state = g.translation.width }
-                    .onEnded { g in
-                        let delta = Double(g.translation.width / w) * span
-                        let stepped = (base + delta) / step
-                        let newVal = max(range.lowerBound,
-                                         min(range.upperBound, stepped.rounded() * step))
-                        base = newVal
-                        value = newVal
-                    }
-            )
-            .onAppear { base = value }
-            .onChange(of: value) { _, newVal in if drag == 0 { base = newVal } }
-        }
-        .frame(height: 26)
     }
 }

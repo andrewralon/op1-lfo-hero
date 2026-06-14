@@ -2,71 +2,27 @@ import CoreBluetooth
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var app: AppState
-    @State private var showDevicePicker = false
-
     var body: some View {
         VStack(spacing: 0) {
-            // Status bar
-            StatusBarView(showPicker: $showDevicePicker)
-                .frame(height: 30)
-
-            Rectangle().fill(C.bg3).frame(height: 1)
-
-            // 4 track strips — fixed height so fader doesn't dominate
             TracksView()
                 .frame(height: 280)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
-            // Horizontal transport row below tracks (matches desktop layout)
             TransportBarView()
                 .frame(height: 50)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
-            // LFO panel fills the remaining space
             LFOPanelView()
                 .frame(maxHeight: .infinity)
         }
         .background(C.bg)
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $showDevicePicker) {
-            DevicePickerView()
-        }
     }
 }
 
-// MARK: - Status bar
-
-struct StatusBarView: View {
-    @EnvironmentObject var app: AppState
-    @Binding var showPicker: Bool
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Button { showPicker = true } label: {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(app.isConnected ? C.green : C.dim)
-                        .frame(width: 6, height: 6)
-                    Text(app.connectionLabel)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(app.isConnected ? C.text : C.dim)
-                        .lineLimit(1)
-                }
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
-        }
-        .padding(.horizontal, 10)
-        .frame(maxHeight: .infinity)
-        .background(C.bg2)
-    }
-}
-
-// MARK: - Device picker sheet
+// MARK: - Device picker sheet (used by LFOPanelView)
 
 struct DevicePickerView: View {
     @EnvironmentObject var app: AppState
