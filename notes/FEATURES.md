@@ -4,6 +4,7 @@
 - [ ] Generic MIDI device support: allow the app to connect to any MIDI device, not just OP-1s. Remove the OP-1 keyword filter from port detection; let the user pick a port from a list. Disable or hide OP-1-specific features (tape scrub, octave shift, BLE detection) when a non-OP-1 device is selected.
 - [ ] Desktop executables: package the app as a standalone binary for macOS and Windows using PyInstaller (or similar), so users can run it without a Python environment.
 - [ ] GitHub Actions release workflow: on GitHub release publish, automatically build the macOS and Windows executables and upload them as release artifacts. Triggered by the `release: published` event; one job per platform using hosted runners.
+- [ ] iOS port: refactor the UI layer to run on iOS (e.g. via Kivy, BeeWare/Toga, or a web-based frontend). Keep the existing PyQt6 desktop path intact so the app can still be launched from Python; the iOS target should share the core engine (`automation.py`, `clock.py`, `controller.py`) and add a separate UI entry point.
 - [ ] Responsive layout: allow the window to be freely resized (width and height). Keep icon-like controls fixed (pan dial, transport buttons, LFO track buttons, spinbox widths). Let track strips, waveform preview, LFO list, and volume faders scale to fill available space.
 - [ ] Automation / fader conflict: manually moving a fader while automation is running should cancel that automation clip
 - [ ] Preset saving: save/load slider positions and automation clips as JSON
@@ -13,7 +14,6 @@
 - ✗ Startup tempo mode detection: MIDI only exposes two groups — OP-1 sending clock (Beat Match / PO Sync / 1/16) vs silent (FREE / MIDI Sync). Modes within each group are indistinguishable; jitter overlap rules out finer discrimination. The app now auto-detects the two groups and labels them accordingly. Full empirical results in RESEARCH.md.
 
 ## Done
-- [x] iOS port: refactor the UI layer to run on iOS (e.g. via Kivy, BeeWare/Toga, or a web-based frontend). Keep the existing PyQt6 desktop path intact so the app can still be launched from Python; the iOS target should share the core engine (`automation.py`, `clock.py`, `controller.py`) and add a separate UI entry point.
 - [x] Project scaffold (venv, requirements.txt, .gitignore, src/ layout)
 - [x] MIDI device detection and connection (auto-detect OP-1 by port name)
 - [x] Clock listener: 24 PPQN tick counting, smoothed BPM calculation, beat callback
