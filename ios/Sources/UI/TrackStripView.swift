@@ -17,9 +17,9 @@ struct TrackStripView: View {
             // ── Mute button ───────────────────────────────────────────────────
             Button { app.toggleMute(track: track) } label: {
                 Text("\(track)")
-                    .font(.system(size: 16, weight: .bold, design: .monospaced))
+                    .font(.system(size: C.trackLabelSize, weight: .bold, design: .monospaced))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 7)
+                    .padding(.vertical, 5)
                     .background(muted ? color.opacity(0.2) : color)
                     .foregroundColor(muted ? color : .black)
             }
@@ -53,6 +53,6 @@ struct TracksView: View {
             ForEach(1...4, id: \.self) { TrackStripView(track: $0) }
         }
         .padding(.horizontal, 2)
-        .padding(.vertical, 4)
+        .padding(.vertical, 2)
     }
 }

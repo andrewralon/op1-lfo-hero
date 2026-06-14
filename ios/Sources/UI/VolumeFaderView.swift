@@ -41,7 +41,8 @@ struct VolumeFaderView: View {
                     }
 
                     Rectangle()
-                        .fill(Color.white.opacity(0.90))
+                        .fill(Color.gray)
+                        .overlay(Rectangle().stroke(Color.black, lineWidth: 1.5))
                         .frame(width: thumbSize, height: thumbSize)
                         .rotationEffect(.degrees(45))
                         .shadow(color: .black.opacity(0.45), radius: 1.5, y: 1)
@@ -53,13 +54,13 @@ struct VolumeFaderView: View {
                 // ── Live digits — always 2 digits, update every drag frame ──
                 HStack(alignment: .bottom, spacing: 0) {
                     Text(String(Int(display) / 10))
-                        .font(.system(size: 34, weight: .bold, design: .monospaced))
-                        .foregroundColor(C.text)
+                        .font(.system(size: 38, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .padding(.trailing, 7)
                     Text(String(Int(display) % 10))
-                        .font(.system(size: 34, weight: .bold, design: .monospaced))
-                        .foregroundColor(C.text)
+                        .font(.system(size: 38, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.leading, 7)
                 }

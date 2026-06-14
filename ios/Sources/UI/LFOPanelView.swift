@@ -1,5 +1,7 @@
 import SwiftUI
 
+private let ctrlFontSize: CGFloat = 15  // dropdowns + scrub boxes always match
+
 struct LFOPanelView: View {
     @EnvironmentObject var app: AppState
     @State private var selectedLfoID: UUID? = nil
@@ -35,7 +37,7 @@ struct LFOPanelView: View {
             Rectangle().fill(C.bg3).frame(height: 1)
 
             // ── 2. Param + wave dropdowns — fitted width, centered ────────────
-            HStack(spacing: 12) {
+            HStack(spacing: 6) {
                 Spacer()
                 Image(systemName: "umbrella").font(.system(size: 16)).foregroundColor(C.dim)
                 Menu {
@@ -46,7 +48,7 @@ struct LFOPanelView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text(app.lfoParam.rawValue)
-                            .font(.system(size: 15, weight: .medium))
+                            .font(.system(size: ctrlFontSize, weight: .medium))
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(size: 10))
                     }
@@ -67,7 +69,7 @@ struct LFOPanelView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Text(app.lfoWave.rawValue)
-                            .font(.system(size: 15, weight: .medium))
+                            .font(.system(size: ctrlFontSize, weight: .medium))
                             .frame(minWidth: 72, alignment: .leading)  // wide enough for "triangle"
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.system(size: 10))
@@ -93,23 +95,23 @@ struct LFOPanelView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "timer")
                         .font(.system(size: 17))
-                        .foregroundColor(C.dim)
+                        .foregroundColor(Color(hex: "#aaaaaa"))
 
                     HStack(spacing: 0) {
                         Button { app.lfoRate = max(1, app.lfoRate - 1) } label: {
                             Image(systemName: "minus").frame(width: 28, height: 36)
                         }
-                        .buttonStyle(.plain).foregroundColor(C.dim)
+                        .buttonStyle(.plain).foregroundColor(Color(hex: "#aaaaaa"))
 
                         Text(RATE_LABELS[app.lfoRate - 1])
                             .font(.system(size: 13, weight: .bold, design: .monospaced))
-                            .foregroundColor(C.text)
+                            .foregroundColor(.white)
                             .frame(width: 32)
 
                         Button { app.lfoRate = min(8, app.lfoRate + 1) } label: {
                             Image(systemName: "plus").frame(width: 28, height: 36)
                         }
-                        .buttonStyle(.plain).foregroundColor(C.dim)
+                        .buttonStyle(.plain).foregroundColor(Color(hex: "#aaaaaa"))
                     }
                     .background(C.bg3).cornerRadius(4)
                 }
@@ -120,7 +122,7 @@ struct LFOPanelView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.up.and.down")
                         .font(.system(size: 17))
-                        .foregroundColor(C.dim)
+                        .foregroundColor(Color(hex: "#aaaaaa"))
 
                     ScrubValue(value: $app.lfoDepth, range: 0...99)
                         .frame(width: 58)
@@ -132,7 +134,7 @@ struct LFOPanelView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.up.and.down.circle")
                         .font(.system(size: 17))
-                        .foregroundColor(C.dim)
+                        .foregroundColor(Color(hex: "#aaaaaa"))
 
                     ScrubValue(value: $app.lfoCenter, range: 0...99)
                         .frame(width: 58)
@@ -230,7 +232,7 @@ struct LFOPanelView: View {
                         .foregroundColor(C.dim)
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .padding(.vertical, 4)
             }
             .buttonStyle(.plain)
             .background(C.bg2)
@@ -264,8 +266,8 @@ private struct ScrubValue: View {
                 )
                 .frame(height: 36)
             Text(String(Int(live)))
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(drag != 0 ? C.green : C.text)
+                .font(.system(size: ctrlFontSize, weight: .bold, design: .monospaced))
+                .foregroundColor(drag != 0 ? C.green : .white)
         }
         .gesture(
             DragGesture(minimumDistance: 2)
@@ -327,7 +329,7 @@ private struct TrackToggleButton: View {
     var body: some View {
         Button(action: action) {
             Text("\(track)")
-                .font(.system(size: 18, weight: .bold, design: .monospaced))
+                .font(.system(size: C.trackLabelSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
                 .frame(width: 42, height: 42)
                 .background(state == 0 ? C.bg3 : color)
@@ -335,7 +337,7 @@ private struct TrackToggleButton: View {
                 .cornerRadius(7)
         }
         .buttonStyle(.plain)
-        .opacity(disabled ? 0.35 : 1)
+        .opacity(disabled ? 0.6 : 1)
         .disabled(disabled)
     }
 }
@@ -351,7 +353,7 @@ private struct MasterToggleButton: View {
     var body: some View {
         Button(action: action) {
             Text("m")
-                .font(.system(size: 18, weight: .bold, design: .monospaced))
+                .font(.system(size: C.trackLabelSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
                 .frame(width: 42, height: 42)
                 .background(state == 0 ? C.bg3 : C.green)
@@ -359,7 +361,7 @@ private struct MasterToggleButton: View {
                 .cornerRadius(7)
         }
         .buttonStyle(.plain)
-        .opacity(disabled ? 0.35 : 1)
+        .opacity(disabled ? 0.6 : 1)
         .disabled(disabled)
     }
 }
