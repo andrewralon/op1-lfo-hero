@@ -293,7 +293,7 @@ private struct CompactPicker<T>: View
 private struct ScrubValue: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
-    var sensitivity: Double = 0.25
+    var sensitivity: Double = 0.15
 
     @GestureState private var drag: CGFloat = 0
     @State private var base: Double = 0
