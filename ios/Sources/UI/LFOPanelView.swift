@@ -86,7 +86,7 @@ struct LFOPanelView: View {
                     ScrubValue(value: Binding(
                         get: { Double(app.lfoRate) },
                         set: { app.lfoRate = max(1, min(8, Int($0.rounded()))) }
-                    ), range: 1...8, sensitivity: 0.08)
+                    ), range: 1...8, sensitivity: 0.04)
                     .frame(width: 58)
                 }
 
@@ -293,7 +293,7 @@ private struct CompactPicker<T>: View
 private struct ScrubValue: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
-    var sensitivity: Double = 0.5
+    var sensitivity: Double = 0.25
 
     @GestureState private var drag: CGFloat = 0
     @State private var base: Double = 0
