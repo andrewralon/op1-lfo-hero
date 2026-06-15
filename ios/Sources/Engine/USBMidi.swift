@@ -48,7 +48,7 @@ final class USBMidi: NSObject, ObservableObject {
         // Retry scans in case iOS hasn't fully enumerated the USB device yet.
         // Run on global queue — scanForOP1() dispatches state changes to main internally.
         DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 1.0) { self.scanForOP1() }
-        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 3.0) { self.scanForOP1() }
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 1.5) { self.scanForOP1() }
     }
 
     private func setupMIDI() {

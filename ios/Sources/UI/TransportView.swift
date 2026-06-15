@@ -9,8 +9,8 @@ struct TransportBarView: View {
 
             Spacer()
 
-            TransBtn(symbol: "play.fill",  active: app.isPlaying) { app.play() }
-            TransBtn(symbol: "stop.fill",  active: false)          { app.stop() }
+            TransBtn(symbol: "play.fill",  active: app.isPlaying, disabled: !app.isClockMaster) { app.play() }
+            TransBtn(symbol: "stop.fill",  active: false)                                        { app.stop() }
 
             Sep()
 
@@ -214,6 +214,7 @@ private struct TransBtn: View {
     let symbol: String
     var weight: Font.Weight = .regular
     let active: Bool
+    var disabled: Bool = false
     let action: () -> Void
 
     var body: some View {
@@ -222,10 +223,11 @@ private struct TransBtn: View {
                 .font(.system(size: 20, weight: weight))
                 .frame(width: 44)
                 .frame(maxHeight: .infinity)
-                .background(active ? C.green.opacity(0.18) : Color.clear)
-                .foregroundColor(active ? C.green : C.text)
+                .background(active && !disabled ? C.green.opacity(0.18) : Color.clear)
+                .foregroundColor(disabled ? C.dim : active ? C.green : C.text)
         }
         .buttonStyle(ImmediateButtonStyle())
+        .disabled(disabled)
     }
 }
 

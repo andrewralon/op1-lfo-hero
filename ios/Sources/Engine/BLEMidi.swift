@@ -8,7 +8,7 @@ private let bleMIDICharUUID    = CBUUID(string: "7772E5DB-3868-4112-A1A9-F2669D1
 final class BLEMidi: NSObject, ObservableObject {
 
     enum State: Equatable {
-        case off, scanning, connecting(String), connected(String), disconnected(String)
+        case off, scanning, connecting(String), connected(String), disconnected(String), notFound
 
         var label: String {
             switch self {
@@ -17,6 +17,7 @@ final class BLEMidi: NSObject, ObservableObject {
             case .connecting(let n):   return "connecting to \(n)…"
             case .connected(let n):    return "\(n) (ble)"
             case .disconnected(let n): return "\(n) disconnected"
+            case .notFound:            return "no device found"
             }
         }
 
@@ -39,6 +40,7 @@ final class BLEMidi: NSObject, ObservableObject {
     private var midiChar: CBCharacteristic?
     private var peripheral: CBPeripheral?
     private let queue = DispatchQueue(label: "ble.midi", qos: .userInteractive)
+    private var scanTimeout: DispatchWorkItem?
 
     override init() {
         super.init()
@@ -48,13 +50,25 @@ final class BLEMidi: NSObject, ObservableObject {
     // MARK: - Public API
 
     func startScan() {
+        scanTimeout?.cancel()
         DispatchQueue.main.async { self.discovered.removeAll() }
         guard central.state == .poweredOn else { return }
         DispatchQueue.main.async { self.state = .scanning }
         central.scanForPeripherals(withServices: [bleMIDIServiceUUID])
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            // Keep scanning — auto-connect still works if an OP-1 appears later.
+            // Just change the label so the user sees a clear status instead of "scanning…" forever.
+            DispatchQueue.main.async {
+                if case .scanning = self.state { self.state = .notFound }
+            }
+        }
+        scanTimeout = timeout
+        queue.asyncAfter(deadline: .now() + 5.0, execute: timeout)
     }
 
     func connect(_ p: CBPeripheral) {
+        scanTimeout?.cancel()
         central.stopScan()
         peripheral = p
         DispatchQueue.main.async { self.state = .connecting(p.name ?? "device") }
@@ -132,6 +146,7 @@ extension BLEMidi: CBCentralManagerDelegate {
 
     func centralManager(_ c: CBCentralManager, didDiscover p: CBPeripheral,
                         advertisementData: [String: Any], rssi: NSNumber) {
+        scanTimeout?.cancel()
         guard !discovered.contains(p) else { return }
         DispatchQueue.main.async { self.discovered.append(p) }
         // Auto-connect to first OP-1 found
