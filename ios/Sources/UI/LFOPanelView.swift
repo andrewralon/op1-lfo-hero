@@ -85,7 +85,9 @@ struct LFOPanelView: View {
 
                     HStack(spacing: 0) {
                         Button { app.lfoRate = max(1, app.lfoRate - 1) } label: {
-                            Image(systemName: "minus").frame(width: 28, height: 36)
+                            Image(systemName: "minus")
+                                .frame(width: 40, height: 36)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain).foregroundColor(Color(hex: "#aaaaaa"))
 
@@ -95,7 +97,9 @@ struct LFOPanelView: View {
                             .frame(width: 32)
 
                         Button { app.lfoRate = min(8, app.lfoRate + 1) } label: {
-                            Image(systemName: "plus").frame(width: 28, height: 36)
+                            Image(systemName: "plus")
+                                .frame(width: 40, height: 36)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain).foregroundColor(Color(hex: "#aaaaaa"))
                     }
