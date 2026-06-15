@@ -27,7 +27,6 @@ final class ClockEngine {
 
     // MARK: - Transport state
     private var sppBeats = 0
-    private var hasEverPlayed = false
 
     weak var router: MidiRouter? {
         didSet { wireRouter() }
@@ -93,7 +92,12 @@ final class ClockEngine {
     func disableClock() {
         masterTimer?.cancel()
         masterTimer = nil
-        lock.lock(); isClockMaster = false; lock.unlock()
+        lock.lock()
+        isClockMaster = false
+        bpmHistory.removeAll()
+        lastTickTime = 0
+        slaveTick = 0
+        lock.unlock()
     }
 
     func setMasterBpm(_ newBpm: Double) {
@@ -156,13 +160,7 @@ final class ClockEngine {
     // MARK: - Transport commands
 
     func play() {
-        if !hasEverPlayed {
-            sppBeats = 0
-            router?.send([0xFA])
-            hasEverPlayed = true
-        } else {
-            router?.send([0xFB])
-        }
+        router?.send([0xFA])
         isPlaying = true
     }
 

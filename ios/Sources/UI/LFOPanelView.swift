@@ -249,7 +249,7 @@ struct LFOPanelView: View {
                     Text(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")
                         .foregroundColor(app.isClockMaster ? C.green : C.track(1))
                 }
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 2)
@@ -283,7 +283,7 @@ private struct CompactPicker<T>: View
                     Text(selection.rawValue)
                         .foregroundColor(.white)
                 }
-                .font(.system(size: ctrlFontSize, weight: .medium))
+                .font(.system(size: ctrlFontSize, weight: .bold))
             }
             .padding(.horizontal, 11)
             .padding(.vertical, 8)
