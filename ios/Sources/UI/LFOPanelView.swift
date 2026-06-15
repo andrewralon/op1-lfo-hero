@@ -301,25 +301,26 @@ private struct CompactPicker<T>: View
                         selection = opt
                         show = false
                     } label: {
-                        HStack {
-                            Text(opt.rawValue)
-                                .font(.system(size: ctrlFontSize,
-                                              weight: .bold,
-                                              design: .monospaced))
-                                .foregroundColor(selection == opt ? .accentColor : C.text)
-                            Spacer()
-                            if selection == opt {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.accentColor)
+                        // Text fills full width (tap anywhere on the row) and is centered.
+                        // Checkmark overlaid on trailing edge so it doesn't shift text off-center.
+                        Text(opt.rawValue)
+                            .font(.system(size: ctrlFontSize, weight: .bold, design: .monospaced))
+                            .foregroundColor(selection == opt ? .accentColor : C.text)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 10)
+                            .contentShape(Rectangle())
+                            .overlay(alignment: .trailing) {
+                                if selection == opt {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.accentColor)
+                                        .padding(.trailing, 20)
+                                }
                             }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
                     }
                     .buttonStyle(.plain)
                     if idx < options.count - 1 {
-                        Divider().padding(.horizontal, 20)
+                        Divider()
                     }
                 }
             }
