@@ -1,0 +1,448 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		F303F7CA2FDE4BC80060AA2D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C22FDE4BC80060AA2D /* Theme.swift */; };
+		F303F7CB2FDE4BC80060AA2D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7BF2FDE4BC80060AA2D /* ContentView.swift */; };
+		F303F7CC2FDE4BC80060AA2D /* TransportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C42FDE4BC80060AA2D /* TransportView.swift */; };
+		F303F7CD2FDE4BC80060AA2D /* Controller.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7BC2FDE4BC80060AA2D /* Controller.swift */; };
+		F303F7CE2FDE4BC80060AA2D /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7B82FDE4BC80060AA2D /* AppState.swift */; };
+		F303F7CF2FDE4BC80060AA2D /* ClockEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7BB2FDE4BC80060AA2D /* ClockEngine.swift */; };
+		F303F7D02FDE4BC80060AA2D /* VolumeFaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C52FDE4BC80060AA2D /* VolumeFaderView.swift */; };
+		F303F7D12FDE4BC80060AA2D /* TrackStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C32FDE4BC80060AA2D /* TrackStripView.swift */; };
+		F303F7D22FDE4BC80060AA2D /* LFOHeroApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C82FDE4BC80060AA2D /* LFOHeroApp.swift */; };
+		F303F7D32FDE4BC80060AA2D /* LFOPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C02FDE4BC80060AA2D /* LFOPanelView.swift */; };
+		F303F7D42FDE4BC80060AA2D /* AutomationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7B92FDE4BC80060AA2D /* AutomationEngine.swift */; };
+		F303F7D52FDE4BC80060AA2D /* PanKnobView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C12FDE4BC80060AA2D /* PanKnobView.swift */; };
+		F303F7D62FDE4BC80060AA2D /* BLEMidi.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7BA2FDE4BC80060AA2D /* BLEMidi.swift */; };
+		F303F7D72FDE4BC80060AA2D /* WaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C62FDE4BC80060AA2D /* WaveformView.swift */; };
+		F303F7D82FDE4BC80060AA2D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7BD2FDE4BC80060AA2D /* Models.swift */; };
+		F303F7E12FDE4BC80060AA2D /* USBMidi.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7E02FDE4BC80060AA2D /* USBMidi.swift */; };
+		F303F7E32FDE4BC80060AA2D /* MidiRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7E22FDE4BC80060AA2D /* MidiRouter.swift */; };
+		F303F7E52FDE4BC80060AA2D /* CoreMIDI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F303F7E42FDE4BC80060AA2D /* CoreMIDI.framework */; };
+		F33102832FE07989008CF623 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F33102822FE07989008CF623 /* Assets.xcassets */; };
+		F33102852FE07994008CF623 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = F33102842FE07994008CF623 /* Info.plist */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		F303F79E2FDE4A770060AA2D /* op1-lfo-hero.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "op1-lfo-hero.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F303F7B82FDE4BC80060AA2D /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		F303F7B92FDE4BC80060AA2D /* AutomationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationEngine.swift; sourceTree = "<group>"; };
+		F303F7BA2FDE4BC80060AA2D /* BLEMidi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLEMidi.swift; sourceTree = "<group>"; };
+		F303F7BB2FDE4BC80060AA2D /* ClockEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockEngine.swift; sourceTree = "<group>"; };
+		F303F7BC2FDE4BC80060AA2D /* Controller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Controller.swift; sourceTree = "<group>"; };
+		F303F7BD2FDE4BC80060AA2D /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		F303F7BF2FDE4BC80060AA2D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		F303F7C02FDE4BC80060AA2D /* LFOPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFOPanelView.swift; sourceTree = "<group>"; };
+		F303F7C12FDE4BC80060AA2D /* PanKnobView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanKnobView.swift; sourceTree = "<group>"; };
+		F303F7C22FDE4BC80060AA2D /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		F303F7C32FDE4BC80060AA2D /* TrackStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackStripView.swift; sourceTree = "<group>"; };
+		F303F7C42FDE4BC80060AA2D /* TransportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportView.swift; sourceTree = "<group>"; };
+		F303F7C52FDE4BC80060AA2D /* VolumeFaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeFaderView.swift; sourceTree = "<group>"; };
+		F303F7C62FDE4BC80060AA2D /* WaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaveformView.swift; sourceTree = "<group>"; };
+		F303F7C82FDE4BC80060AA2D /* LFOHeroApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFOHeroApp.swift; sourceTree = "<group>"; };
+		F303F7E02FDE4BC80060AA2D /* USBMidi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = USBMidi.swift; sourceTree = "<group>"; };
+		F303F7E22FDE4BC80060AA2D /* MidiRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MidiRouter.swift; sourceTree = "<group>"; };
+		F303F7E42FDE4BC80060AA2D /* CoreMIDI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMIDI.framework; path = System/Library/Frameworks/CoreMIDI.framework; sourceTree = SDKROOT; };
+		F33102822FE07989008CF623 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F33102842FE07994008CF623 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F303F79B2FDE4A770060AA2D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F303F7E52FDE4BC80060AA2D /* CoreMIDI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		F303F7952FDE4A770060AA2D = {
+			isa = PBXGroup;
+			children = (
+				F33102822FE07989008CF623 /* Assets.xcassets */,
+				F33102842FE07994008CF623 /* Info.plist */,
+				F303F79F2FDE4A770060AA2D /* Products */,
+				F303F7C92FDE4BC80060AA2D /* Sources */,
+				F303F7E62FDE4BC80060AA2D /* Frameworks */,
+			);
+			sourceTree = "<group>";
+		};
+		F303F79F2FDE4A770060AA2D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F303F79E2FDE4A770060AA2D /* op1-lfo-hero.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F303F7BE2FDE4BC80060AA2D /* Engine */ = {
+			isa = PBXGroup;
+			children = (
+				F303F7B82FDE4BC80060AA2D /* AppState.swift */,
+				F303F7B92FDE4BC80060AA2D /* AutomationEngine.swift */,
+				F303F7BA2FDE4BC80060AA2D /* BLEMidi.swift */,
+				F303F7BB2FDE4BC80060AA2D /* ClockEngine.swift */,
+				F303F7BC2FDE4BC80060AA2D /* Controller.swift */,
+				F303F7E22FDE4BC80060AA2D /* MidiRouter.swift */,
+				F303F7BD2FDE4BC80060AA2D /* Models.swift */,
+				F303F7E02FDE4BC80060AA2D /* USBMidi.swift */,
+			);
+			path = Engine;
+			sourceTree = "<group>";
+		};
+		F303F7C72FDE4BC80060AA2D /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				F303F7BF2FDE4BC80060AA2D /* ContentView.swift */,
+				F303F7C02FDE4BC80060AA2D /* LFOPanelView.swift */,
+				F303F7C12FDE4BC80060AA2D /* PanKnobView.swift */,
+				F303F7C22FDE4BC80060AA2D /* Theme.swift */,
+				F303F7C32FDE4BC80060AA2D /* TrackStripView.swift */,
+				F303F7C42FDE4BC80060AA2D /* TransportView.swift */,
+				F303F7C52FDE4BC80060AA2D /* VolumeFaderView.swift */,
+				F303F7C62FDE4BC80060AA2D /* WaveformView.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		F303F7C92FDE4BC80060AA2D /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				F303F7BE2FDE4BC80060AA2D /* Engine */,
+				F303F7C72FDE4BC80060AA2D /* UI */,
+				F303F7C82FDE4BC80060AA2D /* LFOHeroApp.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		F303F7E62FDE4BC80060AA2D /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				F303F7E42FDE4BC80060AA2D /* CoreMIDI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F303F79D2FDE4A770060AA2D /* op1-lfo-hero */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F303F7A92FDE4A780060AA2D /* Build configuration list for PBXNativeTarget "op1-lfo-hero" */;
+			buildPhases = (
+				F303F79A2FDE4A770060AA2D /* Sources */,
+				F303F79B2FDE4A770060AA2D /* Frameworks */,
+				F303F79C2FDE4A770060AA2D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "op1-lfo-hero";
+			packageProductDependencies = (
+			);
+			productName = "op1-lfo-hero";
+			productReference = F303F79E2FDE4A770060AA2D /* op1-lfo-hero.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F303F7962FDE4A770060AA2D /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2630;
+				LastUpgradeCheck = 2630;
+				TargetAttributes = {
+					F303F79D2FDE4A770060AA2D = {
+						CreatedOnToolsVersion = 26.3;
+					};
+				};
+			};
+			buildConfigurationList = F303F7992FDE4A770060AA2D /* Build configuration list for PBXProject "op1-lfo-hero" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = F303F7952FDE4A770060AA2D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = F303F79F2FDE4A770060AA2D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F303F79D2FDE4A770060AA2D /* op1-lfo-hero */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		F303F79C2FDE4A770060AA2D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F33102852FE07994008CF623 /* Info.plist in Resources */,
+				F33102832FE07989008CF623 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F303F79A2FDE4A770060AA2D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F303F7CA2FDE4BC80060AA2D /* Theme.swift in Sources */,
+				F303F7CB2FDE4BC80060AA2D /* ContentView.swift in Sources */,
+				F303F7CC2FDE4BC80060AA2D /* TransportView.swift in Sources */,
+				F303F7CD2FDE4BC80060AA2D /* Controller.swift in Sources */,
+				F303F7CE2FDE4BC80060AA2D /* AppState.swift in Sources */,
+				F303F7CF2FDE4BC80060AA2D /* ClockEngine.swift in Sources */,
+				F303F7D02FDE4BC80060AA2D /* VolumeFaderView.swift in Sources */,
+				F303F7D12FDE4BC80060AA2D /* TrackStripView.swift in Sources */,
+				F303F7D22FDE4BC80060AA2D /* LFOHeroApp.swift in Sources */,
+				F303F7D32FDE4BC80060AA2D /* LFOPanelView.swift in Sources */,
+				F303F7D42FDE4BC80060AA2D /* AutomationEngine.swift in Sources */,
+				F303F7D52FDE4BC80060AA2D /* PanKnobView.swift in Sources */,
+				F303F7D62FDE4BC80060AA2D /* BLEMidi.swift in Sources */,
+				F303F7E32FDE4BC80060AA2D /* MidiRouter.swift in Sources */,
+				F303F7D72FDE4BC80060AA2D /* WaveformView.swift in Sources */,
+				F303F7D82FDE4BC80060AA2D /* Models.swift in Sources */,
+				F303F7E12FDE4BC80060AA2D /* USBMidi.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		F303F7A72FDE4A780060AA2D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 8RG5QJVST3;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		F303F7A82FDE4A780060AA2D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 8RG5QJVST3;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		F303F7AA2FDE4A780060AA2D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8RG5QJVST3;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "op1-lfo-hero/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "op1 lfo hero";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "LFO Hero needs Bluetooth to connect to the OP-1 Field via BLE MIDI.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.andrewralon.op1-lfo-hero";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F303F7AB2FDE4A780060AA2D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8RG5QJVST3;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "op1-lfo-hero/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "op1 lfo hero";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "LFO Hero needs Bluetooth to connect to the OP-1 Field via BLE MIDI.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.andrewralon.op1-lfo-hero";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F303F7992FDE4A770060AA2D /* Build configuration list for PBXProject "op1-lfo-hero" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F303F7A72FDE4A780060AA2D /* Debug */,
+				F303F7A82FDE4A780060AA2D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F303F7A92FDE4A780060AA2D /* Build configuration list for PBXNativeTarget "op1-lfo-hero" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F303F7AA2FDE4A780060AA2D /* Debug */,
+				F303F7AB2FDE4A780060AA2D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = F303F7962FDE4A770060AA2D /* Project object */;
+}
