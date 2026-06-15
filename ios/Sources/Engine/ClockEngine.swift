@@ -35,7 +35,7 @@ final class ClockEngine {
     // Controls how far each arrow press moves the tape.
     // .measure = 16 SPP units (1 bar in 4/4) | .scrub = 4 SPP units (1 quarter note)
     enum TapeArrowMode { case measure, scrub }
-    var tapeArrowMode: TapeArrowMode = .scrub
+    var tapeArrowMode: TapeArrowMode = .measure
     private var tapeArrowStep: Int { tapeArrowMode == .measure ? 16 : 4 }
 
     weak var router: MidiRouter? {
