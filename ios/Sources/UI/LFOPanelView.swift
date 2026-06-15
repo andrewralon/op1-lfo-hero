@@ -195,8 +195,8 @@ struct LFOPanelView: View {
                             .foregroundColor(C.red)
                     }
                     .buttonStyle(.plain)
-                    .confirmationDialog("Delete all active LFOs?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-                        Button("Delete All", role: .destructive) {
+                    .confirmationDialog("delete all active LFOs?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                        Button("delete all", role: .destructive) {
                             app.stopAllLfos(); selectedLfoID = nil
                         }
                     }
