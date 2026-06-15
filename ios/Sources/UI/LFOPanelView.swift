@@ -287,7 +287,8 @@ private struct CompactPicker<T>: View
 }
 
 // MARK: - Scrubable number control
-// Drag left/right to change value. sensitivity = units per point of drag.
+// Drag up to increase, down to decrease — matches BpmScrubber direction.
+// sensitivity = units per point of drag.
 
 private struct ScrubValue: View {
     @Binding var value: Double
@@ -298,7 +299,7 @@ private struct ScrubValue: View {
     @State private var base: Double = 0
 
     private var live: Double {
-        max(range.lowerBound, min(range.upperBound, base + Double(drag) * sensitivity))
+        max(range.lowerBound, min(range.upperBound, base - Double(drag) * sensitivity))
     }
 
     var body: some View {
@@ -316,11 +317,11 @@ private struct ScrubValue: View {
         }
         .gesture(
             DragGesture(minimumDistance: 2)
-                .updating($drag) { g, state, _ in state = g.translation.width }
+                .updating($drag) { g, state, _ in state = g.translation.height }
                 .onEnded { g in
                     let newVal = max(range.lowerBound,
                                     min(range.upperBound,
-                                        (base + Double(g.translation.width) * sensitivity).rounded()))
+                                        (base - Double(g.translation.height) * sensitivity).rounded()))
                     base = newVal
                     value = newVal
                 }
