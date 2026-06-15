@@ -15,7 +15,7 @@ final class USBMidi: NSObject, ObservableObject {
         var label: String {
             switch self {
             case .disconnected:        return "no USB MIDI"
-            case .found(let names):    return "USB: \(names.prefix(2).joined(separator: " | "))"
+            case .found(let names):    return names.prefix(2).joined(separator: " | ")
             case .connected(let name): return "\(name) (usb)"
             }
         }
@@ -25,6 +25,9 @@ final class USBMidi: NSObject, ObservableObject {
             return false
         }
     }
+
+    // Virtual/network MIDI endpoints that are never real hardware — filter from found list.
+    private static let virtualEndpointNames = ["network session", "bluetooth", "iac driver"]
 
     @Published var state: State = .disconnected
 
@@ -92,7 +95,10 @@ final class USBMidi: NSObject, ObservableObject {
                 connectSource()
                 return
             }
-            otherNames.append(name)
+            // Skip known virtual/network endpoints — they're never real hardware.
+            let lower = name.lowercased()
+            let isVirtual = USBMidi.virtualEndpointNames.contains { lower.contains($0) }
+            if !isVirtual { otherNames.append(name) }
         }
         // OP-1 not found — clear refs and report what we did find (if anything).
         srcRef = 0
