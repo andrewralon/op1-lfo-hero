@@ -14,25 +14,21 @@ struct LFOPanelView: View {
         return []
     }
 
-    // Colors for all enabled track/master buttons — drives banded waveform preview
-    private var waveColors: [Color] {
+    // (color, isInverted) per enabled track/master — each draws its own waveform
+    private var waveTracks: [(Color, Bool)] {
         let trackDisabled = app.lfoParam.isMasterOnly
         let masterDisabled = !app.lfoParam.isMasterCapable
-        var result: [Color] = []
+        var result: [(Color, Bool)] = []
         if !trackDisabled {
-            for t in 1...4 where (app.trackOn[t] ?? 0) > 0 { result.append(C.track(t)) }
+            for t in 1...4 {
+                let s = app.trackOn[t] ?? 0
+                if s > 0 { result.append((C.track(t), s == 2)) }
+            }
         }
-        if !masterDisabled && app.masterOn > 0 { result.append(C.green) }
-        return result.isEmpty ? [C.green] : result
-    }
-
-    // True if any enabled track/master button is in the inverted (state == 2) position
-    private var waveInverted: Bool {
-        let trackDisabled = app.lfoParam.isMasterOnly
-        let masterDisabled = !app.lfoParam.isMasterCapable
-        let trackInv = !trackDisabled && (1...4).contains { (app.trackOn[$0] ?? 0) == 2 }
-        let masterInv = !masterDisabled && app.masterOn == 2
-        return trackInv || masterInv
+        if !masterDisabled && app.masterOn > 0 {
+            result.append((C.green, app.masterOn == 2))
+        }
+        return result.isEmpty ? [(C.green, false)] : result
     }
 
     var body: some View {
@@ -126,8 +122,7 @@ struct LFOPanelView: View {
                 wave: app.lfoWave,
                 rateTicks: RATE_TICKS[app.lfoRate] ?? (4 * PPQN),
                 depth: app.lfoDepth,
-                inverted: waveInverted,
-                colors: waveColors
+                tracks: waveTracks
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(8)
