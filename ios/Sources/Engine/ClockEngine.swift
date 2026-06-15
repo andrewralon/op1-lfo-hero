@@ -26,7 +26,14 @@ final class ClockEngine {
     private let masterQueue = DispatchQueue(label: "clock.master", qos: .userInteractive)
 
     // MARK: - Transport state
-    private var sppBeats = 0
+    // sppPos is in MIDI Song Position Pointer units (1/16 notes = 6 ticks at 24 PPQN)
+    private var sppPos = 0
+
+    // Controls how far each arrow press moves the tape.
+    // .measure = 16 SPP units (1 bar in 4/4) | .scrub = 4 SPP units (1 quarter note)
+    enum TapeArrowMode { case measure, scrub }
+    var tapeArrowMode: TapeArrowMode = .scrub
+    private var tapeArrowStep: Int { tapeArrowMode == .measure ? 16 : 4 }
 
     weak var router: MidiRouter? {
         didSet { wireRouter() }
@@ -165,7 +172,9 @@ final class ClockEngine {
     // MARK: - Transport commands
 
     func play() {
-        router?.send([0xFA])
+        // SPP to current position + 0xFB (Continue) is more reliable on OP-1 Field
+        // than 0xFA (Start) alone, which some firmware versions ignore after a Stop.
+        sendSPP(isCurrentlyPlaying: true)
         isPlaying = true
     }
 
@@ -174,24 +183,20 @@ final class ClockEngine {
         isPlaying = false
     }
 
-    func tapePrevBar() {
-        router?.send([0xB0, 82, 127])
-        sppBeats = max(0, sppBeats - 4)
-        sendSPP()
+    func tapePrev(isCurrentlyPlaying: Bool) {
+        sppPos = max(0, sppPos - tapeArrowStep)
+        sendSPP(isCurrentlyPlaying: isCurrentlyPlaying)
     }
 
-    func tapeNextBar() {
-        router?.send([0xB0, 83, 127])
-        sppBeats += 4
-        sendSPP()
+    func tapeNext(isCurrentlyPlaying: Bool) {
+        sppPos += tapeArrowStep
+        sendSPP(isCurrentlyPlaying: isCurrentlyPlaying)
     }
 
-    private func sendSPP() {
-        // Song Position Pointer: position in MIDI beats (6 ticks each), LSB first
-        let pos = sppBeats * (PPQN / 6)
-        let lo = UInt8(pos & 0x7F)
-        let hi = UInt8((pos >> 7) & 0x7F)
+    private func sendSPP(isCurrentlyPlaying: Bool) {
+        let lo = UInt8(sppPos & 0x7F)
+        let hi = UInt8((sppPos >> 7) & 0x7F)
         router?.send([0xF2, lo, hi])
-        if isPlaying { router?.send([0xFB]) }
+        if isCurrentlyPlaying { router?.send([0xFB]) }
     }
 }

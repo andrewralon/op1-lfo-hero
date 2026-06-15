@@ -151,8 +151,8 @@ final class AppState: ObservableObject {
         clock.stop()
     }
 
-    func tapePrev() { clock.tapePrevBar() }
-    func tapeNext() { clock.tapeNextBar() }
+    func tapePrev() { clock.tapePrev(isCurrentlyPlaying: isPlaying) }
+    func tapeNext() { clock.tapeNext(isCurrentlyPlaying: isPlaying) }
 
     func enableClock() {
         isClockMaster = true
@@ -207,6 +207,14 @@ final class AppState: ObservableObject {
 
     private func addLfo(track: Int, rateTicks: Int, depth: Double, center: Double,
                         inverted: Bool, loop: Bool) {
+        // Don't add a duplicate loop LFO — same config already running continuously.
+        // One-shots (loop: false) are allowed to stack since their timing differs.
+        if loop && activeLfos.contains(where: {
+            $0.loop && $0.track == track && $0.parameter == lfoParam &&
+            $0.wave == lfoWave && $0.rateTicks == rateTicks &&
+            $0.depth == depth && $0.centerValue == center && $0.inverted == inverted
+        }) { return }
+
         let lfo = LfoClip(track: track, parameter: lfoParam, wave: lfoWave,
                           rateTicks: rateTicks, depth: depth, centerValue: center,
                           inverted: inverted, loop: loop)
