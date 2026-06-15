@@ -1,62 +1,46 @@
 # LFO Hero — iOS App
 
-Native SwiftUI iOS app. Connects directly to the OP-1 Field via **Bluetooth LE MIDI** — no Mac required, no cables, no paid Apple Developer account.
+Native SwiftUI iOS app. Connects to the OP-1 Field via **USB-C** or **Bluetooth LE MIDI** — no paid Apple Developer account required.
 
 ## What it does
 
 | Feature | Detail |
 |---------|--------|
-| BLE MIDI | Auto-detects OP-1 Field by name, connects via CoreBluetooth |
+| USB MIDI | Wired USB-C connection; auto-detects OP-1 Field by name via CoreMIDI |
+| BLE MIDI | Wireless Bluetooth LE MIDI via CoreBluetooth |
 | Transport | Play / Stop / ← tape prev / → tape next |
 | Clock master | Generates 24 PPQN MIDI clock; toggle between master / slave |
-| BPM | Displayed, +1/−1 nudge buttons; auto-tracked when OP-1 is clock master |
+| BPM | Displayed, drag-to-scrub, double-tap for keyboard entry; auto-tracked when OP-1 is clock master |
 | Track strips | Volume fader (red fill, 0-99), pan knob (L/R), mute button — all 4 tracks |
 | LFO panel | All 9 wave shapes, all parameters (volume, pan, mute, tempo, FX 1-4, LFO 1-4), per-track + master targets, loop / one-shot, invert |
-| Screen lock | Disabled while app is open so MIDI keeps flowing |
+| Background | `UIBackgroundModes: audio` keeps MIDI running when screen is locked |
+
+---
+
+## Repo layout
+
+```
+ios/
+  op1-lfo-hero.xcodeproj/   ← open this in Xcode
+  Sources/                  ← all Swift source files (edit here)
+    Engine/                 ← AppState, ClockEngine, BLEMidi, USBMidi, MidiRouter, …
+    UI/                     ← SwiftUI views
+    LFOHeroApp.swift
+  Assets.xcassets/
+  Info.plist                ← UIBackgroundModes: audio (merged with auto-generated plist)
+```
+
+All source files live in the repo — no separate Xcode directory, no rsync step. Edit Swift files directly in `ios/Sources/`, then build in Xcode.
 
 ---
 
 ## Setup (one time)
 
-### 1 — Create the Xcode project
+### 1 — Open the Xcode project
 
-1. Open **Xcode → File → New → Project**
-2. Choose **iOS → App** → Next
-3. Fill in:
-   - **Product Name:** `LFOHero`
-   - **Interface:** SwiftUI
-   - **Language:** Swift
-   - **Bundle Identifier:** `com.yourname.lfohero` (any unique ID)
-4. **Uncheck** "Include Tests"
-5. Save the project anywhere (a `LFOHero/` sibling folder works fine)
+Open `ios/op1-lfo-hero.xcodeproj` in Xcode. Everything is already configured.
 
-### 2 — Add source files
-
-In Finder, drag the entire `Sources/` folder from this directory into the Xcode project navigator onto the `LFOHero` group. In the dialog:
-
-- ✅ Copy items if needed
-- ✅ Create groups (not folder references)
-- Target membership: ✅ LFOHero
-
-Delete the auto-generated `ContentView.swift` and `LFOHeroApp.swift` stubs Xcode created — the ones from `Sources/` replace them.
-
-### 3 — Configure Info.plist
-
-Open `Info.plist` (or `LFOHero/Info.plist`) and add:
-
-```xml
-<key>NSBluetoothAlwaysUsageDescription</key>
-<string>LFO Hero needs Bluetooth to connect to the OP-1 Field via BLE MIDI.</string>
-
-<key>UIBackgroundModes</key>
-<array>
-    <string>audio</string>
-</array>
-```
-
-The `audio` background mode keeps CoreBluetooth MIDI callbacks running when the screen is locked.
-
-### 4 — Free provisioning (no paid account)
+### 2 — Free provisioning (no paid account)
 
 1. Plug your iPhone into the Mac via USB
 2. In Xcode, select your iPhone as the run destination (top toolbar)
@@ -87,9 +71,15 @@ That's it — Xcode re-signs and re-installs automatically.
 
 ## Connecting to the OP-1
 
+### USB (recommended)
+1. Plug the OP-1 into the iPhone via USB-C
+2. Open LFO Hero — it detects the OP-1 automatically
+3. Status bar shows **OP-1 Field (usb)**
+
+### Bluetooth
 1. On the OP-1: **COM → MIDI → BLUETOOTH: ON**
 2. Open LFO Hero — it scans automatically
-3. When the OP-1 appears, the status bar shows **● OP-1 Field (bt)**
+3. Status bar shows **● OP-1 Field (bt)**
 4. If it doesn't auto-connect, tap the status bar to open the device picker
 
 ### Clock modes
