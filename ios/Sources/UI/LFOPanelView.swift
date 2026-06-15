@@ -322,11 +322,17 @@ private struct ScrubValue: View {
     var sensitivity: Double = 0.15
     var decimals: Int = 0
 
-    @GestureState private var drag: CGFloat = 0
+    @GestureState private var drag: CGSize = .zero
     @State private var base: Double = 0
 
+    // Horizontal offset divides sensitivity: 50pt away = half speed, 100pt = third, etc.
+    private func precisionFactor(_ ortho: CGFloat) -> Double {
+        1.0 / max(1.0, Double(abs(ortho)) / 50.0)
+    }
+
     private var live: Double {
-        max(range.lowerBound, min(range.upperBound, base - Double(drag) * sensitivity))
+        let delta = Double(drag.height) * sensitivity * precisionFactor(drag.width)
+        return max(range.lowerBound, min(range.upperBound, base - delta))
     }
 
     private var displayText: String {
@@ -339,27 +345,26 @@ private struct ScrubValue: View {
                 .fill(C.bg3)
                 .overlay(
                     RoundedRectangle(cornerRadius: 3)
-                        .stroke(drag != 0 ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
+                        .stroke(drag != .zero ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
                 )
                 .frame(height: 36)
             Text(displayText)
                 .font(.system(size: ctrlFontSize, weight: .bold, design: .monospaced))
-                .foregroundColor(drag != 0 ? C.green : .white)
+                .foregroundColor(drag != .zero ? C.green : .white)
         }
         .gesture(
             DragGesture(minimumDistance: 2)
-                .updating($drag) { g, state, _ in state = g.translation.height }
+                .updating($drag) { g, state, _ in state = g.translation }
                 .onEnded { g in
-                    var newVal = max(range.lowerBound,
-                                    min(range.upperBound,
-                                        base - Double(g.translation.height) * sensitivity))
+                    let delta = Double(g.translation.height) * sensitivity * precisionFactor(g.translation.width)
+                    var newVal = max(range.lowerBound, min(range.upperBound, base - delta))
                     if decimals == 0 { newVal = newVal.rounded() }
                     base = newVal
                     value = newVal
                 }
         )
         .onAppear { base = value }
-        .onChange(of: value) { _, v in if drag == 0 { base = v } }
+        .onChange(of: value) { _, v in if drag == .zero { base = v } }
     }
 }
 

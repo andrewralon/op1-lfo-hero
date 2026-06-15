@@ -55,18 +55,23 @@ struct TransportBarView: View {
 private struct BpmScrubber: View {
     @EnvironmentObject var app: AppState
     @State  private var base: Double  = 120
-    @GestureState private var drag: CGFloat = 0
+    @GestureState private var drag: CGSize = .zero
     @State  private var editing   = false
     @State  private var editText  = ""
     @FocusState private var focused: Bool
 
+    private func precisionFactor(_ ortho: CGFloat) -> Double {
+        1.0 / max(1.0, Double(abs(ortho)) / 50.0)
+    }
+
     private var live: Double {
-        max(20, min(300, base - Double(drag) * 0.05))
+        let delta = Double(drag.height) * 0.05 * precisionFactor(drag.width)
+        return max(20, min(300, base - delta))
     }
 
     private var strokeColor: Color {
-        if editing   { return C.green.opacity(0.8) }
-        if drag != 0 { return C.green.opacity(0.6) }
+        if editing       { return C.green.opacity(0.8) }
+        if drag != .zero { return C.green.opacity(0.6) }
         return .clear
     }
 
@@ -93,7 +98,7 @@ private struct BpmScrubber: View {
             } else {
                 Text(String(format: "%.1f", live))
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
-                    .foregroundColor(drag != 0 ? C.green : .white)
+                    .foregroundColor(drag != .zero ? C.green : .white)
             }
         }
         .contentShape(Rectangle())
@@ -101,11 +106,12 @@ private struct BpmScrubber: View {
             DragGesture(minimumDistance: 2)
                 .updating($drag) { g, state, _ in
                     guard !editing else { return }
-                    state = g.translation.height
+                    state = g.translation
                 }
                 .onEnded { g in
                     guard !editing else { return }
-                    let raw     = max(20, min(300, base - Double(g.translation.height) * 0.05))
+                    let delta   = Double(g.translation.height) * 0.05 * precisionFactor(g.translation.width)
+                    let raw     = max(20, min(300, base - delta))
                     let rounded = (raw * 10).rounded() / 10
                     base = rounded
                     app.setBpm(rounded)
@@ -117,7 +123,7 @@ private struct BpmScrubber: View {
                 .onEnded { _ in startEditing() }
         )
         .onAppear { base = app.bpm }
-        .onChange(of: app.bpm) { _, v in if drag == 0 && !editing { base = v } }
+        .onChange(of: app.bpm) { _, v in if drag == .zero && !editing { base = v } }
     }
 
     private func startEditing() {
