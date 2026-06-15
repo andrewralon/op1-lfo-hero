@@ -1,7 +1,7 @@
 # Comments
 
 ## To fix
-- HIGH - reorder text for active lfo's to be same order as UI - `t1*volume*sine` (not `sine*volume*t1`)
+- HIGH - volume values don't match (app to op1) - off by 1 here and there
 - HIGH - show the scrub UI boxes differently so it's obvious they are scrubbable (vs dropdown, for example) - 2 thin vertical lines next to box? Different color border (white vs gray)? BEST: Single thin vertical white line just to the right of the box
   * fun idea - BPM box could use a way to show the user it can be scrubbed. maybe like it's a big rotating wheel or an old analog clock. maybe clip the top and bottom of the next entries so they're cut off at the edges of the box?
 - MED - pan knob is weird (scrubs up and down, not turning or left-to-right). Not sure how to fix it cause there's no room to scrub horizontally on the screen.
@@ -18,3 +18,6 @@
 - MED - rate/speed needs all of the OP-1 options - 25 options (in order): 8 to 1 (relative tempo time) + 17 for clock symbols 0 to 30 minutes (absolute time)
 - MED - disable all button animations / transition times. just flipping toggle the button fast! this doesn't seem to be working: ".animation(.none, value: state)"
 - LOW - volume value is hidden by thumb. Move higher? fine with scrubbing.... 
+
+## Done
+- [x] HIGH reorder text for active lfo's to be same order as UI - `t1*volume*sine` (not `sine*volume*t1`)

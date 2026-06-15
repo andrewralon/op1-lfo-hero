@@ -106,7 +106,7 @@ struct LfoClip: Identifiable {
         let t = track == 0 ? "m" : "t\(track)"
         let inv = inverted ? "·inv" : ""
         let loopMark = loop ? "↻" : "1×"
-        return "\(wave.rawValue)·\(parameter.rawValue)·\(t)·\(rateLabel)·\(loopMark)\(inv)"
+        return "\(t)·\(parameter.rawValue)·\(wave.rawValue)·\(rateLabel)·\(loopMark)\(inv)"
     }
 }
 
