@@ -46,7 +46,10 @@ final class USBMidi: NSObject, ObservableObject {
         MIDIClientCreateWithBlock("LFOHeroUSB" as CFString, &client) { [weak self] notifPtr in
             let id = notifPtr.pointee.messageID
             guard id == .msgSetupChanged || id == .msgObjectAdded || id == .msgObjectRemoved else { return }
+            // Scan twice: quickly for disconnect, and again after 500ms in case
+            // the device isn't fully enumerated yet on the first scan.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self?.scanForOP1() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5)  { self?.scanForOP1() }
         }
         MIDIOutputPortCreate(client, "LFOHeroOut" as CFString, &outPort)
         // MIDIInputPortCreateWithBlock is deprecated in iOS 14 but provides simple
@@ -75,8 +78,10 @@ final class USBMidi: NSObject, ObservableObject {
             connectSource()
             return
         }
-        // OP-1 not found — tear down previous connection
-        if srcRef != 0 { MIDIPortDisconnectSource(inPort, srcRef); srcRef = 0 }
+        // OP-1 not found — clear refs. CoreMIDI already disconnected the source
+        // when the device was removed; calling MIDIPortDisconnectSource on a dead
+        // endpoint can corrupt the port and prevent reconnection.
+        srcRef = 0
         if destRef != 0 {
             destRef = 0
             DispatchQueue.main.async { self.state = .disconnected }
