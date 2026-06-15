@@ -73,7 +73,7 @@ def main() -> None:
         except KeyboardInterrupt:
             sys.exit(0)
         except Exception as exc:
-            QMessageBox.critical(None, "MIDI Connection Failed", str(exc))
+            QMessageBox.critical(None, "MIDI connection failed", str(exc))
             sys.exit(1)
 
     ble_mode = is_ble_port(in_port_name) or is_ble_port(out_port_name)
@@ -118,7 +118,7 @@ def main() -> None:
         _s.close()
     except Exception:
         _local_ip = "localhost"
-    print(f"Remote control: http://{_local_ip}:{REMOTE_PORT}/")
+    print(f"remote control: http://{_local_ip}:{REMOTE_PORT}/")
     # ───────────────────────────────────────────────────────────────────────
 
     def on_slave_tick(tick_count: int, beat_count: int) -> None:

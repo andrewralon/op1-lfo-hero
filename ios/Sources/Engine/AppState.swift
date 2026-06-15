@@ -13,7 +13,7 @@ final class AppState: ObservableObject {
     let controller: Controller
 
     // MARK: - Connection
-    @Published var connectionLabel = "Scanning…"
+    @Published var connectionLabel = "scanning…"
     @Published var isConnected = false
 
     // MARK: - Transport
@@ -27,8 +27,16 @@ final class AppState: ObservableObject {
     @Published var mutes:   [Int: Bool]   = [1: false, 2: false, 3: false, 4: false]
 
     // MARK: - LFO editor
-    @Published var lfoWave   = LfoWave.sine
-    @Published var lfoParam  = Parameter.volume
+    @Published var lfoWave  = LfoWave.sine
+    @Published var lfoParam = Parameter.volume {
+        didSet {
+            if lfoParam == .tempo {
+                masterOn = 1
+            } else if oldValue == .tempo {
+                masterOn = 0
+            }
+        }
+    }
     @Published var lfoRate   = 3           // 1-8
     @Published var lfoDepth  = 25.0        // display units (0-99)
     @Published var lfoCenter = 90.0        // display units (0-99)

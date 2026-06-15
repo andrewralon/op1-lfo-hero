@@ -12,10 +12,10 @@ final class BLEMidi: NSObject, ObservableObject {
 
         var label: String {
             switch self {
-            case .off:                 return "Bluetooth off"
-            case .scanning:            return "Scanning…"
-            case .connecting(let n):   return "Connecting to \(n)…"
-            case .connected(let n):    return "\(n) (bt)"
+            case .off:                 return "bluetooth off"
+            case .scanning:            return "scanning…"
+            case .connecting(let n):   return "connecting to \(n)…"
+            case .connected(let n):    return "\(n) (ble)"
             case .disconnected(let n): return "\(n) disconnected"
             }
         }

@@ -95,7 +95,7 @@ private struct BpmScrubber: View {
                     .toolbar {
                         ToolbarItemGroup(placement: .keyboard) {
                             Spacer()
-                            Button("Done") { commitEdit() }
+                            Button("done") { commitEdit() }
                         }
                     }
             } else {

@@ -73,15 +73,18 @@ struct LFOPanelView: View {
             Rectangle().fill(C.bg3).frame(height: 1)
 
             // ── 2. Param + wave dropdowns — fitted width, centered ────────────
-            HStack(spacing: 6) {
+            HStack(spacing: 14) {
                 Spacer()
-                Image(systemName: "umbrella").font(.system(size: 20)).foregroundColor(Color(hex: "#aaaaaa"))
-                CompactPicker(options: Array(Parameter.allCases),
-                              selection: $app.lfoParam)
-                Spacer()
-                Image(systemName: "waveform.path").font(.system(size: 20)).foregroundColor(Color(hex: "#aaaaaa"))
-                CompactPicker(options: Array(LfoWave.allCases),
-                              selection: $app.lfoWave)
+                HStack(spacing: 6) {
+                    Image(systemName: "umbrella").font(.system(size: 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                    CompactPicker(options: Array(Parameter.allCases),
+                                  selection: $app.lfoParam)
+                }
+                HStack(spacing: 6) {
+                    Image(systemName: "waveform.path").font(.system(size: 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                    CompactPicker(options: Array(LfoWave.allCases),
+                                  selection: $app.lfoWave)
+                }
                 Spacer()
             }
             .padding(.vertical, 4)
@@ -368,6 +371,7 @@ private struct ScrubValue: View {
                     let dh = g.translation.height - prevHeight
                     accumulated += dh * sensitivity * precisionFactor(g.translation.width)
                     prevHeight = g.translation.height
+                    value = live
                 }
                 .onEnded { _ in
                     var newVal = live

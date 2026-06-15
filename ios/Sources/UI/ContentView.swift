@@ -32,9 +32,9 @@ struct DevicePickerView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Discovered Devices") {
+                Section("discovered devices") {
                     if app.ble.discovered.isEmpty {
-                        Label("Scanning for BLE MIDI devices…", systemImage: "wave.3.right")
+                        Label("scanning for BLE MIDI devices…", systemImage: "wave.3.right")
                             .foregroundColor(C.dim)
                     } else {
                         ForEach(app.ble.discovered, id: \.identifier) { p in
@@ -55,18 +55,18 @@ struct DevicePickerView: View {
                     }
                 }
                 Section {
-                    Button("Disconnect") {
+                    Button("disconnect") {
                         app.ble.disconnect()
                         dismiss()
                     }
                     .foregroundColor(C.red)
                 }
             }
-            .navigationTitle("BLE MIDI Device")
+            .navigationTitle("BLE MIDI device")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button("done") { dismiss() }
                 }
             }
         }

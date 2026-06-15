@@ -100,8 +100,8 @@ class RemoteServer:
         async def manifest():
             from fastapi.responses import Response
             data = json.dumps({
-                "name": "LFO Hero Remote",
-                "short_name": "LFO Hero",
+                "name": "op1 lfo hero",
+                "short_name": "op1 lfo hero",
                 "start_url": "/",
                 "display": "standalone",
                 "background_color": "#111111",

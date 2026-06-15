@@ -13,7 +13,7 @@ final class USBMidi: NSObject, ObservableObject {
 
         var label: String {
             switch self {
-            case .disconnected:        return "No USB MIDI"
+            case .disconnected:        return "no USB MIDI"
             case .connected(let name): return "\(name) (usb)"
             }
         }
