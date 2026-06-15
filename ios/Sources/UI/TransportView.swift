@@ -7,6 +7,8 @@ struct TransportBarView: View {
     var body: some View {
         HStack(spacing: 0) {
 
+            Spacer()
+
             TransBtn(symbol: "play.fill",  active: app.isPlaying) { app.play() }
             TransBtn(symbol: "stop.fill",  active: false)          { app.stop() }
 

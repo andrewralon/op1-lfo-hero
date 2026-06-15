@@ -24,6 +24,7 @@ struct TrackStripView: View {
                     .foregroundColor(muted ? color : .black)
             }
             .buttonStyle(.plain)
+            .animation(.none, value: muted)
 
             // ── Pan knob ──────────────────────────────────────────────────────
             PanKnobView(value: pan) { app.setPan(track: track, value: $0) }

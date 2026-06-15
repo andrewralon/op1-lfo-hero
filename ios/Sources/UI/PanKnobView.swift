@@ -15,7 +15,7 @@ struct PanKnobView: View {
             let r  = sz / 2 - 1
 
             let rawVal   = max(-63, min(63, base + Int(-drag / 1.4)))
-            let liveVal  = abs(rawVal) <= 3 ? 0 : rawVal
+            let liveVal  = abs(rawVal) <= 2 ? 0 : rawVal
             let angleDeg = Double(liveVal) / 63.0 * 130.0
             let rad      = (angleDeg - 90) * Double.pi / 180
             let tipX     = cx + CGFloat(cos(rad)) * r
@@ -49,7 +49,7 @@ struct PanKnobView: View {
                     .updating($drag) { g, state, _ in state = g.translation.height }
                     .onEnded { g in
                         let raw    = max(-63, min(63, base + Int(-g.translation.height / 1.4)))
-                        let newVal = abs(raw) <= 3 ? 0 : raw
+                        let newVal = abs(raw) <= 2 ? 0 : raw
                         base = newVal
                         value = newVal
                         onChange(newVal)
