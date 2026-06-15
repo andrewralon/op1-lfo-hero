@@ -61,7 +61,7 @@ private struct BpmScrubber: View {
     @FocusState private var focused: Bool
 
     private var live: Double {
-        max(20, min(300, base - Double(drag) * 0.1))
+        max(20, min(300, base - Double(drag) * 0.05))
     }
 
     private var strokeColor: Color {
@@ -105,7 +105,7 @@ private struct BpmScrubber: View {
                 }
                 .onEnded { g in
                     guard !editing else { return }
-                    let raw     = max(20, min(300, base - Double(g.translation.height) * 0.1))
+                    let raw     = max(20, min(300, base - Double(g.translation.height) * 0.05))
                     let rounded = (raw * 10).rounded() / 10
                     base = rounded
                     app.setBpm(rounded)

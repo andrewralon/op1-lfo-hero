@@ -14,6 +14,25 @@ struct LFOPanelView: View {
         return []
     }
 
+    // Snaps lfoCenter to the OP-1's current value for the selected parameter/track.
+    private func snapCenter() {
+        if app.lfoParam == .tempo {
+            app.lfoCenter = app.bpm
+            return
+        }
+        guard let track = (1...4).first(where: { (app.trackOn[$0] ?? 0) > 0 }) else { return }
+        switch app.lfoParam {
+        case .volume:
+            app.lfoCenter = app.volumes[track] ?? 90
+        case .pan:
+            app.lfoCenter = midiToUI(Double((app.pans[track] ?? 0) + 64))
+        case .mute:
+            app.lfoCenter = (app.mutes[track] ?? false) ? 99 : 0
+        default:
+            break  // fx/lfo params not tracked in AppState
+        }
+    }
+
     // (color, isInverted) per enabled track/master — each draws its own waveform
     private var waveTracks: [(Color, Bool)] {
         let trackDisabled = app.lfoParam.isMasterOnly
@@ -83,7 +102,7 @@ struct LFOPanelView: View {
                         get: { Double(app.lfoRate) },
                         set: { app.lfoRate = max(1, min(8, Int($0.rounded()))) }
                     ), range: 1...8, sensitivity: 0.04)
-                    .frame(width: 58)
+                    .frame(width: 40)
                 }
 
                 Spacer(minLength: 20)
@@ -106,8 +125,20 @@ struct LFOPanelView: View {
                         .font(.system(size: 20))
                         .foregroundColor(Color(hex: "#aaaaaa"))
 
-                    ScrubValue(value: $app.lfoCenter, range: 0...99)
-                        .frame(width: 58)
+                    ScrubValue(value: $app.lfoCenter,
+                               range: app.lfoParam == .tempo ? 20...300 : 0...99,
+                               decimals: app.lfoParam == .tempo ? 1 : 0)
+                        .frame(width: 74)
+
+                    Button { snapCenter() } label: {
+                        Image(systemName: "scope")
+                            .font(.system(size: 13))
+                            .foregroundColor(Color(hex: "#aaaaaa"))
+                            .frame(width: 28, height: 36)
+                            .background(C.bg3)
+                            .cornerRadius(3)
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 Spacer(minLength: 0)
@@ -289,12 +320,17 @@ private struct ScrubValue: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
     var sensitivity: Double = 0.15
+    var decimals: Int = 0
 
     @GestureState private var drag: CGFloat = 0
     @State private var base: Double = 0
 
     private var live: Double {
         max(range.lowerBound, min(range.upperBound, base - Double(drag) * sensitivity))
+    }
+
+    private var displayText: String {
+        decimals > 0 ? String(format: "%.\(decimals)f", live) : String(Int(live.rounded()))
     }
 
     var body: some View {
@@ -306,7 +342,7 @@ private struct ScrubValue: View {
                         .stroke(drag != 0 ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
                 )
                 .frame(height: 36)
-            Text(String(Int(live.rounded())))
+            Text(displayText)
                 .font(.system(size: ctrlFontSize, weight: .bold, design: .monospaced))
                 .foregroundColor(drag != 0 ? C.green : .white)
         }
@@ -314,9 +350,10 @@ private struct ScrubValue: View {
             DragGesture(minimumDistance: 2)
                 .updating($drag) { g, state, _ in state = g.translation.height }
                 .onEnded { g in
-                    let newVal = max(range.lowerBound,
+                    var newVal = max(range.lowerBound,
                                     min(range.upperBound,
-                                        (base - Double(g.translation.height) * sensitivity).rounded()))
+                                        base - Double(g.translation.height) * sensitivity))
+                    if decimals == 0 { newVal = newVal.rounded() }
                     base = newVal
                     value = newVal
                 }
