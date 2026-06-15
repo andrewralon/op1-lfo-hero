@@ -39,7 +39,8 @@ final class USBMidi: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        setupMIDI()
+        // CoreMIDI setup is safe on any thread; keep main thread free for first render
+        DispatchQueue.global(qos: .userInteractive).async { self.setupMIDI() }
     }
 
     private func setupMIDI() {

@@ -27,13 +27,19 @@ struct TrackStripView: View {
             .animation(.none, value: muted)
 
             // ── Pan knob ──────────────────────────────────────────────────────
-            PanKnobView(value: pan) { app.setPan(track: track, value: $0) }
+            PanKnobView(
+                value: pan,
+                onLiveChange: { app.controller.setPan(track: track, value: $0 + 64) }
+            ) { app.setPan(track: track, value: $0) }
                 .padding(.horizontal, 12)
                 .frame(height: 62)
                 .padding(.vertical, 5)
 
             // ── Fader (digits live-update inside VolumeFaderView) ─────────────
-            VolumeFaderView(value: vol) { app.setVolume(track: track, value: $0) }
+            VolumeFaderView(
+                value: vol,
+                onLiveChange: { app.controller.setVolume(track: track, value: uiToMidi($0)) }
+            ) { app.setVolume(track: track, value: $0) }
                 .padding(.vertical, 8)
                 .frame(maxHeight: .infinity)
         }

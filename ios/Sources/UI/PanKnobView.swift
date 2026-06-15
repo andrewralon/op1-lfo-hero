@@ -2,7 +2,8 @@ import SwiftUI
 
 struct PanKnobView: View {
     @Binding var value: Int   // -63..+63, 0 = center
-    let onChange: (Int) -> Void
+    var onLiveChange: ((Int) -> Void)? = nil  // called every drag frame (MIDI only)
+    let onChange: (Int) -> Void               // called on drag end (commits to AppState)
 
     @GestureState private var drag: CGFloat = 0
     @State private var base: Int = 0
@@ -47,6 +48,11 @@ struct PanKnobView: View {
             .gesture(
                 DragGesture(minimumDistance: 1)
                     .updating($drag) { g, state, _ in state = g.translation.height }
+                    .onChanged { g in
+                        let raw  = max(-63, min(63, base + Int(-g.translation.height / 1.4)))
+                        let live = abs(raw) <= 2 ? 0 : raw
+                        onLiveChange?(live)
+                    }
                     .onEnded { g in
                         let raw    = max(-63, min(63, base + Int(-g.translation.height / 1.4)))
                         let newVal = abs(raw) <= 2 ? 0 : raw

@@ -4,7 +4,8 @@ import SwiftUI
 // (display is computed from accumulated delta, updated every drag frame)
 struct VolumeFaderView: View {
     @Binding var value: Double  // 0-99
-    let onChange: (Double) -> Void
+    var onLiveChange: ((Double) -> Void)? = nil  // called every drag frame (MIDI only, no state update)
+    let onChange: (Double) -> Void               // called on drag end (commits to AppState)
 
     private let trackW: CGFloat    = 6
     private let thumbSize: CGFloat = 14  // square rotated 45° = perfect ◇
@@ -87,6 +88,7 @@ struct VolumeFaderView: View {
                         let dh = g.translation.height - prevHeight
                         accumulated += Double(dh / travel * 99) * precisionFactor(g.translation.width)
                         prevHeight = g.translation.height
+                        onLiveChange?(max(0, min(99, base - accumulated)))
                     }
                     .onEnded { _ in
                         let newVal = max(0, min(99, base - accumulated))

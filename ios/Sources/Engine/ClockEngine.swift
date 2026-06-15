@@ -16,7 +16,7 @@ final class ClockEngine {
     // MARK: - Slave (listening) state
     private var slaveTick = 0
     private var bpmHistory: [Double] = []
-    private let smoothN = 48  // double-smoothing for BLE jitter
+    private let smoothN = 96  // larger window = smoother BPM display over BLE/USB jitter
     private var lastTickTime: Double = 0
 
     // MARK: - Master (generating) state
@@ -53,9 +53,14 @@ final class ClockEngine {
             if bpmHistory.count >= 8 {
                 let avg = bpmHistory.reduce(0, +) / Double(bpmHistory.count)
                 let newBpm = 60.0 / (Double(PPQN) * avg)
-                bpm = newBpm
-                lock.unlock()
-                bpmCallback?(newBpm)
+                // Only publish when the change is visible at 1-decimal display precision
+                if abs(newBpm - bpm) >= 0.05 {
+                    bpm = newBpm
+                    lock.unlock()
+                    bpmCallback?(newBpm)
+                } else {
+                    lock.unlock()
+                }
             } else {
                 lock.unlock()
             }

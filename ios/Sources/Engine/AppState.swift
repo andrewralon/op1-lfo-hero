@@ -122,10 +122,17 @@ final class AppState: ObservableObject {
             let track = channel + 1
             guard (1...4).contains(track) else { return }
             DispatchQueue.main.async {
+                guard let self else { return }
                 switch cc {
-                case 7:  self?.volumes[track] = midiToUI(Double(value))
-                case 9:  self?.mutes[track]   = value >= 64
-                case 10: self?.pans[track]    = value - 64
+                case 7:
+                    let v = midiToUI(Double(value))
+                    if self.volumes[track] != v { self.volumes[track] = v }
+                case 9:
+                    let m = value >= 64
+                    if self.mutes[track] != m { self.mutes[track] = m }
+                case 10:
+                    let p = value - 64
+                    if self.pans[track] != p { self.pans[track] = p }
                 default: break
                 }
             }
