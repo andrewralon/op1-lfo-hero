@@ -113,17 +113,22 @@ final class ClockEngine {
         bpmCallback?(clamped)
     }
 
+    // nextFireTime tracks the absolute intended fire time so rescheduling never
+    // adds handler execution latency to the period (only accessed on masterQueue).
+    private var nextFireTime: DispatchTime = .now()
+    private var lastTickNs = 0
+
     private func scheduleMasterTimer(bpm: Double) {
         masterTimer?.cancel()
         let t = DispatchSource.makeTimerSource(queue: masterQueue)
         masterTimer = t
         let ns = Int(60_000_000_000 / (bpm * Double(PPQN)))
-        t.schedule(deadline: .now(), repeating: .nanoseconds(ns), leeway: .microseconds(200))
+        nextFireTime = .now()
+        lastTickNs = 0  // force period sync on first tick
+        t.schedule(deadline: nextFireTime, repeating: .nanoseconds(ns), leeway: .microseconds(200))
         t.setEventHandler { [weak self] in self?.fireMasterTick() }
         t.resume()
     }
-
-    private var lastTickNs = 0
 
     private func fireMasterTick() {
         router?.send([0xF8])
@@ -133,11 +138,14 @@ final class ClockEngine {
         let currentBpm = masterBpm
         lock.unlock()
 
-        // Adapt timer period when BPM changes (e.g. from tempo LFO) without restarting
         let ns = Int(60_000_000_000 / (currentBpm * Double(PPQN)))
+        // Always advance by the current period so nextFireTime stays on the ideal grid.
+        // Only reschedule the timer when the period actually changes — and use the
+        // absolute nextFireTime so handler latency never accumulates into the clock.
+        nextFireTime = nextFireTime + .nanoseconds(ns)
         if ns != lastTickNs {
             lastTickNs = ns
-            masterTimer?.schedule(deadline: .now() + .nanoseconds(ns),
+            masterTimer?.schedule(deadline: nextFireTime,
                                   repeating: .nanoseconds(ns),
                                   leeway: .microseconds(200))
         }
