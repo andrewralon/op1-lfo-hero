@@ -16,4 +16,5 @@
   * rate looks good. maybe call it "speed" internally to match the op1.
   * depth / amplitude / peak-to-peak & center - no visual feedback for what they do since the waveform doesn't change.... not clear without trying it.
 - MED - rate/speed needs all of the OP-1 options - 25 options (in order): 8 to 1 (relative tempo time) + 17 for clock symbols 0 to 30 minutes (absolute time)
+- MED - disable all button animations / transition times. just flipping toggle the button fast! this doesn't seem to be working: ".animation(.none, value: state)"
 - LOW - volume value is hidden by thumb. Move higher? fine with scrubbing.... 
