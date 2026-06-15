@@ -14,8 +14,8 @@ struct TransportBarView: View {
 
             Sep()
 
-            TransBtn(symbol: "chevron.backward.2", weight: .thin, active: false) { app.tapePrev() }
-            TransBtn(symbol: "chevron.forward.2",  weight: .thin, active: false) { app.tapeNext() }
+            TransBtn(symbol: "arrow.left",  active: false) { app.tapePrev() }
+            TransBtn(symbol: "arrow.right", active: false) { app.tapeNext() }
 
             Sep()
 

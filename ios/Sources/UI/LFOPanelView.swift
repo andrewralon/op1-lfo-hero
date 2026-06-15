@@ -6,6 +6,7 @@ struct LFOPanelView: View {
     @EnvironmentObject var app: AppState
     @State private var selectedLfoID: UUID? = nil
     @State private var showDevicePicker = false
+    @State private var showDeleteConfirm = false
 
     private var previewLfos: [LfoClip] {
         if let id = selectedLfoID, let lfo = app.activeLfos.first(where: { $0.id == id }) {
@@ -187,13 +188,18 @@ struct LFOPanelView: View {
 
                     Rectangle().fill(C.bg3).frame(height: 1)
 
-                    Button { app.stopAllLfos(); selectedLfoID = nil } label: {
+                    Button { showDeleteConfirm = true } label: {
                         Image(systemName: "trash").font(.system(size: 16))
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(C.red.opacity(0.18))
                             .foregroundColor(C.red)
                     }
                     .buttonStyle(.plain)
+                    .confirmationDialog("Delete all active LFOs?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                        Button("Delete All", role: .destructive) {
+                            app.stopAllLfos(); selectedLfoID = nil
+                        }
+                    }
                 }
                 .frame(width: 76)
 
@@ -211,7 +217,9 @@ struct LFOPanelView: View {
                             }
                         }
                     }
-                    .padding(6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 5)
+                    .padding(.leading, 5)
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -221,28 +229,30 @@ struct LFOPanelView: View {
             Rectangle().fill(C.bg3).frame(height: 1)
 
             // ── 6. Status bar — at the bottom (matches Python layout) ─────────
-            Button { showDevicePicker = true } label: {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(app.isConnected ? C.green : C.yellow)
-                        .frame(width: 7, height: 7)
-                    Text(app.connectionLabel)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    Spacer()
-                    HStack(spacing: 0) {
-                        Text("tempo: ")
+            HStack(spacing: 6) {
+                Button { showDevicePicker = true } label: {
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(app.isConnected ? C.green : C.yellow)
+                            .frame(width: 7, height: 7)
+                        Text(app.connectionLabel)
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
                             .foregroundColor(.white)
-                        Text(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")
-                            .foregroundColor(app.isClockMaster ? C.green : C.track(1))
+                            .lineLimit(1)
                     }
-                    .font(.system(size: 9, design: .monospaced))
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 2)
+                .buttonStyle(.plain)
+                Spacer()
+                HStack(spacing: 0) {
+                    Text("tempo: ")
+                        .foregroundColor(.white)
+                    Text(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")
+                        .foregroundColor(app.isClockMaster ? C.green : C.track(1))
+                }
+                .font(.system(size: 9, design: .monospaced))
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 2)
             .background(C.bg2)
         }
         .background(C.bg)
@@ -399,20 +409,24 @@ private struct ActiveLfoChip: View {
     let onStop: () -> Void
 
     var body: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 5) {
             Circle()
                 .fill(lfo.track == 0 ? C.green : C.track(lfo.track))
-                .frame(width: 5, height: 5)
+                .frame(width: 6, height: 6)
             Text(lfo.shortLabel)
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundColor(selected ? C.text : C.dim)
+                .font(.system(size: 12, design: .monospaced))
+                .foregroundColor(.white)
             Button { onStop() } label: {
-                Image(systemName: "xmark").font(.system(size: 7)).foregroundColor(C.dim)
+                Image(systemName: "xmark").font(.system(size: 11, weight: .medium)).foregroundColor(C.dim)
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 6).padding(.vertical, 3)
-        .background(selected ? C.bg3 : C.bg2)
+        .padding(.horizontal, 7).padding(.vertical, 4)
+        .background(C.bg3)
+        .overlay(
+            RoundedRectangle(cornerRadius: 3)
+                .stroke(selected ? C.green.opacity(0.7) : Color.clear, lineWidth: 1)
+        )
         .cornerRadius(3)
         .onTapGesture { onSelect() }
     }
