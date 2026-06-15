@@ -14,6 +14,26 @@ struct LFOPanelView: View {
         return []
     }
 
+    // Color of the first enabled track/master button, used to tint the preview waveform
+    private var waveColor: Color {
+        let trackDisabled = app.lfoParam.isMasterOnly
+        let masterDisabled = !app.lfoParam.isMasterCapable
+        if !trackDisabled, let t = (1...4).first(where: { (app.trackOn[$0] ?? 0) > 0 }) {
+            return C.track(t)
+        }
+        if !masterDisabled && app.masterOn > 0 { return C.green }
+        return C.green
+    }
+
+    // True if any enabled track/master button is in the inverted (state == 2) position
+    private var waveInverted: Bool {
+        let trackDisabled = app.lfoParam.isMasterOnly
+        let masterDisabled = !app.lfoParam.isMasterCapable
+        let trackInv = !trackDisabled && (1...4).contains { (app.trackOn[$0] ?? 0) == 2 }
+        let masterInv = !masterDisabled && app.masterOn == 2
+        return trackInv || masterInv
+    }
+
     var body: some View {
         VStack(spacing: 0) {
 
@@ -40,47 +60,12 @@ struct LFOPanelView: View {
             HStack(spacing: 6) {
                 Spacer()
                 Image(systemName: "umbrella").font(.system(size: 16)).foregroundColor(C.dim)
-                Menu {
-                    // Reversed so most-used params appear at top of the menu
-                    ForEach(Parameter.allCases.reversed()) { p in
-                        Button(p.rawValue) { app.lfoParam = p }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(app.lfoParam.rawValue)
-                            .font(.system(size: ctrlFontSize, weight: .medium))
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 10))
-                    }
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 8)
-                    .background(C.bg3)
-                    .cornerRadius(5)
-                }
-                .foregroundColor(.accentColor)
-
+                CompactPicker(options: Array(Parameter.allCases.reversed()),
+                              selection: $app.lfoParam)
                 Spacer()
-
                 Image(systemName: "waveform.path").font(.system(size: 16)).foregroundColor(C.dim)
-                Menu {
-                    ForEach(LfoWave.allCases.reversed()) { w in
-                        Button(w.rawValue) { app.lfoWave = w }
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(app.lfoWave.rawValue)
-                            .font(.system(size: ctrlFontSize, weight: .medium))
-                            .frame(minWidth: 72, alignment: .leading)  // wide enough for "triangle"
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 10))
-                    }
-                    .padding(.horizontal, 11)
-                    .padding(.vertical, 8)
-                    .background(C.bg3)
-                    .cornerRadius(5)
-                }
-                .foregroundColor(.accentColor)
-
+                CompactPicker(options: Array(LfoWave.allCases.reversed()),
+                              selection: $app.lfoWave)
                 Spacer()
             }
             .padding(.vertical, 6)
@@ -151,7 +136,9 @@ struct LFOPanelView: View {
                 lfos: previewLfos,
                 wave: app.lfoWave,
                 rateTicks: RATE_TICKS[app.lfoRate] ?? (4 * PPQN),
-                depth: app.lfoDepth
+                depth: app.lfoDepth,
+                inverted: waveInverted,
+                color: waveColor
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(8)
@@ -239,6 +226,75 @@ struct LFOPanelView: View {
         }
         .background(C.bg)
         .sheet(isPresented: $showDevicePicker) { DevicePickerView() }
+    }
+}
+
+// MARK: - Compact picker (replaces Menu to get tight item spacing)
+// Button sizes itself to the widest option via invisible ZStack overlay.
+// Sheet height is computed from item count so it fits without scrolling.
+
+private struct CompactPicker<T>: View
+    where T: Identifiable & RawRepresentable & Hashable,
+          T.RawValue == String
+{
+    let options: [T]
+    @Binding var selection: T
+    @State private var show = false
+
+    var body: some View {
+        Button { show = true } label: {
+            HStack(spacing: 4) {
+                // ZStack sizes to widest option; only current selection is visible
+                ZStack(alignment: .leading) {
+                    ForEach(options) { opt in
+                        Text(opt.rawValue).opacity(0)
+                    }
+                    Text(selection.rawValue)
+                }
+                .font(.system(size: ctrlFontSize, weight: .medium))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10))
+            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 8)
+            .background(C.bg3)
+            .cornerRadius(5)
+        }
+        .foregroundColor(.accentColor)
+        .sheet(isPresented: $show) {
+            VStack(spacing: 0) {
+                ForEach(Array(options.enumerated()), id: \.offset) { idx, opt in
+                    Button {
+                        selection = opt
+                        show = false
+                    } label: {
+                        HStack {
+                            Text(opt.rawValue)
+                                .font(.system(size: ctrlFontSize,
+                                              weight: selection == opt ? .bold : .regular,
+                                              design: .monospaced))
+                                .foregroundColor(selection == opt ? .accentColor : C.text)
+                            Spacer()
+                            if selection == opt {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.accentColor)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                    }
+                    .buttonStyle(.plain)
+                    if idx < options.count - 1 {
+                        Divider().padding(.horizontal, 20)
+                    }
+                }
+            }
+            .padding(.vertical, 6)
+            .presentationDetents([.height(CGFloat(options.count) * 40 + 40)])
+            .presentationDragIndicator(.visible)
+            .preferredColorScheme(.dark)
+        }
     }
 }
 

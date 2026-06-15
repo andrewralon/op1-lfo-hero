@@ -5,6 +5,7 @@ struct WaveformView: View {
     let rateTicks: Int
     let depth: Double    // 0-99 display units
     let color: Color
+    var inverted: Bool = false
 
     var body: some View {
         Canvas { ctx, size in
@@ -25,7 +26,7 @@ struct WaveformView: View {
                 let phase = t * nCycles
                 let p = phase.truncatingRemainder(dividingBy: 1.0)
 
-                let y: Double
+                var y: Double
                 if wave == .random {
                     let step = Int(p * 8) % 8
                     if step != prevStep {
@@ -37,6 +38,7 @@ struct WaveformView: View {
                 } else {
                     y = wave.value(at: p)
                 }
+                if inverted { y = -y }
 
                 let px = CGFloat(t) * w
                 let py = midY - CGFloat(y) * amplitude
@@ -65,10 +67,13 @@ struct MultiWaveformView: View {
     let wave: LfoWave
     let rateTicks: Int
     let depth: Double
+    var inverted: Bool = false
+    var color: Color = C.green
 
     var body: some View {
         if lfos.isEmpty {
-            WaveformView(wave: wave, rateTicks: rateTicks, depth: depth, color: C.green)
+            WaveformView(wave: wave, rateTicks: rateTicks, depth: depth,
+                         color: color, inverted: inverted)
         } else {
             Canvas { ctx, size in
                 let midY = size.height / 2
@@ -78,9 +83,9 @@ struct MultiWaveformView: View {
                 ctx.stroke(center, with: .color(C.groove), lineWidth: 1)
 
                 for lfo in lfos {
-                    let color = lfo.track == 0 ? C.green : C.track(lfo.track)
+                    let c = lfo.track == 0 ? C.green : C.track(lfo.track)
                     let path  = buildPath(lfo: lfo, size: size)
-                    ctx.stroke(path, with: .color(color),
+                    ctx.stroke(path, with: .color(c),
                                style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
                 }
             }
