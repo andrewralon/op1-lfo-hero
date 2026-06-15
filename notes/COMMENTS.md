@@ -1,6 +1,9 @@
 # Comments
 
 ## To fix
+- HIGH - add parameter: SUSTAIN - CC 64 >= 64 = down
+- HIGH - add OCTAVE shift capability - CC 79 < 64 = down, ≥ 64 = up
+- HIGH - fix left/right scrub mode if possible, like pressing them on the op1!
 - HIGH - show the scrub UI boxes differently so it's obvious they are scrubbable (vs dropdown, for example) - 2 thin vertical lines next to box? Different color border (white vs gray)? BEST: Single thin vertical white line just to the right of the box
   * fun idea - BPM box could use a way to show the user it can be scrubbed. maybe like it's a big rotating wheel or an old analog clock. maybe clip the top and bottom of the next entries so they're cut off at the edges of the box?
 - MED - pan knob is weird (scrubs up and down, not turning or left-to-right). Not sure how to fix it cause there's no room to scrub horizontally on the screen.
