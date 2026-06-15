@@ -142,8 +142,6 @@ final class AppState: ObservableObject {
     // MARK: - Transport actions
 
     func play() {
-        guard !isPlaying else { return }
-        isPlaying = true
         clock.play()
     }
 
@@ -157,7 +155,9 @@ final class AppState: ObservableObject {
 
     func enableClock() {
         isClockMaster = true
-        clock.enableClock(bpm: bpm)
+        let startBpm = bpm > 1.0 ? bpm : 100.0  // handle sentinel (0) from OP-1 mode
+        bpm = startBpm
+        clock.enableClock(bpm: startBpm)
     }
 
     func disableClock() {

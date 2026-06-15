@@ -99,7 +99,8 @@ private struct BpmScrubber: View {
                         }
                     }
             } else {
-                Text(String(format: "%.1f", live))
+                let noData = !app.isClockMaster && app.bpm < 1.0
+                Text(noData ? "---.-" : String(format: "%.1f", live))
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundColor(isActive ? C.green : .white)
             }

@@ -109,10 +109,12 @@ final class ClockEngine {
         masterTimer = nil
         lock.lock()
         isClockMaster = false
+        bpm = 0   // sentinel: no slave data; cleared when first OP-1 ticks arrive
         bpmHistory.removeAll()
         lastTickTime = 0
         slaveTick = 0
         lock.unlock()
+        bpmCallback?(0)  // push sentinel to display immediately
     }
 
     func setMasterBpm(_ newBpm: Double) {
