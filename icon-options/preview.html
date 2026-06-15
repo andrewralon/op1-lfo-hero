@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>App Icon Options — OP-1 LFO Hero</title>
+<style>
+  body { background: #222; font-family: -apple-system, sans-serif; color: #ccc; padding: 40px; margin: 0; }
+  h1 { color: #fff; font-size: 18px; margin-bottom: 32px; }
+  .grid { display: flex; gap: 48px; flex-wrap: wrap; }
+  .option { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+  .label { font-size: 13px; color: #aaa; text-align: center; max-width: 200px; line-height: 1.5; }
+  .label strong { color: #fff; display: block; margin-bottom: 4px; font-size: 15px; }
+  .icon-wrap {
+    border-radius: 22.5%;
+    overflow: hidden;
+    width: 200px; height: 200px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  }
+  .icon-wrap img { width: 200px; height: 200px; display: block; }
+  .colors { display: flex; gap: 6px; margin-top: 4px; }
+  .swatch { width: 12px; height: 12px; border-radius: 50%; }
+</style>
+</head>
+<body>
+<h1>App Icon Options — OP-1 LFO Hero</h1>
+<div class="grid">
+
+  <div class="option">
+    <div class="icon-wrap">
+      <img src="icon-a-grid.svg">
+    </div>
+    <div class="label">
+      <strong>A — Grid (touching)</strong>
+      2×2 grid, circles touch at edges. Clean, symmetric, reads well at all sizes.
+    </div>
+  </div>
+
+  <div class="option">
+    <div class="icon-wrap">
+      <img src="icon-b-overlap.svg">
+    </div>
+    <div class="label">
+      <strong>B — Grid (overlapping)</strong>
+      2×2 grid with ~55px overlap. Blue is on top, layered toward orange. More colorful and dynamic in the center.
+    </div>
+  </div>
+
+  <div class="option">
+    <div class="icon-wrap">
+      <img src="icon-c-diamond.svg">
+    </div>
+    <div class="label">
+      <strong>C — Diamond</strong>
+      Circles at N/E/S/W compass points. No overlap. More open and airy, background shows between them.
+    </div>
+  </div>
+
+  <div class="option">
+    <div class="icon-wrap">
+      <img src="icon-d-wave.svg">
+    </div>
+    <div class="label">
+      <strong>D — Wave</strong>
+      4 circles staggered high/low in a sine pattern, referencing the LFO waveform. Circles slightly overlap in sequence.
+    </div>
+  </div>
+
+  <div class="option">
+    <div class="icon-wrap">
+      <img src="icon-c2-weave.svg">
+    </div>
+    <div class="label">
+      <strong>C2 — Diamond Weave</strong>
+      Blue (top), amber (right), gray (bottom), orange (left). ~58px overlap. Clockwise weave: blue → amber → gray → orange → blue.
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

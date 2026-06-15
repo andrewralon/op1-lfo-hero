@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#111111"/>
+  <!-- Diamond / compass arrangement — circles at N, E, S, W -->
+  <!-- Track 1: Blue — Top -->
+  <circle cx="512" cy="220" r="190" fill="#4477bb"/>
+  <!-- Track 2: Amber — Right -->
+  <circle cx="804" cy="512" r="190" fill="#bb9933"/>
+  <!-- Track 4: Orange — Bottom -->
+  <circle cx="512" cy="804" r="190" fill="#ff6a00"/>
+  <!-- Track 3: Gray — Left -->
+  <circle cx="220" cy="512" r="190" fill="#848c94"/>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#111111"/>
+  <defs>
+    <!--
+      Clockwise weave: blue > amber > gray > orange > blue
+      Positions: blue=N, amber=E, gray=S, orange=W
+
+      Draw order: orange, gray, amber, blue — this gives 3 of 4 correct overlaps.
+      The 4th (orange on top of blue) is fixed by re-drawing orange clipped to blue's area.
+    -->
+    <mask id="blue-area">
+      <rect width="1024" height="1024" fill="black"/>
+      <circle cx="512" cy="242" r="225" fill="white"/>
+    </mask>
+  </defs>
+
+  <!-- 1. Orange (W) — bottom layer -->
+  <circle cx="242" cy="512" r="220" fill="#ff6a00" stroke="black" stroke-width="8"/>
+  <!-- 2. Gray (S) — gray overlaps orange ✓ -->
+  <circle cx="512" cy="782" r="220" fill="#848c94" stroke="black" stroke-width="8"/>
+  <!-- 3. Amber (E) — amber overlaps gray ✓ -->
+  <circle cx="782" cy="512" r="220" fill="#bb9933" stroke="black" stroke-width="8"/>
+  <!-- 4. Blue (N) — blue overlaps amber ✓ -->
+  <circle cx="512" cy="242" r="220" fill="#4477bb" stroke="black" stroke-width="8"/>
+  <!-- 5. Orange patch — re-draw orange, visible only inside blue's circle — orange overlaps blue ✓ -->
+  <circle cx="242" cy="512" r="220" fill="#ff6a00" stroke="black" stroke-width="8" mask="url(#blue-area)"/>
+</svg>

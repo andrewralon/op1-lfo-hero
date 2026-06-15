@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#111111"/>
+  <!-- 2x2 grid, circles touch at edges, no gap -->
+  <!-- Track 1: Blue — Top Left -->
+  <circle cx="296" cy="296" r="216" fill="#4477bb"/>
+  <!-- Track 2: Amber — Top Right -->
+  <circle cx="728" cy="296" r="216" fill="#bb9933"/>
+  <!-- Track 3: Gray — Bottom Left -->
+  <circle cx="296" cy="728" r="216" fill="#848c94"/>
+  <!-- Track 4: Orange — Bottom Right -->
+  <circle cx="728" cy="728" r="216" fill="#ff6a00"/>
+</svg>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#111111"/>
+  <!-- Wave / staggered — 4 circles along a sine path, LFO reference -->
+  <!-- Circles alternate high/low suggesting one LFO cycle -->
+  <!-- Track 4: Orange — bottom-right (draw first, will be behind) -->
+  <circle cx="830" cy="660" r="172" fill="#ff6a00"/>
+  <!-- Track 3: Gray — top-right -->
+  <circle cx="614" cy="364" r="172" fill="#848c94"/>
+  <!-- Track 2: Amber — bottom-left -->
+  <circle cx="410" cy="660" r="172" fill="#bb9933"/>
+  <!-- Track 1: Blue — top-left (draw last, on top) -->
+  <circle cx="194" cy="364" r="172" fill="#4477bb"/>
+</svg>

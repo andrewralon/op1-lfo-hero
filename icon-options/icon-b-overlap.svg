@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#111111"/>
+  <!-- 2x2 grid, circles overlap ~55px each — layered BR→BL→TR→TL -->
+  <!-- Track 4: Orange — Bottom Right (bottom layer) -->
+  <circle cx="748" cy="748" r="260" fill="#ff6a00"/>
+  <!-- Track 3: Gray — Bottom Left -->
+  <circle cx="276" cy="748" r="260" fill="#848c94"/>
+  <!-- Track 2: Amber — Top Right -->
+  <circle cx="748" cy="276" r="260" fill="#bb9933"/>
+  <!-- Track 1: Blue — Top Left (top layer) -->
+  <circle cx="276" cy="276" r="260" fill="#4477bb"/>
+</svg>
