@@ -74,10 +74,10 @@ struct LFOPanelView: View {
             Rectangle().fill(C.bg3).frame(height: 1)
 
             // ── 2. Param + wave dropdowns — fitted width, centered ────────────
-            HStack(spacing: 14) {
+            HStack(spacing: 30) {
                 Spacer()
                 HStack(spacing: 6) {
-                    Image(systemName: "umbrella").font(.system(size: 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                    Image(systemName: "bolt.fill").font(.system(size: 20)).foregroundColor(Color(hex: "#aaaaaa"))
                     CompactPicker(options: Array(Parameter.allCases),
                                   selection: $app.lfoParam)
                 }
