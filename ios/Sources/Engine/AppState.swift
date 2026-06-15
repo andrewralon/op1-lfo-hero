@@ -94,7 +94,11 @@ final class AppState: ObservableObject {
         clock.tickCallback = { [weak self] tick in
             guard let self else { return }
             if !self.clock.isClockMaster {
-                DispatchQueue.main.async { self.slaveTicksReceived += 1 }
+                // Only update during initial sync (< 9 ticks). After that the BPM display
+                // takes over and steady-state 40 Hz main-thread dispatches serve no purpose.
+                if self.slaveTicksReceived < 9 {
+                    DispatchQueue.main.async { self.slaveTicksReceived += 1 }
+                }
             }
             self.automation.onTick(tick)
         }

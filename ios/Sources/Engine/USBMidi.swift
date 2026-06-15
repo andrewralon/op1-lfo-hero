@@ -45,20 +45,22 @@ final class USBMidi: NSObject, ObservableObject {
     override init() {
         super.init()
         DispatchQueue.global(qos: .userInteractive).async { self.setupMIDI() }
-        // Extra scans from the main thread: the background scan above may run before
-        // iOS has fully enumerated the USB device, so retry at 1s and 3s.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.scanForOP1() }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { self.scanForOP1() }
+        // Retry scans in case iOS hasn't fully enumerated the USB device yet.
+        // Run on global queue — scanForOP1() dispatches state changes to main internally.
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 1.0) { self.scanForOP1() }
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 3.0) { self.scanForOP1() }
     }
 
     private func setupMIDI() {
         MIDIClientCreateWithBlock("LFOHeroUSB" as CFString, &client) { [weak self] notifPtr in
             let id = notifPtr.pointee.messageID
             guard id == .msgSetupChanged || id == .msgObjectAdded || id == .msgObjectRemoved else { return }
-            // Scan twice: quickly for disconnect, and again after 500ms in case
-            // the device isn't fully enumerated yet on the first scan.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self?.scanForOP1() }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5)  { self?.scanForOP1() }
+            // MIDIGetNumberOfDestinations() inside scanForOP1() is a blocking IPC call to
+            // MIDIServer. If MIDIServer is still starting up it can block for 5–15 seconds.
+            // Run on background queue to keep the main thread free.
+            let q = DispatchQueue.global(qos: .userInteractive)
+            q.asyncAfter(deadline: .now() + 0.15) { self?.scanForOP1() }
+            q.asyncAfter(deadline: .now() + 0.50) { self?.scanForOP1() }
         }
         MIDIOutputPortCreate(client, "LFOHeroOut" as CFString, &outPort)
         // MIDIInputPortCreateWithBlock is deprecated in iOS 14 but provides simple
