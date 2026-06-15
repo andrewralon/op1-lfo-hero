@@ -42,6 +42,14 @@ extension Color {
     }
 }
 
+/// No press feedback, no transition animations — for toggle buttons that supply their own visual state.
+struct ImmediateButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .transaction { $0.animation = nil }
+    }
+}
+
 // A simple dark rounded button style used throughout the app
 struct DarkButton: ButtonStyle {
     var color: Color = C.bg3

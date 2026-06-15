@@ -225,7 +225,7 @@ private struct TransBtn: View {
                 .background(active ? C.green.opacity(0.18) : Color.clear)
                 .foregroundColor(active ? C.green : C.text)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ImmediateButtonStyle())
     }
 }
 

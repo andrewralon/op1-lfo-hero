@@ -23,8 +23,7 @@ struct TrackStripView: View {
                     .background(muted ? color.opacity(0.2) : color)
                     .foregroundColor(muted ? color : .black)
             }
-            .buttonStyle(.plain)
-            .animation(.none, value: muted)
+            .buttonStyle(ImmediateButtonStyle())
 
             // ── Pan knob ──────────────────────────────────────────────────────
             PanKnobView(

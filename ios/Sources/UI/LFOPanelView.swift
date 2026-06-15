@@ -459,9 +459,8 @@ private struct TrackToggleButton: View {
                 .foregroundColor(state == 0 ? color : .black)
                 .cornerRadius(7)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ImmediateButtonStyle())
         .disabled(disabled)
-        .animation(.none, value: state)
     }
 }
 
@@ -483,8 +482,7 @@ private struct MasterToggleButton: View {
                 .foregroundColor(state == 0 ? C.green : .black)
                 .cornerRadius(7)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ImmediateButtonStyle())
         .disabled(disabled)
-        .animation(.none, value: state)
     }
 }
