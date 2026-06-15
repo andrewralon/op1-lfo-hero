@@ -172,10 +172,7 @@ final class ClockEngine {
     // MARK: - Transport commands
 
     func play() {
-        // SPP to current position + 0xFB (Continue) is more reliable on OP-1 Field
-        // than 0xFA (Start) alone, which some firmware versions ignore after a Stop.
-        sendSPP(isCurrentlyPlaying: true)
-        isPlaying = true
+        router?.send([0xFA])
     }
 
     func stop() {
@@ -183,20 +180,25 @@ final class ClockEngine {
         isPlaying = false
     }
 
-    func tapePrev(isCurrentlyPlaying: Bool) {
+    func tapePrev() {
         sppPos = max(0, sppPos - tapeArrowStep)
-        sendSPP(isCurrentlyPlaying: isCurrentlyPlaying)
+        sendTapeSeek(cc: 82)
     }
 
-    func tapeNext(isCurrentlyPlaying: Bool) {
+    func tapeNext() {
         sppPos += tapeArrowStep
-        sendSPP(isCurrentlyPlaying: isCurrentlyPlaying)
+        sendTapeSeek(cc: 83)
     }
 
-    private func sendSPP(isCurrentlyPlaying: Bool) {
+    // CC 82/83 tells the OP-1 to seek; SPP sets the target position;
+    // 0xFB (Continue) always follows so playback resumes after the seek —
+    // not gated on isPlaying because the OP-1 may have been started by its
+    // own Play button without the app knowing about it.
+    private func sendTapeSeek(cc: UInt8) {
         let lo = UInt8(sppPos & 0x7F)
         let hi = UInt8((sppPos >> 7) & 0x7F)
+        router?.send([0xB0, cc, 127])
         router?.send([0xF2, lo, hi])
-        if isCurrentlyPlaying { router?.send([0xFB]) }
+        router?.send([0xFB])
     }
 }

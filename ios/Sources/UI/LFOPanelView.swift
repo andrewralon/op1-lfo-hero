@@ -188,7 +188,10 @@ struct LFOPanelView: View {
 
                     Rectangle().fill(C.bg3).frame(height: 1)
 
-                    Button { showDeleteConfirm = true } label: {
+                    Button {
+                        if app.activeLfos.isEmpty { return }
+                        showDeleteConfirm = true
+                    } label: {
                         Image(systemName: "trash").font(.system(size: 16))
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(C.red.opacity(0.18))

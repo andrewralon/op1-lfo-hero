@@ -142,7 +142,6 @@ final class AppState: ObservableObject {
     // MARK: - Transport actions
 
     func play() {
-        isPlaying = true
         clock.play()
     }
 
@@ -151,8 +150,8 @@ final class AppState: ObservableObject {
         clock.stop()
     }
 
-    func tapePrev() { clock.tapePrev(isCurrentlyPlaying: isPlaying) }
-    func tapeNext() { clock.tapeNext(isCurrentlyPlaying: isPlaying) }
+    func tapePrev() { clock.tapePrev() }
+    func tapeNext() { clock.tapeNext() }
 
     func enableClock() {
         isClockMaster = true
