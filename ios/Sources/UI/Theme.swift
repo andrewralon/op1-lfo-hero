@@ -25,7 +25,7 @@ enum C {
     static let transportH: CGFloat = 32
 
     // Shared font sizes — keep these in sync across views
-    static let trackLabelSize: CGFloat = 18   // mute buttons + LFO track/master buttons
+    static let trackLabelSize: CGFloat = 20   // mute buttons + LFO track/master buttons
 }
 
 extension Color {

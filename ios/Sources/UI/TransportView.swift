@@ -17,29 +17,31 @@ struct TransportBarView: View {
 
             Sep()
 
-            // Clock master/slave toggle — metronome icon skinnier+taller via scaleEffect
+            // Clock master/slave toggle — whole group is blue (op1) or green (app)
             Button {
                 if app.isClockMaster { app.disableClock() } else { app.enableClock() }
             } label: {
-                VStack(spacing: 0) {
+                VStack(spacing: 1) {
                     Image(systemName: "metronome")
                         .font(.system(size: 32, weight: .regular))
-                        .scaleEffect(x: 0.65, y: 1.22, anchor: .center)
-                        .foregroundColor(app.isClockMaster ? C.green : C.dim)
+                        .scaleEffect(x: 0.65, y: 1.05, anchor: .center)
                     Text(app.isClockMaster ? "app" : "op1")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundColor(app.isClockMaster ? C.green : C.track(1))
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 }
-                .frame(width: 48)
+                .frame(width: 42)
                 .frame(maxHeight: .infinity)
-                .background(app.isClockMaster ? C.green.opacity(0.18) : Color.clear)
+                .foregroundColor(app.isClockMaster ? C.green : C.track(1))
             }
             .buttonStyle(.plain)
+            .padding(.leading, 10)
 
-            // BPM scrubber fills remaining space
+            // BPM scrubber — compact fixed width with uniform 6pt margin
             BpmScrubber()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.horizontal, 8)
+                .frame(width: 82)
+                .frame(maxHeight: .infinity)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 6)
+            Spacer()
         }
         .background(C.bg2)
     }
@@ -74,7 +76,7 @@ private struct BpmScrubber: View {
 
             if editing {
                 TextField("", text: $editText)
-                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundColor(C.green)
                     .multilineTextAlignment(.center)
                     .keyboardType(.decimalPad)
@@ -88,7 +90,7 @@ private struct BpmScrubber: View {
                     }
             } else {
                 Text(String(format: "%.1f", live))
-                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundColor(drag != 0 ? C.green : .white)
             }
         }

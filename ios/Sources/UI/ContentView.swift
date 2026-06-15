@@ -6,6 +6,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             TracksView()
                 .frame(height: 280)
+                .padding(.bottom, 5)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 

@@ -193,7 +193,7 @@ struct LFOPanelView: View {
                 .buttonStyle(.plain)
 
                 Button { app.stopAllLfos(); selectedLfoID = nil } label: {
-                    Label("delete all", systemImage: "xmark.circle")
+                    Label("delete", systemImage: "xmark.circle")
                         .font(.system(size: 14, weight: .medium))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 7)
@@ -219,7 +219,7 @@ struct LFOPanelView: View {
                         .foregroundColor(app.isConnected ? C.text : C.orange)
                         .lineLimit(1)
                     Spacer()
-                    Text("tempo: \(app.isClockMaster ? "app (midi sync)" : "op-1")")
+                    Text("tempo: \(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")")
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundColor(C.dim)
                 }
@@ -255,10 +255,9 @@ private struct CompactPicker<T>: View
                         Text(opt.rawValue).opacity(0)
                     }
                     Text(selection.rawValue)
+                        .foregroundColor(.white)
                 }
                 .font(.system(size: ctrlFontSize, weight: .medium))
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 10))
             }
             .padding(.horizontal, 11)
             .padding(.vertical, 8)
@@ -276,7 +275,7 @@ private struct CompactPicker<T>: View
                         HStack {
                             Text(opt.rawValue)
                                 .font(.system(size: ctrlFontSize,
-                                              weight: selection == opt ? .bold : .regular,
+                                              weight: .bold,
                                               design: .monospaced))
                                 .foregroundColor(selection == opt ? .accentColor : C.text)
                             Spacer()
@@ -392,7 +391,7 @@ private struct TrackToggleButton: View {
             Text("\(track)")
                 .font(.system(size: C.trackLabelSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: 42, height: 42)
+                .frame(width: 46, height: 46)
                 .background(state == 0 ? C.bg3 : color)
                 .foregroundColor(state == 0 ? color : .black)
                 .cornerRadius(7)
@@ -416,7 +415,7 @@ private struct MasterToggleButton: View {
             Text("m")
                 .font(.system(size: C.trackLabelSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: 42, height: 42)
+                .frame(width: 46, height: 46)
                 .background(state == 0 ? C.bg3 : C.green)
                 .foregroundColor(state == 0 ? C.green : .black)
                 .cornerRadius(7)

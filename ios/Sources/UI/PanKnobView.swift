@@ -14,11 +14,12 @@ struct PanKnobView: View {
             let cy = sz / 2
             let r  = sz / 2 - 1
 
-            let liveVal  = max(-63, min(63, base + Int(-drag / 1.4)))
+            let rawVal   = max(-63, min(63, base + Int(-drag / 1.4)))
+            let liveVal  = abs(rawVal) <= 3 ? 0 : rawVal
             let angleDeg = Double(liveVal) / 63.0 * 130.0
             let rad      = (angleDeg - 90) * Double.pi / 180
-            let tipX     = cx + CGFloat(cos(rad)) * r * 0.66
-            let tipY     = cy + CGFloat(sin(rad)) * r * 0.66
+            let tipX     = cx + CGFloat(cos(rad)) * r
+            let tipY     = cy + CGFloat(sin(rad)) * r
 
             ZStack {
                 Circle()
@@ -39,7 +40,7 @@ struct PanKnobView: View {
                     p.addLine(to: CGPoint(x: tipX, y: tipY))
                 }
                 .stroke(liveVal == 0 ? C.green : C.text,
-                        style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round))
             }
             .frame(width: sz, height: sz)
             .contentShape(Circle())
@@ -47,8 +48,8 @@ struct PanKnobView: View {
                 DragGesture(minimumDistance: 1)
                     .updating($drag) { g, state, _ in state = g.translation.height }
                     .onEnded { g in
-                        let delta = Int(-g.translation.height / 1.4)
-                        let newVal = max(-63, min(63, base + delta))
+                        let raw    = max(-63, min(63, base + Int(-g.translation.height / 1.4)))
+                        let newVal = abs(raw) <= 3 ? 0 : raw
                         base = newVal
                         value = newVal
                         onChange(newVal)
