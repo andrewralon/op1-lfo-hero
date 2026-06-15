@@ -104,9 +104,9 @@ struct LfoClip: Identifiable {
 
     var shortLabel: String {
         let t = track == 0 ? "m" : "t\(track)"
-        let inv = inverted ? " [inv]" : ""
-        let loopMark = loop ? "∞" : "1×"
-        return "\(wave.rawValue) · \(parameter.rawValue) · \(t) · \(rateLabel) \(loopMark)\(inv)"
+        let inv = inverted ? "·inv" : ""
+        let loopMark = loop ? "↻" : "1×"
+        return "\(wave.rawValue)·\(parameter.rawValue)·\(t)·\(rateLabel)·\(loopMark)\(inv)"
     }
 }
 
