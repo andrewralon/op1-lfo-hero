@@ -38,7 +38,7 @@ final class AppState: ObservableObject {
         }
     }
     @Published var lfoRate   = 3           // 1-8
-    @Published var lfoDepth  = 25.0        // display units (0-99)
+    @Published var lfoDepth  = 10.0        // display units (0-99)
     @Published var lfoCenter = 90.0        // display units (0-99)
     @Published var trackOn   = [1: 1, 2: 0, 3: 0, 4: 0]  // 0=off 1=on 2=inv
     @Published var masterOn  = 0                            // 0=off 1=on 2=inv
