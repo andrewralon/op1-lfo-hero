@@ -29,15 +29,14 @@ final class ClockEngine {
     private var sppBeats = 0
     private var hasEverPlayed = false
 
-    // BLE engine reference (weak to avoid retain cycle)
-    weak var ble: BLEMidi? {
-        didSet { wireBLE() }
+    weak var router: MidiRouter? {
+        didSet { wireRouter() }
     }
 
-    private func wireBLE() {
-        ble?.onClock = { [weak self] in self?.handleSlaveTick() }
-        ble?.onStart = { [weak self] in self?.handleStart() }
-        ble?.onStop  = { [weak self] in self?.handleStop()  }
+    private func wireRouter() {
+        router?.onClock = { [weak self] in self?.handleSlaveTick() }
+        router?.onStart = { [weak self] in self?.handleStart() }
+        router?.onStop  = { [weak self] in self?.handleStop()  }
     }
 
     // MARK: - Slave mode
@@ -116,7 +115,7 @@ final class ClockEngine {
     }
 
     private func fireMasterTick() {
-        ble?.send([0xF8])
+        router?.send([0xF8])
         lock.lock(); masterTickCount += 1; let tick = masterTickCount; lock.unlock()
         tickCallback?(tick)
     }
@@ -126,27 +125,27 @@ final class ClockEngine {
     func play() {
         if !hasEverPlayed {
             sppBeats = 0
-            ble?.send([0xFA])
+            router?.send([0xFA])
             hasEverPlayed = true
         } else {
-            ble?.send([0xFB])
+            router?.send([0xFB])
         }
         isPlaying = true
     }
 
     func stop() {
-        ble?.send([0xFC])
+        router?.send([0xFC])
         isPlaying = false
     }
 
     func tapePrevBar() {
-        ble?.send([0xB0, 82, 127])
+        router?.send([0xB0, 82, 127])
         sppBeats = max(0, sppBeats - 4)
         sendSPP()
     }
 
     func tapeNextBar() {
-        ble?.send([0xB0, 83, 127])
+        router?.send([0xB0, 83, 127])
         sppBeats += 4
         sendSPP()
     }
@@ -156,7 +155,7 @@ final class ClockEngine {
         let pos = sppBeats * (PPQN / 6)
         let lo = UInt8(pos & 0x7F)
         let hi = UInt8((pos >> 7) & 0x7F)
-        ble?.send([0xF2, lo, hi])
-        if isPlaying { ble?.send([0xFB]) }
+        router?.send([0xF2, lo, hi])
+        if isPlaying { router?.send([0xFB]) }
     }
 }

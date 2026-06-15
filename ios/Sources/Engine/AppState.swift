@@ -6,7 +6,8 @@ import SwiftUI
 final class AppState: ObservableObject {
 
     // MARK: - Engine objects
-    let ble         = BLEMidi()
+    let router      = MidiRouter()
+    var ble: BLEMidi { router.ble }   // convenience for DevicePickerView
     let clock       = ClockEngine()
     let automation  = AutomationEngine()
     let controller: Controller
@@ -45,9 +46,9 @@ final class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init() {
-        controller = Controller(ble: ble)
+        controller = Controller(router: router)
         automation.controller = controller
-        clock.ble = ble
+        clock.router = router
 
         wireCallbacks()
 
@@ -56,12 +57,18 @@ final class AppState: ObservableObject {
     }
 
     private func wireCallbacks() {
-        // BLE state → UI label
-        ble.$state
+        // USB + BLE state → connection label (USB preferred when connected)
+        Publishers.CombineLatest(router.ble.$state, router.usb.$state)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] s in
-                self?.connectionLabel = s.label
-                self?.isConnected = s.isConnected
+            .sink { [weak self] bleState, usbState in
+                guard let self else { return }
+                if usbState.isConnected {
+                    self.connectionLabel = usbState.label
+                    self.isConnected = true
+                } else {
+                    self.connectionLabel = bleState.label
+                    self.isConnected = bleState.isConnected
+                }
             }
             .store(in: &cancellables)
 
@@ -102,8 +109,8 @@ final class AppState: ObservableObject {
             }
         }
 
-        // CC from OP-1 → sync UI sliders/knobs
-        ble.onCC = { [weak self] channel, cc, value in
+        // CC from OP-1 → sync UI sliders/knobs (router forwards from whichever transport is active)
+        router.onCC = { [weak self] channel, cc, value in
             let track = channel + 1
             guard (1...4).contains(track) else { return }
             DispatchQueue.main.async {

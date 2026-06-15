@@ -52,9 +52,10 @@ enum LfoWave: String, CaseIterable, Identifiable {
                 return 1 - 2 * (pow(10, (p - 0.5) * 2) - 1) / 9
             }
         case .sweepUp:
-            return sin(2 * .pi * 4 * p * p)
+            return sin(2 * .pi * 5 * p * p * p)
         case .sweepDn:
-            return sin(2 * .pi * 4 * (2 * p - p * p))
+            let q = 1 - p
+            return sin(2 * .pi * 5 * (1 - q * q * q))
         case .random:
             // Caller must handle stateful random (AutomationEngine tracks step state)
             let step = Int(p * 8) % 8

@@ -1,7 +1,7 @@
 import Foundation
 
 final class Controller {
-    weak var ble: BLEMidi?
+    weak var router: MidiRouter?
 
     private let CC_VOLUME    = 7
     private let CC_MUTE      = 9
@@ -15,8 +15,8 @@ final class Controller {
     private var muteState = [Int: Bool]()
     private let lock = NSLock()
 
-    init(ble: BLEMidi) {
-        self.ble = ble
+    init(router: MidiRouter) {
+        self.router = router
     }
 
     func setVolume(track: Int, value: Int) {
@@ -63,11 +63,11 @@ final class Controller {
         sendCC(ch: max(0, track - 1), cc: cc, val: value)
     }
 
-    func octaveUp()   { ble?.send([0xB0, UInt8(CC_OCTAVE), 127]) }
-    func octaveDown() { ble?.send([0xB0, UInt8(CC_OCTAVE), 0])   }
+    func octaveUp()   { router?.send([0xB0, UInt8(CC_OCTAVE), 127]) }
+    func octaveDown() { router?.send([0xB0, UInt8(CC_OCTAVE), 0])   }
 
     private func sendCC(ch: Int, cc: Int, val: Int) {
         let v = max(0, min(127, val))
-        ble?.send([UInt8(0xB0 | (ch & 0x0F)), UInt8(cc), UInt8(v)])
+        router?.send([UInt8(0xB0 | (ch & 0x0F)), UInt8(cc), UInt8(v)])
     }
 }

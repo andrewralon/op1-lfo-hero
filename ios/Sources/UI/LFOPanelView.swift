@@ -77,33 +77,17 @@ struct LFOPanelView: View {
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
 
-                // Rate stepper
+                // Rate scrubber (1–8, horizontal drag matches depth/center)
                 HStack(spacing: 6) {
                     Image(systemName: "timer")
                         .font(.system(size: 20))
                         .foregroundColor(Color(hex: "#aaaaaa"))
 
-                    HStack(spacing: 0) {
-                        Button { app.lfoRate = max(1, app.lfoRate - 1) } label: {
-                            Image(systemName: "minus")
-                                .frame(width: 40, height: 36)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain).foregroundColor(Color(hex: "#aaaaaa"))
-
-                        Text(RATE_LABELS[app.lfoRate - 1])
-                            .font(.system(size: ctrlFontSize, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white)
-                            .frame(width: 32)
-
-                        Button { app.lfoRate = min(8, app.lfoRate + 1) } label: {
-                            Image(systemName: "plus")
-                                .frame(width: 40, height: 36)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain).foregroundColor(Color(hex: "#aaaaaa"))
-                    }
-                    .background(C.bg3).cornerRadius(4)
+                    ScrubValue(value: Binding(
+                        get: { Double(app.lfoRate) },
+                        set: { app.lfoRate = max(1, min(8, Int($0.rounded()))) }
+                    ), range: 1...8, sensitivity: 0.08)
+                    .frame(width: 58)
                 }
 
                 Spacer(minLength: 20)
@@ -303,17 +287,18 @@ private struct CompactPicker<T>: View
 }
 
 // MARK: - Scrubable number control
-// Drag left to decrease, right to increase — 1pt of drag = 0.5 units
+// Drag left/right to change value. sensitivity = units per point of drag.
 
 private struct ScrubValue: View {
     @Binding var value: Double
     let range: ClosedRange<Double>
+    var sensitivity: Double = 0.5
 
     @GestureState private var drag: CGFloat = 0
     @State private var base: Double = 0
 
     private var live: Double {
-        max(range.lowerBound, min(range.upperBound, base + Double(drag) * 0.5))
+        max(range.lowerBound, min(range.upperBound, base + Double(drag) * sensitivity))
     }
 
     var body: some View {
@@ -325,7 +310,7 @@ private struct ScrubValue: View {
                         .stroke(drag != 0 ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
                 )
                 .frame(height: 36)
-            Text(String(Int(live)))
+            Text(String(Int(live.rounded())))
                 .font(.system(size: ctrlFontSize, weight: .bold, design: .monospaced))
                 .foregroundColor(drag != 0 ? C.green : .white)
         }
@@ -335,7 +320,7 @@ private struct ScrubValue: View {
                 .onEnded { g in
                     let newVal = max(range.lowerBound,
                                     min(range.upperBound,
-                                        (base + Double(g.translation.width) * 0.5).rounded()))
+                                        (base + Double(g.translation.width) * sensitivity).rounded()))
                     base = newVal
                     value = newVal
                 }
@@ -399,6 +384,7 @@ private struct TrackToggleButton: View {
         .buttonStyle(.plain)
         .opacity(disabled ? 0.6 : 1)
         .disabled(disabled)
+        .animation(.none, value: state)
     }
 }
 
@@ -423,5 +409,6 @@ private struct MasterToggleButton: View {
         .buttonStyle(.plain)
         .opacity(disabled ? 0.6 : 1)
         .disabled(disabled)
+        .animation(.none, value: state)
     }
 }

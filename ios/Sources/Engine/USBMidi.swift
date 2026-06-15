@@ -1,0 +1,147 @@
+import Combine
+import CoreMIDI
+import Foundation
+
+/// CoreMIDI USB MIDI transport. Auto-detects the OP-1 Field when plugged in via USB-C.
+/// Sends raw MIDI bytes (no BLE timestamp wrapper). Calls the same onClock/onStart/onStop/onCC
+/// callbacks as BLEMidi so MidiRouter can treat both transports uniformly.
+final class USBMidi: NSObject, ObservableObject {
+
+    enum State: Equatable {
+        case disconnected
+        case connected(String)
+
+        var label: String {
+            switch self {
+            case .disconnected:        return "No USB MIDI"
+            case .connected(let name): return "\(name) (usb)"
+            }
+        }
+
+        var isConnected: Bool {
+            if case .connected = self { return true }
+            return false
+        }
+    }
+
+    @Published var state: State = .disconnected
+
+    var onClock: (() -> Void)?
+    var onStart: (() -> Void)?
+    var onStop:  (() -> Void)?
+    var onCC:    ((Int, Int, Int) -> Void)?
+
+    private var client  = MIDIClientRef()
+    private var outPort = MIDIPortRef()
+    private var inPort  = MIDIPortRef()
+    private var destRef = MIDIEndpointRef()
+    private var srcRef  = MIDIEndpointRef()
+
+    override init() {
+        super.init()
+        setupMIDI()
+    }
+
+    private func setupMIDI() {
+        MIDIClientCreateWithBlock("LFOHeroUSB" as CFString, &client) { [weak self] notifPtr in
+            let id = notifPtr.pointee.messageID
+            guard id == .msgSetupChanged || id == .msgObjectAdded || id == .msgObjectRemoved else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self?.scanForOP1() }
+        }
+        MIDIOutputPortCreate(client, "LFOHeroOut" as CFString, &outPort)
+        // MIDIInputPortCreateWithBlock is deprecated in iOS 14 but provides simple
+        // MIDI 1.0 byte-stream access; avoids UMP parsing overhead for our use case.
+        MIDIInputPortCreateWithBlock(client, "LFOHeroIn" as CFString, &inPort) { [weak self] pktList, _ in
+            var pkt = pktList.pointee.packet
+            for _ in 0..<pktList.pointee.numPackets {
+                let n = Int(pkt.length)
+                withUnsafeBytes(of: pkt.data) { self?.parseBytes(Array($0.prefix(n))) }
+                pkt = MIDIPacketNext(&pkt).pointee
+            }
+        }
+        scanForOP1()
+    }
+
+    // MARK: - Device discovery
+
+    private func scanForOP1() {
+        for i in 0..<MIDIGetNumberOfDestinations() {
+            let dest = MIDIGetDestination(i)
+            guard let name = midiName(dest), isOP1(name) else { continue }
+            if destRef != dest {
+                destRef = dest
+                DispatchQueue.main.async { self.state = .connected(name) }
+            }
+            connectSource()
+            return
+        }
+        // OP-1 not found — tear down previous connection
+        if srcRef != 0 { MIDIPortDisconnectSource(inPort, srcRef); srcRef = 0 }
+        if destRef != 0 {
+            destRef = 0
+            DispatchQueue.main.async { self.state = .disconnected }
+        }
+    }
+
+    private func connectSource() {
+        for i in 0..<MIDIGetNumberOfSources() {
+            let src = MIDIGetSource(i)
+            guard let name = midiName(src), isOP1(name) else { continue }
+            if srcRef != src {
+                if srcRef != 0 { MIDIPortDisconnectSource(inPort, srcRef) }
+                srcRef = src
+                MIDIPortConnectSource(inPort, src, nil)
+            }
+            return
+        }
+    }
+
+    private func midiName(_ ep: MIDIEndpointRef) -> String? {
+        var prop: Unmanaged<CFString>?
+        guard MIDIObjectGetStringProperty(ep, kMIDIPropertyDisplayName, &prop) == noErr else { return nil }
+        return prop?.takeRetainedValue() as String?
+    }
+
+    private func isOP1(_ name: String) -> Bool {
+        let l = name.lowercased()
+        return l.contains("op-1") || l.contains("op1")
+    }
+
+    // MARK: - Send
+
+    func send(_ bytes: [UInt8]) {
+        guard destRef != 0, outPort != 0 else { return }
+        var list = MIDIPacketList()
+        var pkt  = MIDIPacketListInit(&list)
+        pkt = MIDIPacketListAdd(&list, MemoryLayout<MIDIPacketList>.size, pkt, 0, bytes.count, bytes)
+        MIDISend(outPort, destRef, &list)
+    }
+
+    // MARK: - Incoming MIDI parser (raw bytes, same logic as BLEMidi)
+
+    private func parseBytes(_ bytes: [UInt8]) {
+        var i = 0
+        while i < bytes.count {
+            let b = bytes[i]
+            switch b {
+            case 0xF8: onClock?(); i += 1
+            case 0xFA: onStart?(); i += 1
+            case 0xFB:             i += 1
+            case 0xFC: onStop?();  i += 1
+            default:
+                guard b & 0x80 != 0 else { i += 1; continue }
+                let ch = Int(b & 0x0F)
+                switch b & 0xF0 {
+                case 0xB0 where i + 2 < bytes.count:
+                    onCC?(ch, Int(bytes[i + 1]), Int(bytes[i + 2])); i += 3
+                case 0x80, 0x90, 0xA0, 0xE0:
+                    i += i + 2 < bytes.count ? 3 : 1
+                case 0xC0, 0xD0:
+                    i += i + 1 < bytes.count ? 2 : 1
+                default:
+                    i += 1
+                }
+            }
+        }
+    }
+}
