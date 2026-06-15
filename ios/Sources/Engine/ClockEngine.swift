@@ -116,7 +116,6 @@ final class ClockEngine {
         lastTickTime = 0
         slaveTick = 0
         lock.unlock()
-        bpmCallback?(0)  // push sentinel to display immediately
     }
 
     func setMasterBpm(_ newBpm: Double) {
