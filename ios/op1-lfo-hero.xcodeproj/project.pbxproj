@@ -26,7 +26,6 @@
 		F303F7E32FDE4BC80060AA2D /* MidiRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7E22FDE4BC80060AA2D /* MidiRouter.swift */; };
 		F303F7E52FDE4BC80060AA2D /* CoreMIDI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F303F7E42FDE4BC80060AA2D /* CoreMIDI.framework */; };
 		F33102832FE07989008CF623 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F33102822FE07989008CF623 /* Assets.xcassets */; };
-		F33102852FE07994008CF623 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = F33102842FE07994008CF623 /* Info.plist */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -193,7 +192,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F33102852FE07994008CF623 /* Info.plist in Resources */,
 				F33102832FE07989008CF623 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -359,7 +357,7 @@
 				DEVELOPMENT_TEAM = 8RG5QJVST3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "op1-lfo-hero/Info.plist";
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "op1 lfo hero";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "LFO Hero needs Bluetooth to connect to the OP-1 Field via BLE MIDI.";
@@ -395,7 +393,7 @@
 				DEVELOPMENT_TEAM = 8RG5QJVST3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "op1-lfo-hero/Info.plist";
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "op1 lfo hero";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "LFO Hero needs Bluetooth to connect to the OP-1 Field via BLE MIDI.";
