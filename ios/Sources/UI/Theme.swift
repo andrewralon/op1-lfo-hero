@@ -9,6 +9,7 @@ enum C {
     static let green   = Color(hex: "#4ec94e")
     static let red     = Color(hex: "#c04040")
     static let orange  = Color(hex: "#e09030")
+    static let yellow  = Color(hex: "#FFE500")
     static let groove  = Color(hex: "#333333")
 
     static let track: [Int: Color] = [

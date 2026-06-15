@@ -1,6 +1,8 @@
 import SwiftUI
 
 // Draws one waveform path per (color, inverted) pair, overlaid on a shared canvas.
+// When multiple tracks share the same inversion state (identical shape), a single
+// path is drawn with alternating solid color segments — no gaps, no transparency.
 struct WaveformView: View {
     let wave: LfoWave
     let rateTicks: Int
@@ -10,24 +12,31 @@ struct WaveformView: View {
     var body: some View {
         Canvas { ctx, size in
             let nCycles = Double(8 * PPQN) / Double(rateTicks)
-            let w = size.width
-            let h = size.height
-            let midY = h / 2
-            let amplitude = midY * 0.88
-            let steps = Int(w * 1.5)
-            let strokeStyle = StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+            let w       = size.width
+            let midY    = size.height / 2
+            let amp     = midY * 0.88
+            let steps   = Int(w * 1.5)
+            // Target ~60 pt per color segment; steps are ~1.5 per pt so multiply directly.
+            let segLen  = max(1, Int(waveformSegmentPt * Double(steps) / Double(w)))
 
             var center = Path()
             center.move(to: CGPoint(x: 0, y: midY))
             center.addLine(to: CGPoint(x: w, y: midY))
             ctx.stroke(center, with: .color(C.groove), lineWidth: 1)
 
-            for (color, inverted) in tracks {
-                var path = Path()
-                var prevStep = -1
-                var stepY = 0.0
+            // Process normal and inverted groups independently
+            let normalGroup   = tracks.filter { !$0.inverted }
+            let invertedGroup = tracks.filter {  $0.inverted }
+
+            for (inverted, group) in [(false, normalGroup), (true, invertedGroup)] {
+                guard !group.isEmpty else { continue }
+
+                // Build shared point array — same shape for every track in this group
+                var pts = [CGPoint]()
+                pts.reserveCapacity(steps + 1)
+                var prevStep = -1; var stepY = 0.0
                 for i in 0...steps {
-                    let t = Double(i) / Double(steps)
+                    let t     = Double(i) / Double(steps)
                     let phase = (t * nCycles).truncatingRemainder(dividingBy: 1.0)
                     var y: Double
                     if wave == .random {
@@ -42,12 +51,35 @@ struct WaveformView: View {
                         y = wave.value(at: phase)
                     }
                     if inverted { y = -y }
-                    let px = CGFloat(t) * w
-                    let py = midY - CGFloat(y) * amplitude
-                    if i == 0 { path.move(to: CGPoint(x: px, y: py)) }
-                    else       { path.addLine(to: CGPoint(x: px, y: py)) }
+                    pts.append(CGPoint(x: CGFloat(t) * w,
+                                      y: midY - CGFloat(y) * amp))
                 }
-                ctx.stroke(path, with: .color(color), style: strokeStyle)
+
+                if group.count == 1 {
+                    // Single track — one solid path
+                    var path = Path()
+                    for (i, pt) in pts.enumerated() {
+                        if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+                    }
+                    ctx.stroke(path, with: .color(group[0].color), style: solidStroke)
+                } else {
+                    // Multiple tracks — solid alternating color segments, no gaps.
+                    // Each segment starts at the last point of the previous one so
+                    // there is never a break in the line.
+                    var start = 0; var ci = 0
+                    while start < pts.count - 1 {
+                        let end = min(start + segLen, pts.count - 1)
+                        var path = Path()
+                        for i in start...end {
+                            if i == start { path.move(to: pts[i]) }
+                            else          { path.addLine(to: pts[i]) }
+                        }
+                        ctx.stroke(path, with: .color(group[ci % group.count].color),
+                                   style: solidStroke)
+                        ci    += 1
+                        start  = end   // overlap by 1 pt — prevents pixel-level gaps
+                    }
+                }
             }
         }
         .background(C.bg2)
@@ -76,9 +108,8 @@ struct MultiWaveformView: View {
 
                 for lfo in lfos {
                     let c = lfo.track == 0 ? C.green : C.track(lfo.track)
-                    let path = buildPath(lfo: lfo, size: size)
-                    ctx.stroke(path, with: .color(c),
-                               style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                    ctx.stroke(buildPath(lfo: lfo, size: size), with: .color(c),
+                               style: solidStroke)
                 }
             }
             .background(C.bg2)
@@ -117,3 +148,6 @@ struct MultiWaveformView: View {
         return path
     }
 }
+
+private let solidStroke = StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+private let waveformSegmentPt: Double = 50  // pt per color segment when multiple same-state tracks are shown

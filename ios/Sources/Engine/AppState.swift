@@ -221,7 +221,7 @@ final class AppState: ObservableObject {
 
     func cycleTrack(_ t: Int) {
         let cur = trackOn[t] ?? 0
-        if lfoParam.isMasterOnly { return }
+        if lfoParam.isMasterOnly || masterOn > 0 { return }
         trackOn[t] = (cur + 1) % 3
     }
 

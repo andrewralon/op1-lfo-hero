@@ -58,7 +58,7 @@ struct LFOPanelView: View {
                 ForEach(1...4, id: \.self) { t in
                     TrackToggleButton(track: t,
                                       state: app.trackOn[t] ?? 0,
-                                      disabled: app.lfoParam.isMasterOnly) {
+                                      disabled: app.lfoParam.isMasterOnly || app.masterOn > 0) {
                         app.cycleTrack(t)
                     }
                 }
@@ -225,17 +225,20 @@ struct LFOPanelView: View {
             Button { showDevicePicker = true } label: {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(app.isConnected ? C.green : C.orange)
+                        .fill(app.isConnected ? C.green : C.yellow)
                         .frame(width: 7, height: 7)
                     Text(app.connectionLabel)
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundColor(.white)
                         .lineLimit(1)
                     Spacer()
-                    (Text("tempo: ").foregroundColor(.white)
-                     + Text(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")
-                         .foregroundColor(app.isClockMaster ? C.green : C.track(1)))
-                        .font(.system(size: 9, design: .monospaced))
+                    HStack(spacing: 0) {
+                        Text("tempo: ")
+                            .foregroundColor(.white)
+                        Text(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")
+                            .foregroundColor(app.isClockMaster ? C.green : C.track(1))
+                    }
+                    .font(.system(size: 9, design: .monospaced))
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 2)

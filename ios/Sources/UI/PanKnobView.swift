@@ -40,7 +40,7 @@ struct PanKnobView: View {
                     p.addLine(to: CGPoint(x: tipX, y: tipY))
                 }
                 .stroke(liveVal == 0 ? C.green : C.text,
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round))
             }
             .frame(width: sz, height: sz)
             .contentShape(Circle())
@@ -64,8 +64,8 @@ struct PanKnobView: View {
     private func limitTick(cx: CGFloat, cy: CGFloat, r: CGFloat, deg: Double) -> Path {
         let rad = deg * Double.pi / 180
         var p = Path()
-        p.move(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 1.15,
-                           y: cy + CGFloat(sin(rad)) * r * 1.15))
+        p.move(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 1.28,
+                           y: cy + CGFloat(sin(rad)) * r * 1.20))
         p.addLine(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 0.85,
                               y: cy + CGFloat(sin(rad)) * r * 0.85))
         return p
