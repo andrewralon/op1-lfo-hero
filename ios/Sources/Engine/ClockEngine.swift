@@ -28,6 +28,9 @@ final class ClockEngine {
     // MARK: - Transport state
     // sppPos is in MIDI Song Position Pointer units (1/16 notes = 6 ticks at 24 PPQN)
     private var sppPos = 0
+    // hasStarted: true after first Start (0xFA) is sent; subsequent play() sends Continue (0xFB)
+    // Mirrors Python MidiClockGenerator._has_started — reset only on goto_start (double-stop)
+    private var hasStarted = false
 
     // Controls how far each arrow press moves the tape.
     // .measure = 16 SPP units (1 bar in 4/4) | .scrub = 4 SPP units (1 quarter note)
@@ -172,7 +175,14 @@ final class ClockEngine {
     // MARK: - Transport commands
 
     func play() {
-        router?.send([0xFA])
+        isPlaying = true
+        if hasStarted {
+            router?.send([0xFB])
+        } else {
+            sppPos = 0
+            router?.send([0xFA])
+            hasStarted = true
+        }
     }
 
     func stop() {
@@ -190,15 +200,11 @@ final class ClockEngine {
         sendTapeSeek(cc: 83)
     }
 
-    // CC 82/83 tells the OP-1 to seek; SPP sets the target position;
-    // 0xFB (Continue) always follows so playback resumes after the seek —
-    // not gated on isPlaying because the OP-1 may have been started by its
-    // own Play button without the app knowing about it.
     private func sendTapeSeek(cc: UInt8) {
         let lo = UInt8(sppPos & 0x7F)
         let hi = UInt8((sppPos >> 7) & 0x7F)
         router?.send([0xB0, cc, 127])
         router?.send([0xF2, lo, hi])
-        router?.send([0xFB])
+        if isPlaying { router?.send([0xFB]) }
     }
 }

@@ -142,6 +142,8 @@ final class AppState: ObservableObject {
     // MARK: - Transport actions
 
     func play() {
+        guard !isPlaying else { return }
+        isPlaying = true
         clock.play()
     }
 
