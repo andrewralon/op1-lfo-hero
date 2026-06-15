@@ -94,7 +94,7 @@ final class AppState: ObservableObject {
                 case .mute:
                     self.mutes[track] = midiVal >= 64
                 case .tempo:
-                    self.clock.setMasterBpm(midiVal)
+                    self.clock.updateMasterBpm(midiVal)
                     self.bpm = midiVal
                 default:
                     break

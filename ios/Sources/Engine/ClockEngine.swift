@@ -104,6 +104,15 @@ final class ClockEngine {
         bpmCallback?(clamped)
     }
 
+    /// Updates the stored BPM without restarting the timer — safe to call at LFO tick rate.
+    /// The running timer adapts its period on the next tick via fireMasterTick.
+    func updateMasterBpm(_ newBpm: Double) {
+        guard isClockMaster else { return }
+        let clamped = max(20, min(300, newBpm))
+        lock.lock(); masterBpm = clamped; bpm = clamped; lock.unlock()
+        bpmCallback?(clamped)
+    }
+
     private func scheduleMasterTimer(bpm: Double) {
         masterTimer?.cancel()
         let t = DispatchSource.makeTimerSource(queue: masterQueue)
@@ -114,9 +123,25 @@ final class ClockEngine {
         t.resume()
     }
 
+    private var lastTickNs = 0
+
     private func fireMasterTick() {
         router?.send([0xF8])
-        lock.lock(); masterTickCount += 1; let tick = masterTickCount; lock.unlock()
+        lock.lock()
+        masterTickCount += 1
+        let tick = masterTickCount
+        let currentBpm = masterBpm
+        lock.unlock()
+
+        // Adapt timer period when BPM changes (e.g. from tempo LFO) without restarting
+        let ns = Int(60_000_000_000 / (currentBpm * Double(PPQN)))
+        if ns != lastTickNs {
+            lastTickNs = ns
+            masterTimer?.schedule(deadline: .now() + .nanoseconds(ns),
+                                  repeating: .nanoseconds(ns),
+                                  leeway: .microseconds(200))
+        }
+
         tickCallback?(tick)
     }
 
