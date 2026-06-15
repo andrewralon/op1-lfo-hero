@@ -61,11 +61,17 @@ final class USBMidi: NSObject, ObservableObject {
         // MIDIInputPortCreateWithBlock is deprecated in iOS 14 but provides simple
         // MIDI 1.0 byte-stream access; avoids UMP parsing overhead for our use case.
         MIDIInputPortCreateWithBlock(client, "LFOHeroIn" as CFString, &inPort) { [weak self] pktList, _ in
-            var pkt = pktList.pointee.packet
-            for _ in 0..<pktList.pointee.numPackets {
-                let n = Int(pkt.length)
-                withUnsafeBytes(of: pkt.data) { self?.parseBytes(Array($0.prefix(n))) }
-                pkt = MIDIPacketNext(&pkt).pointee
+            // Iterate via a pointer into the original packet list memory.
+            // Copying MIDIPacket to the stack then calling MIDIPacketNext on &copy
+            // crashes: MIDIPacketNext does pointer arithmetic from the copy's stack
+            // address, not the list, producing an invalid pointer on the next .pointee.
+            let raw = UnsafeMutableRawPointer(mutating: pktList)
+                .advanced(by: MemoryLayout<MIDIPacketList>.offset(of: \.packet) ?? 8)
+            var pkt = raw.assumingMemoryBound(to: MIDIPacket.self)
+            for _ in 0..<Int(pktList.pointee.numPackets) {
+                let n = Int(pkt.pointee.length)
+                withUnsafeBytes(of: pkt.pointee.data) { self?.parseBytes(Array($0.prefix(n))) }
+                pkt = MIDIPacketNext(pkt)
             }
         }
         scanForOP1()

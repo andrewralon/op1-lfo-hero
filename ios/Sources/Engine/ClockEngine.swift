@@ -56,6 +56,8 @@ final class ClockEngine {
         lock.lock()
         slaveTick += 1
         let tick = slaveTick
+        // Track tape position in real time: 1 SPP unit = 6 ticks at 24 PPQN
+        if isPlaying && slaveTick % 6 == 0 { sppPos += 1 }
         if lastTickTime > 0 {
             let interval = now - lastTickTime
             bpmHistory.append(interval)
@@ -157,6 +159,8 @@ final class ClockEngine {
         masterTickCount += 1
         let tick = masterTickCount
         let currentBpm = masterBpm
+        // Track tape position in real time: 1 SPP unit = 6 ticks at 24 PPQN
+        if isPlaying && masterTickCount % 6 == 0 { sppPos += 1 }
         lock.unlock()
 
         let ns = Int(60_000_000_000 / (currentBpm * Double(PPQN)))
