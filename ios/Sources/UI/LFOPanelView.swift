@@ -14,15 +14,16 @@ struct LFOPanelView: View {
         return []
     }
 
-    // Color of the first enabled track/master button, used to tint the preview waveform
-    private var waveColor: Color {
+    // Colors for all enabled track/master buttons — drives banded waveform preview
+    private var waveColors: [Color] {
         let trackDisabled = app.lfoParam.isMasterOnly
         let masterDisabled = !app.lfoParam.isMasterCapable
-        if !trackDisabled, let t = (1...4).first(where: { (app.trackOn[$0] ?? 0) > 0 }) {
-            return C.track(t)
+        var result: [Color] = []
+        if !trackDisabled {
+            for t in 1...4 where (app.trackOn[t] ?? 0) > 0 { result.append(C.track(t)) }
         }
-        if !masterDisabled && app.masterOn > 0 { return C.green }
-        return C.green
+        if !masterDisabled && app.masterOn > 0 { result.append(C.green) }
+        return result.isEmpty ? [C.green] : result
     }
 
     // True if any enabled track/master button is in the inverted (state == 2) position
@@ -59,12 +60,12 @@ struct LFOPanelView: View {
             // ── 2. Param + wave dropdowns — fitted width, centered ────────────
             HStack(spacing: 6) {
                 Spacer()
-                Image(systemName: "umbrella").font(.system(size: 16)).foregroundColor(C.dim)
-                CompactPicker(options: Array(Parameter.allCases.reversed()),
+                Image(systemName: "umbrella").font(.system(size: 16)).foregroundColor(Color(hex: "#aaaaaa"))
+                CompactPicker(options: Array(Parameter.allCases),
                               selection: $app.lfoParam)
                 Spacer()
-                Image(systemName: "waveform.path").font(.system(size: 16)).foregroundColor(C.dim)
-                CompactPicker(options: Array(LfoWave.allCases.reversed()),
+                Image(systemName: "waveform.path").font(.system(size: 16)).foregroundColor(Color(hex: "#aaaaaa"))
+                CompactPicker(options: Array(LfoWave.allCases),
                               selection: $app.lfoWave)
                 Spacer()
             }
@@ -89,7 +90,7 @@ struct LFOPanelView: View {
                         .buttonStyle(.plain).foregroundColor(Color(hex: "#aaaaaa"))
 
                         Text(RATE_LABELS[app.lfoRate - 1])
-                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                            .font(.system(size: ctrlFontSize, weight: .bold, design: .monospaced))
                             .foregroundColor(.white)
                             .frame(width: 32)
 
@@ -138,7 +139,7 @@ struct LFOPanelView: View {
                 rateTicks: RATE_TICKS[app.lfoRate] ?? (4 * PPQN),
                 depth: app.lfoDepth,
                 inverted: waveInverted,
-                color: waveColor
+                colors: waveColors
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(8)
@@ -166,7 +167,7 @@ struct LFOPanelView: View {
             // ── 5. Start buttons ──────────────────────────────────────────────
             HStack(spacing: 8) {
                 Button { app.lfoStart(loop: true) } label: {
-                    Label("∞ Loop", systemImage: "repeat")
+                    Label("repeat", systemImage: "repeat")
                         .font(.system(size: 11, weight: .medium))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
@@ -177,7 +178,7 @@ struct LFOPanelView: View {
                 .buttonStyle(.plain)
 
                 Button { app.lfoStart(loop: false) } label: {
-                    Label("1× Shot", systemImage: "play.circle")
+                    Label("1x shot", systemImage: "play.circle")
                         .font(.system(size: 11, weight: .medium))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
@@ -188,7 +189,7 @@ struct LFOPanelView: View {
                 .buttonStyle(.plain)
 
                 Button { app.stopAllLfos(); selectedLfoID = nil } label: {
-                    Label("Stop All", systemImage: "xmark.circle")
+                    Label("delete all", systemImage: "xmark.circle")
                         .font(.system(size: 11, weight: .medium))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
