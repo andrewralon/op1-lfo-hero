@@ -36,38 +36,101 @@ struct TransportBarView: View {
             }
             .buttonStyle(.plain)
 
-            // BPM: − value +
-            Button { app.setBpm(app.bpm - 1) } label: {
-                Image(systemName: "minus")
-                    .font(.system(size: 12))
-                    .frame(width: 30)
-                    .frame(maxHeight: .infinity)
-                    .background(C.bg3)
-                    .foregroundColor(C.text)
-            }
-            .buttonStyle(.plain)
-
-            Text(String(format: "%.1f", app.bpm))
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(C.text)
-                .frame(width: 52)
-                .frame(maxHeight: .infinity)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-
-            Button { app.setBpm(app.bpm + 1) } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 12))
-                    .frame(width: 30)
-                    .frame(maxHeight: .infinity)
-                    .background(C.bg3)
-                    .foregroundColor(C.text)
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
+            // BPM scrubber fills remaining space
+            BpmScrubber()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 8)
         }
         .background(C.bg2)
+    }
+}
+
+// MARK: - BPM scrubber
+// Drag up/down = ±0.1 BPM per point. Double-tap or long-press opens keyboard for direct entry.
+
+private struct BpmScrubber: View {
+    @EnvironmentObject var app: AppState
+    @State  private var base: Double  = 120
+    @GestureState private var drag: CGFloat = 0
+    @State  private var editing   = false
+    @State  private var editText  = ""
+    @FocusState private var focused: Bool
+
+    private var live: Double {
+        max(20, min(300, base - Double(drag) * 0.1))
+    }
+
+    private var strokeColor: Color {
+        if editing   { return C.green.opacity(0.8) }
+        if drag != 0 { return C.green.opacity(0.6) }
+        return .clear
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(C.bg3)
+                .overlay(RoundedRectangle(cornerRadius: 3).stroke(strokeColor, lineWidth: 1))
+
+            if editing {
+                TextField("", text: $editText)
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .foregroundColor(C.green)
+                    .multilineTextAlignment(.center)
+                    .keyboardType(.decimalPad)
+                    .focused($focused)
+                    .onSubmit { commitEdit() }
+                    .toolbar {
+                        ToolbarItemGroup(placement: .keyboard) {
+                            Spacer()
+                            Button("Done") { commitEdit() }
+                        }
+                    }
+            } else {
+                Text(String(format: "%.1f", live))
+                    .font(.system(size: 15, weight: .bold, design: .monospaced))
+                    .foregroundColor(drag != 0 ? C.green : .white)
+            }
+        }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 2)
+                .updating($drag) { g, state, _ in
+                    guard !editing else { return }
+                    state = g.translation.height
+                }
+                .onEnded { g in
+                    guard !editing else { return }
+                    let raw     = max(20, min(300, base - Double(g.translation.height) * 0.1))
+                    let rounded = (raw * 10).rounded() / 10
+                    base = rounded
+                    app.setBpm(rounded)
+                }
+        )
+        .onTapGesture(count: 2) { startEditing() }
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.5)
+                .onEnded { _ in startEditing() }
+        )
+        .onAppear { base = app.bpm }
+        .onChange(of: app.bpm) { _, v in if drag == 0 && !editing { base = v } }
+    }
+
+    private func startEditing() {
+        guard !editing else { return }
+        editText = String(format: "%.1f", live)
+        editing  = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { focused = true }
+    }
+
+    private func commitEdit() {
+        if let val = Double(editText) {
+            let rounded = ((max(20, min(300, val))) * 10).rounded() / 10
+            base = rounded
+            app.setBpm(rounded)
+        }
+        editing = false
+        focused = false
     }
 }
 

@@ -19,7 +19,7 @@ struct TrackStripView: View {
                 Text("\(track)")
                     .font(.system(size: C.trackLabelSize, weight: .bold, design: .monospaced))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 5)
+                    .padding(.vertical, 2)
                     .background(muted ? color.opacity(0.2) : color)
                     .foregroundColor(muted ? color : .black)
             }
@@ -29,7 +29,7 @@ struct TrackStripView: View {
             PanKnobView(value: pan) { app.setPan(track: track, value: $0) }
                 .padding(.horizontal, 12)
                 .frame(height: 62)
-                .padding(.vertical, 6)
+                .padding(.vertical, 3)
 
             // ── Fader (digits live-update inside VolumeFaderView) ─────────────
             VolumeFaderView(value: vol) { app.setVolume(track: track, value: $0) }
@@ -53,6 +53,6 @@ struct TracksView: View {
             ForEach(1...4, id: \.self) { TrackStripView(track: $0) }
         }
         .padding(.horizontal, 2)
-        .padding(.vertical, 2)
+        .padding(.vertical, 0)
     }
 }

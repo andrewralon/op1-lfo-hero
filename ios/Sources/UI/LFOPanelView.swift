@@ -53,7 +53,7 @@ struct LFOPanelView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 7)
+            .padding(.vertical, 4)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -69,7 +69,7 @@ struct LFOPanelView: View {
                               selection: $app.lfoWave)
                 Spacer()
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 4)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -132,7 +132,7 @@ struct LFOPanelView: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 7)
+            .padding(.vertical, 4)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -174,7 +174,7 @@ struct LFOPanelView: View {
                     Label("repeat", systemImage: "repeat")
                         .font(.system(size: 14, weight: .medium))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
+                        .padding(.vertical, 7)
                         .background(C.green.opacity(0.25))
                         .foregroundColor(C.green)
                         .cornerRadius(4)
@@ -185,7 +185,7 @@ struct LFOPanelView: View {
                     Label("1x shot", systemImage: "play.circle")
                         .font(.system(size: 14, weight: .medium))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
+                        .padding(.vertical, 7)
                         .background(C.bg3)
                         .foregroundColor(C.text)
                         .cornerRadius(4)
@@ -196,7 +196,7 @@ struct LFOPanelView: View {
                     Label("delete all", systemImage: "xmark.circle")
                         .font(.system(size: 14, weight: .medium))
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 9)
+                        .padding(.vertical, 7)
                         .background(C.red.opacity(0.18))
                         .foregroundColor(C.red)
                         .cornerRadius(4)
@@ -204,7 +204,7 @@ struct LFOPanelView: View {
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, 8)
-            .padding(.vertical, 7)
+            .padding(.vertical, 4)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -224,7 +224,7 @@ struct LFOPanelView: View {
                         .foregroundColor(C.dim)
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 4)
+                .padding(.vertical, 2)
             }
             .buttonStyle(.plain)
             .background(C.bg2)
