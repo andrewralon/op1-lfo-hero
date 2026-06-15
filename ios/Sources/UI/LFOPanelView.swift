@@ -322,17 +322,19 @@ private struct ScrubValue: View {
     var sensitivity: Double = 0.15
     var decimals: Int = 0
 
-    @GestureState private var drag: CGSize = .zero
+    @GestureState private var isActive: Bool = false
     @State private var base: Double = 0
+    @State private var accumulated: Double = 0  // integrated vertical delta
+    @State private var prevHeight: CGFloat = 0
+    @State private var dragStarted = false
 
-    // Horizontal offset divides sensitivity: 50pt away = half speed, 100pt = third, etc.
+    private let precisionScrubHalvingPt: Double = 25
     private func precisionFactor(_ ortho: CGFloat) -> Double {
-        1.0 / max(1.0, Double(abs(ortho)) / 50.0)
+        1.0 / max(1.0, Double(abs(ortho)) / precisionScrubHalvingPt)
     }
 
     private var live: Double {
-        let delta = Double(drag.height) * sensitivity * precisionFactor(drag.width)
-        return max(range.lowerBound, min(range.upperBound, base - delta))
+        max(range.lowerBound, min(range.upperBound, base - accumulated))
     }
 
     private var displayText: String {
@@ -345,26 +347,39 @@ private struct ScrubValue: View {
                 .fill(C.bg3)
                 .overlay(
                     RoundedRectangle(cornerRadius: 3)
-                        .stroke(drag != .zero ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
+                        .stroke(isActive ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
                 )
                 .frame(height: 36)
             Text(displayText)
                 .font(.system(size: ctrlFontSize, weight: .bold, design: .monospaced))
-                .foregroundColor(drag != .zero ? C.green : .white)
+                .foregroundColor(isActive ? C.green : .white)
         }
         .gesture(
             DragGesture(minimumDistance: 2)
-                .updating($drag) { g, state, _ in state = g.translation }
-                .onEnded { g in
-                    let delta = Double(g.translation.height) * sensitivity * precisionFactor(g.translation.width)
-                    var newVal = max(range.lowerBound, min(range.upperBound, base - delta))
+                .updating($isActive) { _, state, _ in state = true }
+                .onChanged { g in
+                    // Skip the first event — use it to anchor prevHeight so there's no initial jump.
+                    guard dragStarted else {
+                        dragStarted = true
+                        prevHeight = g.translation.height
+                        return
+                    }
+                    let dh = g.translation.height - prevHeight
+                    accumulated += dh * sensitivity * precisionFactor(g.translation.width)
+                    prevHeight = g.translation.height
+                }
+                .onEnded { _ in
+                    var newVal = live
                     if decimals == 0 { newVal = newVal.rounded() }
                     base = newVal
                     value = newVal
+                    accumulated = 0
+                    prevHeight = 0
+                    dragStarted = false
                 }
         )
         .onAppear { base = value }
-        .onChange(of: value) { _, v in if drag == .zero { base = v } }
+        .onChange(of: value) { _, v in if !isActive { base = v } }
     }
 }
 

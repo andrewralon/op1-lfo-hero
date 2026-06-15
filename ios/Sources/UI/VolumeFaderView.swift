@@ -1,7 +1,7 @@
 import SwiftUI
 
 // Fader includes the digit display so digits update live while dragging
-// (display is computed from @GestureState drag, so it updates every frame)
+// (display is computed from accumulated delta, updated every drag frame)
 struct VolumeFaderView: View {
     @Binding var value: Double  // 0-99
     let onChange: (Double) -> Void
@@ -9,14 +9,22 @@ struct VolumeFaderView: View {
     private let trackW: CGFloat    = 6
     private let thumbSize: CGFloat = 14  // square rotated 45° = perfect ◇
 
-    @GestureState private var drag: CGFloat = 0
+    private let precisionScrubHalvingPt: Double = 30
+    private func precisionFactor(_ ortho: CGFloat) -> Double {
+        1.0 / max(1.0, Double(abs(ortho)) / precisionScrubHalvingPt)
+    }
+
+    @GestureState private var isActive: Bool = false
     @State private var base: Double = 0
+    @State private var accumulated: Double = 0
+    @State private var prevHeight: CGFloat = 0
+    @State private var dragStarted = false
 
     var body: some View {
         GeometryReader { geo in
             let h       = geo.size.height
             let travel  = max(1, h - thumbSize)
-            let display = max(0, min(99, base - Double(drag / travel * 99)))
+            let display = max(0, min(99, base - accumulated))
             let thumbY  = CGFloat(1.0 - display / 99.0) * travel
             let center  = thumbY + thumbSize / 2
 
@@ -69,17 +77,29 @@ struct VolumeFaderView: View {
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 1)
-                    .updating($drag) { g, state, _ in state = g.translation.height }
-                    .onEnded { g in
-                        let delta = Double(g.translation.height / travel * 99)
-                        let newVal = max(0, min(99, base - delta))
+                    .updating($isActive) { _, state, _ in state = true }
+                    .onChanged { g in
+                        guard dragStarted else {
+                            dragStarted = true
+                            prevHeight = g.translation.height
+                            return
+                        }
+                        let dh = g.translation.height - prevHeight
+                        accumulated += Double(dh / travel * 99) * precisionFactor(g.translation.width)
+                        prevHeight = g.translation.height
+                    }
+                    .onEnded { _ in
+                        let newVal = max(0, min(99, base - accumulated))
                         base = newVal
                         value = newVal
                         onChange(newVal)
+                        accumulated = 0
+                        prevHeight = 0
+                        dragStarted = false
                     }
             )
             .onAppear { base = value }
-            .onChange(of: value) { _, newVal in if drag == 0 { base = newVal } }
+            .onChange(of: value) { _, newVal in if !isActive { base = newVal } }
         }
     }
 }

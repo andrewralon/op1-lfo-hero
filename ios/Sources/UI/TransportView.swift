@@ -55,23 +55,26 @@ struct TransportBarView: View {
 private struct BpmScrubber: View {
     @EnvironmentObject var app: AppState
     @State  private var base: Double  = 120
-    @GestureState private var drag: CGSize = .zero
-    @State  private var editing   = false
-    @State  private var editText  = ""
+    @GestureState private var isActive: Bool = false
+    @State  private var editing     = false
+    @State  private var editText    = ""
+    @State  private var accumulated: Double = 0
+    @State  private var prevHeight: CGFloat = 0
+    @State  private var dragStarted = false
     @FocusState private var focused: Bool
 
+    private let precisionScrubHalvingPt: Double = 40
     private func precisionFactor(_ ortho: CGFloat) -> Double {
-        1.0 / max(1.0, Double(abs(ortho)) / 50.0)
+        1.0 / max(1.0, Double(abs(ortho)) / precisionScrubHalvingPt)
     }
 
     private var live: Double {
-        let delta = Double(drag.height) * 0.05 * precisionFactor(drag.width)
-        return max(20, min(300, base - delta))
+        max(20, min(300, base - accumulated))
     }
 
     private var strokeColor: Color {
-        if editing       { return C.green.opacity(0.8) }
-        if drag != .zero { return C.green.opacity(0.6) }
+        if editing  { return C.green.opacity(0.8) }
+        if isActive { return C.green.opacity(0.6) }
         return .clear
     }
 
@@ -98,23 +101,35 @@ private struct BpmScrubber: View {
             } else {
                 Text(String(format: "%.1f", live))
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
-                    .foregroundColor(drag != .zero ? C.green : .white)
+                    .foregroundColor(isActive ? C.green : .white)
             }
         }
         .contentShape(Rectangle())
         .gesture(
             DragGesture(minimumDistance: 2)
-                .updating($drag) { g, state, _ in
+                .updating($isActive) { _, state, _ in
                     guard !editing else { return }
-                    state = g.translation
+                    state = true
                 }
-                .onEnded { g in
+                .onChanged { g in
                     guard !editing else { return }
-                    let delta   = Double(g.translation.height) * 0.05 * precisionFactor(g.translation.width)
-                    let raw     = max(20, min(300, base - delta))
-                    let rounded = (raw * 10).rounded() / 10
+                    guard dragStarted else {
+                        dragStarted = true
+                        prevHeight = g.translation.height
+                        return
+                    }
+                    let dh = g.translation.height - prevHeight
+                    accumulated += dh * 0.05 * precisionFactor(g.translation.width)
+                    prevHeight = g.translation.height
+                }
+                .onEnded { _ in
+                    guard !editing else { return }
+                    let rounded = (live * 10).rounded() / 10
                     base = rounded
                     app.setBpm(rounded)
+                    accumulated = 0
+                    prevHeight = 0
+                    dragStarted = false
                 }
         )
         .onTapGesture(count: 2) { startEditing() }
@@ -123,7 +138,7 @@ private struct BpmScrubber: View {
                 .onEnded { _ in startEditing() }
         )
         .onAppear { base = app.bpm }
-        .onChange(of: app.bpm) { _, v in if drag == .zero && !editing { base = v } }
+        .onChange(of: app.bpm) { _, v in if !isActive && !editing { base = v } }
     }
 
     private func startEditing() {
