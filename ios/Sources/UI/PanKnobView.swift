@@ -64,10 +64,10 @@ struct PanKnobView: View {
     private func limitTick(cx: CGFloat, cy: CGFloat, r: CGFloat, deg: Double) -> Path {
         let rad = deg * Double.pi / 180
         var p = Path()
-        p.move(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 0.96,
-                           y: cy + CGFloat(sin(rad)) * r * 0.96))
-        p.addLine(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 0.74,
-                              y: cy + CGFloat(sin(rad)) * r * 0.74))
+        p.move(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 1.15,
+                           y: cy + CGFloat(sin(rad)) * r * 1.15))
+        p.addLine(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 0.85,
+                              y: cy + CGFloat(sin(rad)) * r * 0.85))
         return p
     }
 }
