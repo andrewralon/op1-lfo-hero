@@ -14,8 +14,8 @@ struct TransportBarView: View {
 
             Sep()
 
-            TapeBtn(symbol: "arrow.left")  { app.tapePrev() }
-            TapeBtn(symbol: "arrow.right") { app.tapeNext() }
+            TransBtn(symbol: "arrow.left",  active: false) { app.tapePrev() }
+            TransBtn(symbol: "arrow.right", active: false) { app.tapeNext() }
 
             Sep()
 
@@ -164,51 +164,51 @@ private struct BpmScrubber: View {
     }
 }
 
-// Hold (≥350ms) scrubs tape continuously at 10 steps/sec; quick tap steps once.
-private struct TapeBtn: View {
-    let symbol: String
-    let action: () -> Void
+// // Hold (≥350ms) scrubs tape continuously at 10 steps/sec; quick tap steps once.
+// private struct TapeBtn: View {
+//     let symbol: String
+//     let action: () -> Void
 
-    @GestureState private var pressing = false
-    @State private var scrubTimer: DispatchSourceTimer? = nil
-    @State private var didScrub = false
+//     @GestureState private var pressing = false
+//     @State private var scrubTimer: DispatchSourceTimer? = nil
+//     @State private var didScrub = false
 
-    var body: some View {
-        Image(systemName: symbol)
-            .font(.system(size: 20, weight: .regular))
-            .frame(width: 44)
-            .frame(maxHeight: .infinity)
-            .background(didScrub ? C.green.opacity(0.18) : Color.clear)
-            .foregroundColor(didScrub ? C.green : C.text)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .updating($pressing) { _, state, _ in state = true }
-                    .onEnded { _ in
-                        scrubTimer?.cancel()
-                        scrubTimer = nil
-                        if !didScrub { action() }
-                        didScrub = false
-                    }
-            )
-            .onChange(of: pressing) { _, isNowPressed in
-                guard isNowPressed else { return }
-                didScrub = false
-                let t = DispatchSource.makeTimerSource(queue: .main)
-                scrubTimer = t
-                t.schedule(deadline: .now() + 0.35, repeating: 0.1)
-                t.setEventHandler { [self] in
-                    didScrub = true
-                    action()
-                }
-                t.resume()
-            }
-            .onDisappear {
-                scrubTimer?.cancel()
-                scrubTimer = nil
-            }
-    }
-}
+//     var body: some View {
+//         Image(systemName: symbol)
+//             .font(.system(size: 20, weight: .regular))
+//             .frame(width: 44)
+//             .frame(maxHeight: .infinity)
+//             .background(didScrub ? C.green.opacity(0.18) : Color.clear)
+//             .foregroundColor(didScrub ? C.green : C.text)
+//             .contentShape(Rectangle())
+//             .gesture(
+//                 DragGesture(minimumDistance: 0)
+//                     .updating($pressing) { _, state, _ in state = true }
+//                     .onEnded { _ in
+//                         scrubTimer?.cancel()
+//                         scrubTimer = nil
+//                         if !didScrub { action() }
+//                         didScrub = false
+//                     }
+//             )
+//             .onChange(of: pressing) { _, isNowPressed in
+//                 guard isNowPressed else { return }
+//                 didScrub = false
+//                 let t = DispatchSource.makeTimerSource(queue: .main)
+//                 scrubTimer = t
+//                 t.schedule(deadline: .now() + 0.35, repeating: 0.1)
+//                 t.setEventHandler { [self] in
+//                     didScrub = true
+//                     action()
+//                 }
+//                 t.resume()
+//             }
+//             .onDisappear {
+//                 scrubTimer?.cancel()
+//                 scrubTimer = nil
+//             }
+//     }
+// }
 
 private struct TransBtn: View {
     let symbol: String
