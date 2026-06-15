@@ -14,8 +14,8 @@ struct TransportBarView: View {
 
             Sep()
 
-            TransBtn(symbol: "arrowshape.left.fill",  active: false) { app.tapePrev() }
-            TransBtn(symbol: "arrowshape.right.fill", active: false) { app.tapeNext() }
+            TransBtn(symbol: "chevron.backward.2", weight: .thin, active: false) { app.tapePrev() }
+            TransBtn(symbol: "chevron.forward.2",  weight: .thin, active: false) { app.tapeNext() }
 
             Sep()
 
@@ -161,13 +161,14 @@ private struct BpmScrubber: View {
 
 private struct TransBtn: View {
     let symbol: String
+    var weight: Font.Weight = .regular
     let active: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 20))
+                .font(.system(size: 20, weight: weight))
                 .frame(width: 44)
                 .frame(maxHeight: .infinity)
                 .background(active ? C.green.opacity(0.18) : Color.clear)

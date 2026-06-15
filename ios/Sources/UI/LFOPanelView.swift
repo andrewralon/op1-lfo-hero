@@ -168,39 +168,30 @@ struct LFOPanelView: View {
                 // Left: three action buttons stacked vertically
                 VStack(spacing: 0) {
                     Button { app.lfoStart(loop: true) } label: {
-                        VStack(spacing: 2) {
-                            Image(systemName: "repeat").font(.system(size: 13))
-                            Text("repeat").font(.system(size: 11, weight: .medium))
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(C.green.opacity(0.25))
-                        .foregroundColor(C.green)
+                        Image(systemName: "repeat").font(.system(size: 16))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(C.green.opacity(0.25))
+                            .foregroundColor(C.green)
                     }
                     .buttonStyle(.plain)
 
                     Rectangle().fill(C.bg3).frame(height: 1)
 
                     Button { app.lfoStart(loop: false) } label: {
-                        VStack(spacing: 2) {
-                            Image(systemName: "play.circle").font(.system(size: 13))
-                            Text("1x shot").font(.system(size: 11, weight: .medium))
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(C.bg3)
-                        .foregroundColor(C.text)
+                        Image(systemName: "arrow.forward.to.line").font(.system(size: 16))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(C.bg3)
+                            .foregroundColor(C.text)
                     }
                     .buttonStyle(.plain)
 
                     Rectangle().fill(C.bg3).frame(height: 1)
 
                     Button { app.stopAllLfos(); selectedLfoID = nil } label: {
-                        VStack(spacing: 2) {
-                            Image(systemName: "xmark.circle").font(.system(size: 13))
-                            Text("delete").font(.system(size: 11, weight: .medium))
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(C.red.opacity(0.18))
-                        .foregroundColor(C.red)
+                        Image(systemName: "trash").font(.system(size: 16))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(C.red.opacity(0.18))
+                            .foregroundColor(C.red)
                     }
                     .buttonStyle(.plain)
                 }
