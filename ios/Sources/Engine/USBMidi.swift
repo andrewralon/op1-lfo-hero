@@ -9,11 +9,13 @@ final class USBMidi: NSObject, ObservableObject {
 
     enum State: Equatable {
         case disconnected
+        case found([String])     // MIDI destinations exist but none matched OP-1
         case connected(String)
 
         var label: String {
             switch self {
             case .disconnected:        return "no USB MIDI"
+            case .found(let names):    return "USB: \(names.prefix(2).joined(separator: " | "))"
             case .connected(let name): return "\(name) (usb)"
             }
         }
@@ -39,8 +41,11 @@ final class USBMidi: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        // CoreMIDI setup is safe on any thread; keep main thread free for first render
         DispatchQueue.global(qos: .userInteractive).async { self.setupMIDI() }
+        // Extra scans from the main thread: the background scan above may run before
+        // iOS has fully enumerated the USB device, so retry at 1s and 3s.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.scanForOP1() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { self.scanForOP1() }
     }
 
     private func setupMIDI() {
@@ -69,27 +74,51 @@ final class USBMidi: NSObject, ObservableObject {
     // MARK: - Device discovery
 
     private func scanForOP1() {
+        var otherNames: [String] = []
         for i in 0..<MIDIGetNumberOfDestinations() {
             let dest = MIDIGetDestination(i)
-            guard let name = midiName(dest), isOP1(name) else { continue }
-            if destRef != dest {
-                destRef = dest
-                DispatchQueue.main.async { self.state = .connected(name) }
+            guard let name = midiName(dest) else { continue }
+            if isOP1(name) {
+                if destRef != dest {
+                    destRef = dest
+                    DispatchQueue.main.async { self.state = .connected(name) }
+                }
+                connectSource()
+                return
             }
-            connectSource()
-            return
+            otherNames.append(name)
         }
-        // OP-1 not found — clear refs. CoreMIDI already disconnected the source
-        // when the device was removed; calling MIDIPortDisconnectSource on a dead
-        // endpoint can corrupt the port and prevent reconnection.
+        // OP-1 not found — clear refs and report what we did find (if anything).
         srcRef = 0
-        if destRef != 0 {
-            destRef = 0
-            DispatchQueue.main.async { self.state = .disconnected }
+        if destRef != 0 { destRef = 0 }
+        let names = otherNames
+        DispatchQueue.main.async {
+            self.state = names.isEmpty ? .disconnected : .found(names)
         }
     }
 
     private func connectSource() {
+        // Primary: entity-based discovery.
+        // Once we have the destination endpoint, ask CoreMIDI which entity owns it,
+        // then connect ALL source endpoints in that entity. This catches dedicated
+        // clock ports whose display name may not contain "op-1".
+        if destRef != 0 {
+            var entity = MIDIEntityRef()
+            if MIDIEndpointGetEntity(destRef, &entity) == noErr {
+                let count = MIDIEntityGetNumberOfSources(entity)
+                if count > 0 {
+                    if srcRef != 0 { MIDIPortDisconnectSource(inPort, srcRef); srcRef = 0 }
+                    for i in 0..<count {
+                        let src = MIDIEntityGetSource(entity, i)
+                        guard src != 0 else { continue }
+                        MIDIPortConnectSource(inPort, src, nil)
+                        if srcRef == 0 { srcRef = src }
+                    }
+                    return
+                }
+            }
+        }
+        // Fallback: name-based search (original behavior).
         for i in 0..<MIDIGetNumberOfSources() {
             let src = MIDIGetSource(i)
             guard let name = midiName(src), isOP1(name) else { continue }

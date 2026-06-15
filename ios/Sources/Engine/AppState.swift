@@ -20,6 +20,7 @@ final class AppState: ObservableObject {
     @Published var bpm: Double = 100.0
     @Published var isClockMaster = false
     @Published var isPlaying = false
+    @Published var slaveTicksReceived: Int = 0  // diagnostic: counts ticks from OP-1
 
     // MARK: - Track state  (volume: 0-99 display, pan: -63..+63)
     @Published var volumes: [Int: Double] = [1: 90, 2: 90, 3: 90, 4: 90]
@@ -73,6 +74,10 @@ final class AppState: ObservableObject {
                 if usbState.isConnected {
                     self.connectionLabel = usbState.label
                     self.isConnected = true
+                } else if case .found = usbState {
+                    // USB MIDI devices visible but OP-1 name not matched — show what was found
+                    self.connectionLabel = usbState.label
+                    self.isConnected = false
                 } else {
                     self.connectionLabel = bleState.label
                     self.isConnected = bleState.isConnected
@@ -85,9 +90,13 @@ final class AppState: ObservableObject {
             DispatchQueue.main.async { self?.bpm = newBpm }
         }
 
-        // Clock tick → automation engine
+        // Clock tick → automation engine + slave tick counter
         clock.tickCallback = { [weak self] tick in
-            self?.automation.onTick(tick)
+            guard let self else { return }
+            if !self.clock.isClockMaster {
+                DispatchQueue.main.async { self.slaveTicksReceived += 1 }
+            }
+            self.automation.onTick(tick)
         }
 
         // Automation update → fader/knob tracking on UI
@@ -162,6 +171,7 @@ final class AppState: ObservableObject {
 
     func disableClock() {
         isClockMaster = false
+        slaveTicksReceived = 0
         clock.disableClock()
     }
 

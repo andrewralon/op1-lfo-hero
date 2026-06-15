@@ -100,7 +100,11 @@ private struct BpmScrubber: View {
                     }
             } else {
                 let noData = !app.isClockMaster && app.bpm < 1.0
-                Text(noData ? "---.-" : String(format: "%.1f", live))
+                let t = app.slaveTicksReceived
+                let displayText = noData
+                    ? (t == 0 ? "no clk" : t < 9 ? "sync.." : "err?\(t)")
+                    : String(format: "%.1f", live)
+                Text(displayText)
                     .font(.system(size: 18, weight: .bold, design: .monospaced))
                     .foregroundColor(isActive ? C.green : .white)
             }
