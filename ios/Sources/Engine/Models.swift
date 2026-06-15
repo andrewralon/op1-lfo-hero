@@ -113,9 +113,9 @@ struct LfoClip: Identifiable {
 // MARK: - Conversion helpers
 
 func midiToUI(_ v: Double) -> Double {
-    (v * 99 / 127).rounded()
+    (v * 99 / 127).rounded(.down)
 }
 
 func uiToMidi(_ v: Double) -> Int {
-    (Int(v.rounded()) * 127 + 98) / 99
+    (Int(v) * 127 + 98) / 99
 }
