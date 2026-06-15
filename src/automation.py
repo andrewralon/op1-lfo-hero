@@ -155,7 +155,7 @@ LFO_WAVE_ABBREVS: dict[LfoWave, str] = {
 # Multiply rate_ticks by this factor before computing phase for a given wave.
 # Add an entry here to make a waveform span more beats per cycle.
 LFO_RATE_MULTIPLIERS: dict[LfoWave, int] = {
-    LfoWave.SWEEP_UP:   1,
+    LfoWave.SWEEP_UP: 1,
     LfoWave.SWEEP_DN: 1,
 }
 
