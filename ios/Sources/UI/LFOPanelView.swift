@@ -161,11 +161,56 @@ struct LFOPanelView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(8)
 
-            // Active LFO chips (only when running)
-            if !app.activeLfos.isEmpty {
-                Rectangle().fill(C.bg3).frame(height: 1)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
+            Rectangle().fill(C.bg3).frame(height: 1)
+
+            // ── 5. Start buttons (left column) + Active LFOs (right column) ───
+            HStack(spacing: 0) {
+                // Left: three action buttons stacked vertically
+                VStack(spacing: 0) {
+                    Button { app.lfoStart(loop: true) } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "repeat").font(.system(size: 13))
+                            Text("repeat").font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(C.green.opacity(0.25))
+                        .foregroundColor(C.green)
+                    }
+                    .buttonStyle(.plain)
+
+                    Rectangle().fill(C.bg3).frame(height: 1)
+
+                    Button { app.lfoStart(loop: false) } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "play.circle").font(.system(size: 13))
+                            Text("1x shot").font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(C.bg3)
+                        .foregroundColor(C.text)
+                    }
+                    .buttonStyle(.plain)
+
+                    Rectangle().fill(C.bg3).frame(height: 1)
+
+                    Button { app.stopAllLfos(); selectedLfoID = nil } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "xmark.circle").font(.system(size: 13))
+                            Text("delete").font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(C.red.opacity(0.18))
+                        .foregroundColor(C.red)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .frame(width: 76)
+
+                Rectangle().fill(C.bg3).frame(width: 1)
+
+                // Right: active LFO chips — scrollable, fills remaining width
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 4) {
                         ForEach(app.activeLfos) { lfo in
                             ActiveLfoChip(lfo: lfo, selected: selectedLfoID == lfo.id) {
                                 selectedLfoID = selectedLfoID == lfo.id ? nil : lfo.id
@@ -175,49 +220,12 @@ struct LFOPanelView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .padding(6)
                 }
+                .frame(maxWidth: .infinity)
             }
-
-            Rectangle().fill(C.bg3).frame(height: 1)
-
-            // ── 5. Start buttons ──────────────────────────────────────────────
-            HStack(spacing: 8) {
-                Button { app.lfoStart(loop: true) } label: {
-                    Label("repeat", systemImage: "repeat")
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
-                        .background(C.green.opacity(0.25))
-                        .foregroundColor(C.green)
-                        .cornerRadius(4)
-                }
-                .buttonStyle(.plain)
-
-                Button { app.lfoStart(loop: false) } label: {
-                    Label("1x shot", systemImage: "play.circle")
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
-                        .background(C.bg3)
-                        .foregroundColor(C.text)
-                        .cornerRadius(4)
-                }
-                .buttonStyle(.plain)
-
-                Button { app.stopAllLfos(); selectedLfoID = nil } label: {
-                    Label("delete", systemImage: "xmark.circle")
-                        .font(.system(size: 14, weight: .medium))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 7)
-                        .background(C.red.opacity(0.18))
-                        .foregroundColor(C.red)
-                        .cornerRadius(4)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .frame(maxWidth: .infinity)
+            .frame(height: 108)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 

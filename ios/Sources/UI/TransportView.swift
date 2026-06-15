@@ -14,8 +14,8 @@ struct TransportBarView: View {
 
             Sep()
 
-            TransBtn(symbol: "backward.end.fill", active: false) { app.tapePrev() }
-            TransBtn(symbol: "forward.end.fill",  active: false) { app.tapeNext() }
+            TransBtn(symbol: "arrowshape.left.fill",  active: false) { app.tapePrev() }
+            TransBtn(symbol: "arrowshape.right.fill", active: false) { app.tapeNext() }
 
             Sep()
 
@@ -167,7 +167,7 @@ private struct TransBtn: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 15))
+                .font(.system(size: 20))
                 .frame(width: 44)
                 .frame(maxHeight: .infinity)
                 .background(active ? C.green.opacity(0.18) : Color.clear)
