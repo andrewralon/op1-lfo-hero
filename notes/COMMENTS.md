@@ -1,6 +1,7 @@
 # Comments
 
 ## To fix
+- [ ] MED - hit stop twice quickly to return to tape start CC 84, >= 64
 - [ ] MED - start and stop lfos automatically, with start/stop buttons, in time with the op1 tempo
 - [ ] MED - show the scrub UI boxes differently so it's obvious they are scrubbable (vs dropdown, for example) - 2 thin vertical lines next to box? Different color border (white vs gray)? BEST: Single thin vertical white line just to the right of the box
   * fun idea - BPM box could use a way to show the user it can be scrubbed. maybe like it's a big rotating wheel or an old analog clock. maybe clip the top and bottom of the next entries so they're cut off at the edges of the box?
@@ -9,10 +10,15 @@
   * no other obvious solution
 - [ ] MED - pause or stop LFO chaos - maybe stop button should stop lfo activity while setting up new LFOs cause it's distracting. Play should start it. Or a better way?
 - [ ] MED - rate/speed needs all of the OP-1 options - 25 options (in order): 8 to 1 (relative tempo time) + 17 for clock symbols 0 to 30 minutes (absolute time)
-- [ ] LOW - depth & center spinboxes have no visual feedback for what they do since the waveform doesn't change.... not clear without trying it.
-- [ ] LOW - add parameter: SUSTAIN - CC 64 >= 64 = down
-- [ ] LOW - add OCTAVE shift capability - CC 79 < 64 = down, ≥ 64 = up
+- [ ] LOW - add parameter: SOUND SLOT SELECT - CC 102, channel 1-8, >=64 *****
+- [ ] LOW - add parameter: SYNTH PITCH BEND - channel 1-16, 0-16383
+- [ ] LOW - add parameter: ENVELOPE x4 - CC 50-53, 0-127
+- [ ] LOW - add parameter: OCTAVE - CC 79, < 64 = down, ≥ 64 = up
+- [ ] LOW - add parameter: MASTER EQ low/mid/high - CC 90-92, 0-127
+- [ ] LOW - add parameter: SUSTAIN - CC 64, >= 64 = down
+- [ ] LOW - add parameter: LOOP IN/OUT/TOGGLE - CC 86-88, 0-127
 - [ ] LOW - volume value is hidden by thumb. Move higher? fine with scrubbing.... 
+- [ ] LOW - depth & center spinboxes have no visual feedback for what they do since the waveform doesn't change.... not clear without trying it.
 - [ ] LOW - icons: center could use some clarity
 
 ## Later (or not possible)
