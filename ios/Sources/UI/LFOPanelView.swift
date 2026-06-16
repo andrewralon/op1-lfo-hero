@@ -36,7 +36,9 @@ struct LFOPanelView: View {
 
     // (color, isInverted) per enabled track/master — each draws its own waveform
     private var waveTracks: [(Color, Bool)] {
-        let trackDisabled = app.lfoParam.isMasterOnly
+        // Must mirror TrackToggleButton/MasterToggleButton's `disabled` conditions exactly —
+        // a button's stale on/inverted state shouldn't draw a waveform while it's disabled.
+        let trackDisabled = app.lfoParam.isMasterOnly || app.masterOn > 0
         let masterDisabled = !app.lfoParam.isMasterCapable
         var result: [(Color, Bool)] = []
         if !trackDisabled {

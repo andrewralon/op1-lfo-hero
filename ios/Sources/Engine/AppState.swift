@@ -31,9 +31,14 @@ final class AppState: ObservableObject {
     @Published var lfoWave  = LfoWave.sine
     @Published var lfoParam = Parameter.volume {
         didSet {
-            if lfoParam == .tempo {
-                masterOn = 1
-            } else if oldValue == .tempo {
+            if lfoParam.isMasterOnly {
+                // Master-only param (tempo, etc) — master must be on; don't clobber an
+                // existing normal/inverted choice, only kick it on if it was off.
+                if masterOn == 0 { masterOn = 1 }
+            } else if !lfoParam.isMasterCapable {
+                // Track-only param (volume/pan/mute) — master can't apply here, so clear
+                // any stale on/inverted state left over from a master-capable param. This
+                // also re-enables the track buttons, since they're disabled by masterOn > 0.
                 masterOn = 0
             }
         }
@@ -256,7 +261,12 @@ final class AppState: ObservableObject {
     }
 
     func cycleMaster() {
-        if !lfoParam.isMasterCapable { return }
-        masterOn = (masterOn + 1) % 3
+        guard lfoParam.isMasterCapable else { return }
+        if lfoParam.isMasterOnly {
+            // Master-only param — never allowed to land on "off", just alternate normal/inverted.
+            masterOn = masterOn == 1 ? 2 : 1
+        } else {
+            masterOn = (masterOn + 1) % 3
+        }
     }
 }
