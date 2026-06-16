@@ -7,6 +7,8 @@ struct LFOPanelView: View {
     @State private var selectedLfoID: UUID? = nil
     @State private var showDevicePicker = false
     @State private var showDeleteConfirm = false
+    @State private var showHelp = false
+    @State private var showSettings = false
 
     private var previewLfos: [LfoClip] {
         if let id = selectedLfoID, let lfo = app.activeLfos.first(where: { $0.id == id }) {
@@ -73,8 +75,6 @@ struct LFOPanelView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 4)
 
-            Rectangle().fill(C.bg3).frame(height: 1)
-
             // ── 2. Param + wave dropdowns — fitted width, centered ────────────
             HStack(spacing: 30) {
                 Spacer()
@@ -91,8 +91,6 @@ struct LFOPanelView: View {
                 Spacer()
             }
             .padding(.vertical, 4)
-
-            Rectangle().fill(C.bg3).frame(height: 1)
 
             // ── 3. Rate / depth / center — centered as a group ────────────────
             HStack(spacing: 0) {
@@ -151,9 +149,7 @@ struct LFOPanelView: View {
             }
             .padding(.vertical, 4)
 
-            Rectangle().fill(C.bg3).frame(height: 1)
-
-            // ── 4. Waveform preview — full width ──────────────────────────────
+            // ── 4. Waveform preview — full width, fixed (shorter) height ──────
             MultiWaveformView(
                 lfos: previewLfos,
                 wave: app.lfoWave,
@@ -161,12 +157,11 @@ struct LFOPanelView: View {
                 depth: app.lfoDepth,
                 tracks: waveTracks
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(height: 90)
+            .frame(maxWidth: .infinity)
             .padding(8)
 
-            Rectangle().fill(C.bg3).frame(height: 1)
-
-            // ── 5. Start buttons (left column) + Active LFOs (right column) ───
+            // ── 5. Start buttons + Active LFOs + help/settings (fills remaining space) ──
             HStack(spacing: 0) {
                 // Left: three action buttons stacked vertically
                 VStack(spacing: 0) {
@@ -210,7 +205,7 @@ struct LFOPanelView: View {
 
                 Rectangle().fill(C.bg3).frame(width: 1)
 
-                // Right: active LFO chips — scrollable, fills remaining width
+                // Middle: active LFO chips — scrollable, fills remaining width
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(app.activeLfos) { lfo in
@@ -227,9 +222,35 @@ struct LFOPanelView: View {
                     .padding(.leading, 5)
                 }
                 .frame(maxWidth: .infinity)
+
+                Rectangle().fill(C.bg3).frame(width: 1)
+
+                // Right: skinny help / settings icon column
+                VStack(spacing: 0) {
+                    Button { showHelp = true } label: {
+                        Image(systemName: "questionmark.circle").font(.system(size: 16))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(C.bg3)
+                            .foregroundColor(C.text)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("helpButton")
+
+                    Rectangle().fill(C.bg3).frame(height: 1)
+
+                    Button { showSettings = true } label: {
+                        Image(systemName: "gearshape").font(.system(size: 16))
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(C.bg3)
+                            .foregroundColor(C.text)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("settingsButton")
+                }
+                .frame(width: 44)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 108)
+            .frame(maxHeight: .infinity)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -262,6 +283,8 @@ struct LFOPanelView: View {
         }
         .background(C.bg)
         .sheet(isPresented: $showDevicePicker) { DevicePickerView() }
+        .sheet(isPresented: $showHelp) { HelpView() }
+        .sheet(isPresented: $showSettings) { SettingsView() }
     }
 }
 

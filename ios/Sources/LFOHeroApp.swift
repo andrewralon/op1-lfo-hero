@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct LFOHeroApp: App {
     @StateObject private var appState = AppState()
+    @State private var showSplash = true
 
     init() {
         // Configure audio session immediately so iOS doesn't stall the run loop waiting
@@ -15,15 +16,27 @@ struct LFOHeroApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(appState)
-                // Keep screen on while app is active — MIDI apps need this
-                .onAppear {
-                    UIApplication.shared.isIdleTimerDisabled = true
+            ZStack {
+                ContentView()
+                    .environmentObject(appState)
+                    // Keep screen on while app is active — MIDI apps need this
+                    .onAppear {
+                        UIApplication.shared.isIdleTimerDisabled = true
+                    }
+                    .onDisappear {
+                        UIApplication.shared.isIdleTimerDisabled = false
+                    }
+
+                if showSplash {
+                    SplashScreenView()
+                        .transition(.opacity)
                 }
-                .onDisappear {
-                    UIApplication.shared.isIdleTimerDisabled = false
+            }
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                    withAnimation(.easeOut(duration: 0.4)) { showSplash = false }
                 }
+            }
         }
     }
 }

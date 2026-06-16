@@ -4,6 +4,7 @@ enum C {
     static let bg      = Color(hex: "#111111")
     static let bg2     = Color(hex: "#1a1a1a")
     static let bg3     = Color(hex: "#2a2a2a")
+    static let border  = Color(hex: "#454545")
     static let text    = Color(hex: "#d8d8d8")
     static let dim     = Color(hex: "#666666")
     static let green   = Color(hex: "#4ec94e")

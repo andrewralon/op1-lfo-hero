@@ -48,7 +48,7 @@ struct TrackStripView: View {
             RoundedRectangle(cornerRadius: 7)
                 .fill(Color(hex: "#181818"))
                 .overlay(RoundedRectangle(cornerRadius: 7)
-                    .stroke(C.bg3, lineWidth: 0.5))
+                    .stroke(C.border, lineWidth: 0.5))
         )
         .padding(.horizontal, 2)
     }

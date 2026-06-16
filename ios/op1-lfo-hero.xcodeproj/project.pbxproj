@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4B2D1C66F4F73C31243ED771 /* HelpSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */; };
+		71BEA300AD3743FA9B870E02 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D11E2853B035905A9EAF4CE6 /* Foundation.framework */; };
+		CB702C2BCF38D9ECF9C48486 /* SplashScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E24B5EECD649B0D8B5B840 /* SplashScreenView.swift */; };
 		F303F7CA2FDE4BC80060AA2D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C22FDE4BC80060AA2D /* Theme.swift */; };
 		F303F7CB2FDE4BC80060AA2D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7BF2FDE4BC80060AA2D /* ContentView.swift */; };
 		F303F7CC2FDE4BC80060AA2D /* TransportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C42FDE4BC80060AA2D /* TransportView.swift */; };
@@ -28,7 +31,21 @@
 		F33102832FE07989008CF623 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F33102822FE07989008CF623 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		910AC4505E6A299D483BCA57 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F303F7962FDE4A770060AA2D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F303F79D2FDE4A770060AA2D;
+			remoteInfo = "op1-lfo-hero";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		17E24B5EECD649B0D8B5B840 /* SplashScreenView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SplashScreenView.swift; sourceTree = "<group>"; };
+		C1C450ADF47CC354A624CD6E /* op1-lfo-heroUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "op1-lfo-heroUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		D11E2853B035905A9EAF4CE6 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HelpSettingsUITests.swift; path = UITests/HelpSettingsUITests.swift; sourceTree = "<group>"; };
 		F303F79E2FDE4A770060AA2D /* op1-lfo-hero.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "op1-lfo-hero.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F303F7B82FDE4BC80060AA2D /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		F303F7B92FDE4BC80060AA2D /* AutomationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationEngine.swift; sourceTree = "<group>"; };
@@ -53,6 +70,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		76E93BE93F6D2C0D9AEDFB6E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				71BEA300AD3743FA9B870E02 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F303F79B2FDE4A770060AA2D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -64,6 +89,22 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3360AFD87F589C9055429704 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */,
+			);
+			name = UITests;
+			sourceTree = SOURCE_ROOT;
+		};
+		878BB0369DB9376895CFDC31 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				D11E2853B035905A9EAF4CE6 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
 		F303F7952FDE4A770060AA2D = {
 			isa = PBXGroup;
 			children = (
@@ -72,6 +113,7 @@
 				F303F79F2FDE4A770060AA2D /* Products */,
 				F303F7C92FDE4BC80060AA2D /* Sources */,
 				F303F7E62FDE4BC80060AA2D /* Frameworks */,
+				3360AFD87F589C9055429704 /* UITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -79,6 +121,7 @@
 			isa = PBXGroup;
 			children = (
 				F303F79E2FDE4A770060AA2D /* op1-lfo-hero.app */,
+				C1C450ADF47CC354A624CD6E /* op1-lfo-heroUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -109,6 +152,7 @@
 				F303F7C42FDE4BC80060AA2D /* TransportView.swift */,
 				F303F7C52FDE4BC80060AA2D /* VolumeFaderView.swift */,
 				F303F7C62FDE4BC80060AA2D /* WaveformView.swift */,
+				17E24B5EECD649B0D8B5B840 /* SplashScreenView.swift */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -127,6 +171,7 @@
 			isa = PBXGroup;
 			children = (
 				F303F7E42FDE4BC80060AA2D /* CoreMIDI.framework */,
+				878BB0369DB9376895CFDC31 /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -134,6 +179,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		EE6DB896AE67FB18A6CE5EBE /* op1-lfo-heroUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CE352B16F0192C302D3438B3 /* Build configuration list for PBXNativeTarget "op1-lfo-heroUITests" */;
+			buildPhases = (
+				74DE886CC8AFCDEF30B190A4 /* Sources */,
+				76E93BE93F6D2C0D9AEDFB6E /* Frameworks */,
+				A2D1DBDB3833397BE900AC39 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				6AC7E14AEAAAA52D32C8697A /* PBXTargetDependency */,
+			);
+			name = "op1-lfo-heroUITests";
+			productName = "op1-lfo-heroUITests";
+			productReference = C1C450ADF47CC354A624CD6E /* op1-lfo-heroUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		F303F79D2FDE4A770060AA2D /* op1-lfo-hero */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F303F7A92FDE4A780060AA2D /* Build configuration list for PBXNativeTarget "op1-lfo-hero" */;
@@ -147,8 +210,6 @@
 			dependencies = (
 			);
 			name = "op1-lfo-hero";
-			packageProductDependencies = (
-			);
 			productName = "op1-lfo-hero";
 			productReference = F303F79E2FDE4A770060AA2D /* op1-lfo-hero.app */;
 			productType = "com.apple.product-type.application";
@@ -183,11 +244,19 @@
 			projectRoot = "";
 			targets = (
 				F303F79D2FDE4A770060AA2D /* op1-lfo-hero */,
+				EE6DB896AE67FB18A6CE5EBE /* op1-lfo-heroUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A2D1DBDB3833397BE900AC39 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F303F79C2FDE4A770060AA2D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -199,6 +268,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		74DE886CC8AFCDEF30B190A4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4B2D1C66F4F73C31243ED771 /* HelpSettingsUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F303F79A2FDE4A770060AA2D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -220,12 +297,57 @@
 				F303F7D72FDE4BC80060AA2D /* WaveformView.swift in Sources */,
 				F303F7D82FDE4BC80060AA2D /* Models.swift in Sources */,
 				F303F7E12FDE4BC80060AA2D /* USBMidi.swift in Sources */,
+				CB702C2BCF38D9ECF9C48486 /* SplashScreenView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		6AC7E14AEAAAA52D32C8697A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "op1-lfo-hero";
+			target = F303F79D2FDE4A770060AA2D /* op1-lfo-hero */;
+			targetProxy = 910AC4505E6A299D483BCA57 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		08A990FEE4FB83B56A8BBB47 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 8RG5QJVST3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.andrewralon.op1-lfo-hero.UITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "op1-lfo-hero";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		4C01612F8D07822C675385F5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 8RG5QJVST3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.andrewralon.op1-lfo-hero.UITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "op1-lfo-hero";
+			};
+			name = Debug;
+		};
 		F303F7A72FDE4A780060AA2D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -422,6 +544,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		CE352B16F0192C302D3438B3 /* Build configuration list for PBXNativeTarget "op1-lfo-heroUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				08A990FEE4FB83B56A8BBB47 /* Release */,
+				4C01612F8D07822C675385F5 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F303F7992FDE4A770060AA2D /* Build configuration list for PBXProject "op1-lfo-hero" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

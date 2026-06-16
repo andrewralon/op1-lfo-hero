@@ -69,6 +69,45 @@ That's it — Xcode re-signs and re-installs automatically.
 
 ---
 
+## Building & testing from the command line
+
+No need to open Xcode for a quick build or test run — useful for CI or a sanity check after editing source files.
+
+```
+# Build for the simulator
+xcodebuild -project op1-lfo-hero.xcodeproj -scheme op1-lfo-hero \
+  -destination 'generic/platform=iOS Simulator' build
+
+# List available simulators (grab a UDID for the commands below)
+xcrun simctl list devices available
+
+# Boot a simulator, install, and launch
+xcrun simctl boot <UDID>
+xcrun simctl install <UDID> <path-to-built-.app>
+xcrun simctl launch <UDID> com.andrewralon.op1-lfo-hero
+
+# Run the UI tests against a booted simulator
+xcodebuild test -project op1-lfo-hero.xcodeproj -scheme op1-lfo-hero \
+  -destination 'id=<UDID>'
+```
+
+The built `.app` (for `simctl install`) lands under `DerivedData`, e.g.:
+`~/Library/Developer/Xcode/DerivedData/op1-lfo-hero-*/Build/Products/Debug-iphonesimulator/op1-lfo-hero.app`
+
+### UI tests
+
+`ios/UITests/HelpSettingsUITests.swift` covers the help/settings modals via XCUITest — it launches the app and taps real UI elements by accessibility identifier (`helpButton`, `settingsButton`, the `done` button, etc.), not screen coordinates, so the tests keep working across layout changes. Run a single test with `-only-testing`:
+
+```
+xcodebuild test -project op1-lfo-hero.xcodeproj -scheme op1-lfo-hero \
+  -destination 'id=<UDID>' \
+  -only-testing:op1-lfo-heroUITests/HelpSettingsUITests/testHelpModalOpensAndDismisses
+```
+
+New UI buttons/screens should get an `.accessibilityIdentifier(...)` so they can be tested the same way.
+
+---
+
 ## Connecting to the OP-1
 
 ### USB (recommended)

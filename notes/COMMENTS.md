@@ -1,8 +1,6 @@
 # Comments
 
 ## To fix
-- [ ] HIGH - help page: minimal instructions and information
-- [ ] HIGH - settings page: in case i ever need one
 - [ ] MED - hit stop twice quickly to return to tape start CC 84, >= 64
 - [ ] MED - start and stop lfos automatically, with start/stop buttons, in time with the op1 tempo
 - [ ] MED - show the scrub UI boxes differently so it's obvious they are scrubbable (vs dropdown, for example) - 2 thin vertical lines next to box? Different color border (white vs gray)? BEST: Single thin vertical white line just to the right of the box
@@ -35,3 +33,6 @@
 - [x] MED - icons: parameter umbrella??? -> replace with thunderbolt / lightning
 - [x] MED - disable PLAY button if/when it can't be used
 - [x] MED - volume fader grip shape (square at 45 degree angle) is weird and too tall. make it a flatter rhombus / baseball diamond, like what python had
+- [x] HIGH - help page: minimal instructions and information
+- [x] HIGH - settings page: in case i ever need one
+- [x] HIGH - splash screen / startup screen
