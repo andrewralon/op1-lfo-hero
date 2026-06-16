@@ -4,48 +4,33 @@ import SwiftUI
 struct SplashScreenView: View {
     @State private var wavePhase: Double = 0
 
-    private let letterColors: [Color] = [C.track(1), C.track(2), C.track(3), C.track(4)]
-
-    private var appIcon: UIImage? {
-        guard let icons = Bundle.main.infoDictionary?["CFBundleIcons"] as? [String: Any],
-              let primary = icons["CFBundlePrimaryIcon"] as? [String: Any],
-              let files = primary["CFBundleIconFiles"] as? [String],
-              let name = files.last
-        else { return nil }
-        return UIImage(named: name)
-    }
-
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 22) {
             Spacer()
 
-            Group {
-                if let appIcon {
-                    Image(uiImage: appIcon).resizable()
-                } else {
-                    Rectangle().fill(C.bg3)
-                }
-            }
-            .frame(width: 96, height: 96)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(C.border, lineWidth: 0.5))
-            .shadow(color: .black.opacity(0.5), radius: 14, y: 6)
+            // Full-resolution 1024×1024 source art (not the small system-generated icon
+            // file, which looks blurry once stretched up to this size).
+            Image("AppIconArt")
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 140, height: 140)
+                .clipShape(RoundedRectangle(cornerRadius: 28))
+                .overlay(RoundedRectangle(cornerRadius: 28).stroke(C.border, lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.5), radius: 18, y: 8)
 
-            HStack(spacing: 0) {
-                ForEach(Array("op1 lfo hero".enumerated()), id: \.offset) { i, ch in
-                    Text(String(ch))
-                        .foregroundColor(ch == " " ? .clear : letterColors[i % letterColors.count])
-                }
-            }
-            .font(.system(size: 28, weight: .bold, design: .monospaced))
+            Text("op1 lfo hero")
+                .font(.system(size: 40, weight: .bold, design: .monospaced))
+                .foregroundColor(C.white)
 
-            Text("for OP-1 Field")
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .foregroundColor(C.dim)
+            Spacer()
 
             SplashWave(phase: wavePhase)
-                .frame(width: 170, height: 36)
-                .padding(.top, 4)
+                .frame(width: 240, height: 52)
+                .padding(.top, 6)
+
+            Text("make music fun")
+                .font(.system(size: 18, weight: .medium, design: .monospaced))
+                .foregroundColor(C.dim)
 
             Spacer()
             Spacer()
@@ -60,38 +45,24 @@ struct SplashScreenView: View {
     }
 }
 
-// Small multi-colored sine wave that scrolls continuously — a wink at the LFO waveform
+// Small green sine wave that scrolls continuously — a wink at the LFO waveform
 // preview elsewhere in the app.
 private struct SplashWave: View {
     let phase: Double
-    private let colors: [Color] = [C.track(1), C.track(2), C.track(3), C.track(4)]
 
     var body: some View {
         Canvas { ctx, size in
             let midY = size.height / 2
             let steps = max(1, Int(size.width))
-            let segLen = max(1, steps / 10)
 
-            var pts = [CGPoint]()
-            pts.reserveCapacity(steps + 1)
+            var path = Path()
             for i in 0...steps {
                 let t = Double(i) / Double(steps)
                 let y = sin((t * 2 + phase) * 2 * .pi)
-                pts.append(CGPoint(x: CGFloat(t) * size.width, y: midY - CGFloat(y) * midY * 0.85))
+                let pt = CGPoint(x: CGFloat(t) * size.width, y: midY - CGFloat(y) * midY * 0.85)
+                if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
             }
-
-            var start = 0; var ci = 0
-            while start < pts.count - 1 {
-                let end = min(start + segLen, pts.count - 1)
-                var seg = Path()
-                for i in start...end {
-                    if i == start { seg.move(to: pts[i]) } else { seg.addLine(to: pts[i]) }
-                }
-                ctx.stroke(seg, with: .color(colors[ci % colors.count]),
-                           style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                ci += 1
-                start = end
-            }
+            ctx.stroke(path, with: .color(C.green), style: StrokeStyle(lineWidth: 3, lineCap: .round))
         }
     }
 }
