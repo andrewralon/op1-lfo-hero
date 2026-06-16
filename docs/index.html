@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>op1 lfo hero — support</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #111111;
+      color: #d8d8d8;
+      font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+      font-size: 15px;
+      line-height: 1.7;
+      padding: 40px 24px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #4ec94e;
+      font-size: 28px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .tagline {
+      color: #666666;
+      font-size: 13px;
+      margin-bottom: 40px;
+    }
+    h2 {
+      font-size: 13px;
+      font-weight: bold;
+      border-bottom: 1px solid #2a2a2a;
+      padding-bottom: 6px;
+      margin-top: 36px;
+      margin-bottom: 16px;
+    }
+    p { margin-bottom: 12px; }
+    ul { padding-left: 20px; margin-bottom: 12px; }
+    li { margin-bottom: 10px; }
+    code {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    a { color: #4ec94e; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    footer {
+      margin-top: 60px;
+      padding-top: 16px;
+      border-top: 1px solid #2a2a2a;
+      color: #666666;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>op1 lfo hero</h1>
+  <p class="tagline">custom midi lfos for the teenage engineering op-1 field</p>
+
+  <h2>setup</h2>
+  <ul>
+    <li>connect your OP-1 Field via USB-C or pair it over Bluetooth</li>
+    <li>for transport control and clock sync, set the OP-1 to <strong>midi sync</strong> mode (com → midi → sync: midi)</li>
+    <li>for the OP-1 to drive the app's tempo, set sync to <strong>beat match / op1</strong> mode instead</li>
+    <li>the app auto-detects and connects — no manual selection needed</li>
+  </ul>
+
+  <h2>troubleshooting</h2>
+  <ul>
+    <li>
+      <strong>app shows "no device found"</strong><br>
+      make sure the OP-1 is powered on and connected via USB-C (or paired via Bluetooth).
+      try a different cable — some USB-C cables are charge-only and carry no data.
+    </li>
+    <li>
+      <strong>controls send but OP-1 doesn't respond</strong><br>
+      macOS CoreMIDI can get stuck. fix: run <code>sudo pkill -9 coremidi</code> in terminal,
+      then unplug and replug the OP-1. no restart needed.
+    </li>
+    <li>
+      <strong>tape doesn't respond to play / stop</strong><br>
+      confirm the OP-1 is in midi sync mode. the BPM display should show <code>--</code>
+      while waiting for clock — if it shows an internal tempo, sync mode isn't active.
+    </li>
+    <li>
+      <strong>BPM on the OP-1 doesn't match the app</strong><br>
+      the OP-1 needs a few seconds of continuous clock signal to lock in after a tempo change.
+    </li>
+    <li>
+      <strong>left / right tape buttons stop playback</strong><br>
+      this is normal OP-1 behavior — receiving a song position pointer while playing causes
+      it to pause. press play to resume.
+    </li>
+  </ul>
+
+  <h2>support</h2>
+  <p>open an issue on GitHub and we'll get back to you:</p>
+  <p><a href="https://github.com/andrewralon/op1-lfo-hero/issues">github.com/andrewralon/op1-lfo-hero/issues</a></p>
+
+  <footer>
+    op1 lfo hero &nbsp;·&nbsp; <a href="privacy.html">privacy policy</a>
+  </footer>
+
+</body>
+</html>
