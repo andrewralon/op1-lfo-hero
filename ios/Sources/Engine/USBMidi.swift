@@ -36,19 +36,72 @@ final class USBMidi: NSObject, ObservableObject {
     var onStop:  (() -> Void)?
     var onCC:    ((Int, Int, Int) -> Void)?
 
-    private var client  = MIDIClientRef()
-    private var outPort = MIDIPortRef()
-    private var inPort  = MIDIPortRef()
-    private var destRef = MIDIEndpointRef()
-    private var srcRef  = MIDIEndpointRef()
+    private var client     = MIDIClientRef()
+    private var outPort    = MIDIPortRef()
+    private var inPort     = MIDIPortRef()
+    private var destRef    = MIDIEndpointRef()
+    private var srcRef     = MIDIEndpointRef()
+    private var pollTimer:    DispatchSourceTimer?
+    private var midiThread:   Thread?
+    private var midiRunLoop:  RunLoop?
 
     override init() {
         super.init()
-        DispatchQueue.global(qos: .userInteractive).async { self.setupMIDI() }
+        // CoreMIDI only keeps delivering setup-changed/object-added/object-removed
+        // notifications (and refreshing the destination/source cache that
+        // MIDIGetNumberOfDestinations() etc. read from) to a thread with an
+        // actively-pumping run loop. A throwaway DispatchQueue.global() worker thread
+        // exits the instant its block returns, so hot-plug/unplug events silently
+        // stop being delivered forever once that thread is gone — the cache then
+        // stays frozen at whatever it was when the client was created. Run all
+        // CoreMIDI setup on a dedicated thread whose run loop we keep alive for the
+        // life of the app instead.
+        let thread = Thread { [weak self] in
+            guard let self else { return }
+            self.midiRunLoop = RunLoop.current
+            self.setupMIDI()
+            RunLoop.current.add(Port(), forMode: .default)
+            RunLoop.current.run()
+        }
+        thread.name = "USBMidi.CoreMIDI"
+        thread.start()
+        midiThread = thread
         // Retry scans in case iOS hasn't fully enumerated the USB device yet.
         // Run on global queue — scanForOP1() dispatches state changes to main internally.
         DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 1.0) { self.scanForOP1() }
         DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 1.5) { self.scanForOP1() }
+        startPolling()
+    }
+
+    // Even with a persistent run loop, CoreMIDI's add/remove notifications have proven
+    // unreliable across repeated connect/disconnect cycles on-device — they fire
+    // sometimes and not others, with no obvious trigger. Rather than depend on them
+    // while we're searching for the OP-1, force a full client teardown/recreate on every
+    // tick: that's the one thing that has reliably produced a correct, fresh snapshot in
+    // every test (it's exactly what a cold launch does). Only do this while disconnected
+    // — recreating the client while actively connected would interrupt the MIDI stream.
+    private func startPolling() {
+        let t = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
+        t.schedule(deadline: .now() + 2.0, repeating: 2.0, leeway: .milliseconds(500))
+        t.setEventHandler { [weak self] in
+            guard let self, !self.state.isConnected else { return }
+            self.midiRunLoop?.perform { self.recreateClient() }
+        }
+        t.resume()
+        pollTimer = t
+    }
+
+    // Tears down and recreates the CoreMIDI client/ports from scratch, forcing a fresh
+    // enumeration from MIDIServer instead of whatever this process's object cache
+    // currently (possibly stale) reflects. Must run on midiRunLoop's thread so the new
+    // client's notifications stay tied to the persistent run loop.
+    private func recreateClient() {
+        if inPort != 0  { MIDIPortDispose(inPort);  inPort  = MIDIPortRef() }
+        if outPort != 0 { MIDIPortDispose(outPort); outPort = MIDIPortRef() }
+        if client != 0  { MIDIClientDispose(client); client = MIDIClientRef() }
+        destRef = 0
+        srcRef = 0
+        setupMIDI()
     }
 
     private func setupMIDI() {
