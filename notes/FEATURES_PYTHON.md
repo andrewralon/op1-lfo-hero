@@ -1,4 +1,4 @@
-# Features
+# Features (Python)
 
 ## To do
 - [ ] Generic MIDI device support: allow the app to connect to any MIDI device, not just OP-1s. Remove the OP-1 keyword filter from port detection; let the user pick a port from a list. Disable or hide OP-1-specific features (tape scrub, octave shift, BLE detection) when a non-OP-1 device is selected.
