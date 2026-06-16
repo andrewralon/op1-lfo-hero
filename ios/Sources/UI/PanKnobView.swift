@@ -71,9 +71,9 @@ struct PanKnobView: View {
         let rad = deg * Double.pi / 180
         var p = Path()
         p.move(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 1.28,
-                           y: cy + CGFloat(sin(rad)) * r * 1.20))
-        p.addLine(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 0.85,
-                              y: cy + CGFloat(sin(rad)) * r * 0.85))
+                           y: cy + CGFloat(sin(rad)) * r * 1.28))
+        p.addLine(to: CGPoint(x: cx + CGFloat(cos(rad)) * r * 1.0,
+                              y: cy + CGFloat(sin(rad)) * r * 1.0))
         return p
     }
 }

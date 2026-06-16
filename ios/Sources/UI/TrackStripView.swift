@@ -32,7 +32,8 @@ struct TrackStripView: View {
             ) { app.setPan(track: track, value: $0) }
                 .padding(.horizontal, 12)
                 .frame(height: 62)
-                .padding(.vertical, 5)
+                .padding(.top, 10)
+                .padding(.bottom, 5)
 
             // ── Fader (digits live-update inside VolumeFaderView) ─────────────
             VolumeFaderView(
