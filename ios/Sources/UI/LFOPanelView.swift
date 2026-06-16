@@ -455,7 +455,7 @@ private struct TrackToggleButton: View {
                 .font(.system(size: C.trackLabelSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
                 .frame(width: 46, height: 46)
-                .background((state == 0 ? C.bg3 : color).opacity(disabled ? 0.4 : 1.0))
+                .background(color.opacity(state == 0 ? (disabled ? 0.1 : 0.2) : (disabled ? 0.4 : 1.0)))
                 .foregroundColor(state == 0 ? color : .black)
                 .cornerRadius(7)
         }
@@ -478,7 +478,7 @@ private struct MasterToggleButton: View {
                 .font(.system(size: C.trackLabelSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
                 .frame(width: 46, height: 46)
-                .background((state == 0 ? C.bg3 : C.green).opacity(disabled ? 0.4 : 1.0))
+                .background(C.green.opacity(state == 0 ? (disabled ? 0.1 : 0.2) : (disabled ? 0.4 : 1.0)))
                 .foregroundColor(state == 0 ? C.green : .black)
                 .cornerRadius(7)
         }

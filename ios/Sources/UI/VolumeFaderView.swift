@@ -7,8 +7,9 @@ struct VolumeFaderView: View {
     var onLiveChange: ((Double) -> Void)? = nil  // called every drag frame (MIDI only, no state update)
     let onChange: (Double) -> Void               // called on drag end (commits to AppState)
 
-    private let trackW: CGFloat    = 6
-    private let thumbSize: CGFloat = 14  // square rotated 45° = perfect ◇
+    private let trackW: CGFloat = 6
+    private let thumbW: CGFloat = 20  // rhombus width
+    private let thumbH: CGFloat = 12  // rhombus height (squished)
 
     private let precisionScrubHalvingPt: Double = 30
     private func precisionFactor(_ ortho: CGFloat) -> Double {
@@ -24,10 +25,10 @@ struct VolumeFaderView: View {
     var body: some View {
         GeometryReader { geo in
             let h       = geo.size.height
-            let travel  = max(1, h - thumbSize)
+            let travel  = max(1, h - thumbH)
             let display = max(0, min(99, base - accumulated))
             let thumbY  = CGFloat(1.0 - display / 99.0) * travel
-            let center  = thumbY + thumbSize / 2
+            let center  = thumbY + thumbH / 2
 
             ZStack(alignment: .center) {
 
@@ -49,11 +50,10 @@ struct VolumeFaderView: View {
                             .frame(maxWidth: .infinity)
                     }
 
-                    Rectangle()
+                    FaderDiamond()
                         .fill(Color.gray)
-                        .overlay(Rectangle().stroke(Color.black, lineWidth: 1.5))
-                        .frame(width: thumbSize, height: thumbSize)
-                        .rotationEffect(.degrees(45))
+                        .overlay(FaderDiamond().stroke(Color.black, lineWidth: 1.5))
+                        .frame(width: thumbW, height: thumbH)
                         .shadow(color: .black.opacity(0.45), radius: 1.5, y: 1)
                         .offset(y: thumbY)
                         .frame(maxWidth: .infinity)
@@ -103,5 +103,17 @@ struct VolumeFaderView: View {
             .onAppear { base = value }
             .onChange(of: value) { _, newVal in if !isActive { base = newVal } }
         }
+    }
+}
+
+private struct FaderDiamond: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to:    CGPoint(x: rect.midX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        p.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
+        p.closeSubpath()
+        return p
     }
 }
