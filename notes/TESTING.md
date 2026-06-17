@@ -40,11 +40,12 @@ xcrun simctl io <UDID> screenshot /tmp/screenshot.png
 
 ## Layout responsiveness (iOS)
 
-`ContentView.swift` uses `GeometryReader` to scale `TracksView` height:
-- formula: `min(max(280, geo.size.height * 0.32), 440)`
-- iPhone (≤760 pt usable): clamps to 280 pt (unchanged)
-- iPad 11" (≈1115 pt): ~357 pt
-- iPad 13" (≈1302 pt): ~417 pt
+`ContentView.swift` uses `GeometryReader` to match iPhone's proportional row positions:
+- `tracksH    = min(max(280, geo.size.height * 0.37), 500)` — 37% of usable height
+- `transportH = min(max(58,  geo.size.height * 0.076), 90)` — 7.6% of usable height
+- iPhone (759 pt): tracksH=280, transportH=58 (unchanged)
+- iPad 11" (1115 pt): tracksH≈412, transportH≈85
+- iPad 13" (1302 pt): tracksH≈482, transportH≈90
 
 `LFOPanelView.swift` uses `horizontalSizeClass` (`.regular` = iPad) to:
 - scale waveform: 90 pt → 160 pt on iPad

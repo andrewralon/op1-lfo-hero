@@ -4,7 +4,11 @@ import SwiftUI
 struct ContentView: View {
     var body: some View {
         GeometryReader { geo in
-            let tracksH = min(max(280, geo.size.height * 0.32), 440)
+            // Match iPhone proportions on every screen size:
+            //   tracksH   ≈ 37% of usable height (280pt on iPhone, ~412pt on iPad 11")
+            //   transportH ≈ 7.6% of usable height (58pt on iPhone, ~85pt on iPad 11")
+            let tracksH    = min(max(280, geo.size.height * 0.37), 500)
+            let transportH = min(max(58,  geo.size.height * 0.076), 90)
             VStack(spacing: 0) {
                 TracksView()
                     .frame(height: tracksH)
@@ -13,7 +17,7 @@ struct ContentView: View {
                 Rectangle().fill(C.bg3).frame(height: 1)
 
                 TransportBarView()
-                    .frame(height: 58)
+                    .frame(height: transportH)
 
                 LFOPanelView()
                     .frame(maxHeight: .infinity)
