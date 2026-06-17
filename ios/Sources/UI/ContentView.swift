@@ -37,11 +37,20 @@ struct DevicePickerView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section("discovered devices") {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("discovered devices")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(C.dim)
+                        .padding(.top, 20)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+
                     if app.ble.discovered.isEmpty {
                         Label("scanning for ble midi devices…", systemImage: "wave.3.right")
-                            .foregroundColor(C.text)
+                            .foregroundColor(C.dim)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
                     } else {
                         ForEach(app.ble.discovered, id: \.identifier) { p in
                             Button {
@@ -49,25 +58,33 @@ struct DevicePickerView: View {
                                 dismiss()
                             } label: {
                                 HStack {
-                                    Image(systemName: "pianokeys")
+                                    Image(systemName: "pianokeys").foregroundColor(C.text)
                                     Text(p.name ?? p.identifier.uuidString)
                                         .foregroundColor(C.text)
                                     Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .foregroundColor(C.text)
+                                    Image(systemName: "chevron.right").foregroundColor(C.dim)
                                 }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
+                            Divider()
                         }
                     }
-                }
-                Section {
+
+                    Divider().padding(.top, 8)
+
                     Button("disconnect") {
                         app.ble.disconnect()
                         dismiss()
                     }
                     .foregroundColor(C.red)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
             }
+            .background(C.bg)
             .navigationTitle("ble midi device")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -159,9 +176,12 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Text("no settings yet").foregroundColor(C.text)
+            ScrollView {
+                Text("no settings yet")
+                    .foregroundColor(C.dim)
+                    .padding(16)
             }
+            .background(C.bg)
             .navigationTitle("settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -23,6 +23,24 @@ final class HelpSettingsUITests: XCTestCase {
         XCTAssertFalse(app.navigationBars["help"].waitForExistence(timeout: 2))
     }
 
+    func testParamPickerOpens() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        // Wait past splash, then tap the parameter picker button (bold text label)
+        let helpButton = app.buttons["helpButton"]
+        XCTAssertTrue(helpButton.waitForExistence(timeout: 5))
+
+        // The param picker button contains the current param name as bold text
+        let paramPicker = app.buttons.matching(NSPredicate(format: "label CONTAINS 'volume'")).firstMatch
+        XCTAssertTrue(paramPicker.waitForExistence(timeout: 3))
+        paramPicker.tap()
+
+        sleep(1)
+        let screenshot = XCUIScreen.main.screenshot()
+        try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/param_picker.png"))
+    }
+
     func testSettingsModalOpensAndDismisses() throws {
         let app = XCUIApplication()
         app.launch()

@@ -325,7 +325,9 @@ private struct CompactPicker<T>: View
             .cornerRadius(5)
         }
         .foregroundColor(.accentColor)
-        .sheet(isPresented: $show) {
+        .popover(isPresented: $show) {
+            // On iPad: anchored popover near the button.
+            // On iPhone: automatically falls back to a bottom sheet.
             VStack(spacing: 0) {
                 ForEach(Array(options.enumerated()), id: \.offset) { idx, opt in
                     Button {
@@ -338,7 +340,7 @@ private struct CompactPicker<T>: View
                             .font(.system(size: fontSize, weight: .bold, design: .monospaced))
                             .foregroundColor(selection == opt ? .accentColor : C.text)
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 10)
+                            .padding(.vertical, isPad ? 14 : 10)
                             .contentShape(Rectangle())
                             .overlay(alignment: .trailing) {
                                 if selection == opt {
@@ -355,8 +357,9 @@ private struct CompactPicker<T>: View
                     }
                 }
             }
+            .frame(minWidth: 200)
             .padding(.vertical, 6)
-            .presentationDetents([.height(CGFloat(options.count) * 40 + 40)])
+            .presentationDetents([.height(CGFloat(options.count) * 44 + 40)])
             .presentationDragIndicator(.visible)
             .preferredColorScheme(.dark)
         }
