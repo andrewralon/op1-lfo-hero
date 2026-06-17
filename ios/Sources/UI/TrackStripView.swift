@@ -3,6 +3,8 @@ import SwiftUI
 struct TrackStripView: View {
     let track: Int
     @EnvironmentObject var app: AppState
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
 
     var body: some View {
         let color = C.track(track)
@@ -17,9 +19,9 @@ struct TrackStripView: View {
             // ── Mute button ───────────────────────────────────────────────────
             Button { app.toggleMute(track: track) } label: {
                 Text("\(track)")
-                    .font(.system(size: C.trackLabelSize, weight: .bold, design: .monospaced))
+                    .font(.system(size: isPad ? 26 : C.trackLabelSize, weight: .bold, design: .monospaced))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 5)
+                    .padding(.vertical, isPad ? 8 : 5)
                     .background(muted ? color.opacity(0.2) : color)
                     .foregroundColor(muted ? color : .black)
             }
@@ -31,9 +33,9 @@ struct TrackStripView: View {
                 onLiveChange: { app.controller.setPan(track: track, value: $0 + 64) }
             ) { app.setPan(track: track, value: $0) }
                 .padding(.horizontal, 12)
-                .frame(height: 62)
-                .padding(.top, 10)
-                .padding(.bottom, 5)
+                .frame(height: isPad ? 100 : 62)
+                .padding(.top, isPad ? 14 : 10)
+                .padding(.bottom, isPad ? 7 : 5)
 
             // ── Fader (digits live-update inside VolumeFaderView) ─────────────
             VolumeFaderView(
@@ -41,7 +43,8 @@ struct TrackStripView: View {
                 onLiveChange: { app.controller.setVolume(track: track, value: uiToMidi($0)) }
             ) { app.setVolume(track: track, value: $0) }
                 .padding(.vertical, 8)
-                .frame(maxHeight: .infinity)
+                .frame(maxHeight: isPad ? 220 : .infinity)
+            Spacer(minLength: 0)
         }
         .clipShape(RoundedRectangle(cornerRadius: 7))
         .background(

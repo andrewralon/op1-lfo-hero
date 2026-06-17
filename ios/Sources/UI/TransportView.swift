@@ -3,6 +3,8 @@ import SwiftUI
 // Horizontal transport bar — buttons use maxHeight: .infinity so ContentView controls height
 struct TransportBarView: View {
     @EnvironmentObject var app: AppState
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -25,23 +27,23 @@ struct TransportBarView: View {
             } label: {
                 VStack(spacing: -2) {
                     Image(systemName: "metronome")
-                        .font(.system(size: 32, weight: .regular))
+                        .font(.system(size: isPad ? 44 : 32, weight: .regular))
                         .scaleEffect(x: 0.50, y: 1.05, anchor: .center)
                     Text(app.isClockMaster ? "app" : "op1")
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .font(.system(size: isPad ? 17 : 13, weight: .semibold, design: .monospaced))
                 }
-                .frame(width: 42)
+                .frame(width: isPad ? 56 : 42)
                 .frame(maxHeight: .infinity)
                 .foregroundColor(app.isClockMaster ? C.green : C.track(1))
             }
             .buttonStyle(.plain)
-            .padding(.leading, 10)
+            .padding(.leading, isPad ? 14 : 10)
 
             // BPM scrubber — compact fixed width with uniform 6pt margin
             BpmScrubber()
-                .frame(width: 82)
+                .frame(width: isPad ? 108 : 82)
                 .frame(maxHeight: .infinity)
-                .padding(.vertical, 6)
+                .padding(.vertical, isPad ? 8 : 6)
                 .padding(.horizontal, 6)
             Spacer()
         }
@@ -54,6 +56,8 @@ struct TransportBarView: View {
 
 private struct BpmScrubber: View {
     @EnvironmentObject var app: AppState
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
     @State  private var base: Double  = 120
     @GestureState private var isActive: Bool = false
     @State  private var editing     = false
@@ -86,7 +90,7 @@ private struct BpmScrubber: View {
 
             if editing {
                 TextField("", text: $editText)
-                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                    .font(.system(size: isPad ? 24 : 18, weight: .bold, design: .monospaced))
                     .foregroundColor(C.green)
                     .multilineTextAlignment(.center)
                     .keyboardType(.decimalPad)
@@ -105,7 +109,7 @@ private struct BpmScrubber: View {
                     ? (t == 0 ? "no clk" : t < 9 ? "sync.." : "err?\(t)")
                     : String(format: "%.1f", live)
                 Text(displayText)
-                    .font(.system(size: 18, weight: .bold, design: .monospaced))
+                    .font(.system(size: isPad ? 24 : 18, weight: .bold, design: .monospaced))
                     .foregroundColor(isActive ? C.green : .white)
             }
         }
@@ -216,12 +220,14 @@ private struct TransBtn: View {
     let active: Bool
     var disabled: Bool = false
     let action: () -> Void
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 20, weight: weight))
-                .frame(width: 44)
+                .font(.system(size: isPad ? 27 : 20, weight: weight))
+                .frame(width: isPad ? 58 : 44)
                 .frame(maxHeight: .infinity)
                 .background(active && !disabled ? C.green.opacity(0.18) : Color.clear)
                 .foregroundColor(disabled ? C.dim : active ? C.green : C.text)
@@ -232,10 +238,11 @@ private struct TransBtn: View {
 }
 
 private struct Sep: View {
+    @Environment(\.horizontalSizeClass) private var hSize
     var body: some View {
         Rectangle()
             .fill(C.bg3)
-            .frame(width: 1, height: 26)
+            .frame(width: 1, height: hSize == .regular ? 35 : 26)
             .padding(.horizontal, 4)
     }
 }

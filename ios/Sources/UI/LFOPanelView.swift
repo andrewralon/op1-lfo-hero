@@ -1,6 +1,6 @@
 import SwiftUI
 
-private let ctrlFontSize: CGFloat = 15  // dropdowns + scrub boxes always match
+private let ctrlFontSizePhone: CGFloat = 15  // base size for iPhone; views compute isPad variant themselves
 
 struct LFOPanelView: View {
     @EnvironmentObject var app: AppState
@@ -76,72 +76,72 @@ struct LFOPanelView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 4)
+            .padding(.vertical, isPad ? 7 : 4)
 
             // ── 2. Param + wave dropdowns — fitted width, centered ────────────
-            HStack(spacing: 30) {
+            HStack(spacing: isPad ? 40 : 30) {
                 Spacer()
-                HStack(spacing: 6) {
-                    Image(systemName: "bolt.fill").font(.system(size: 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                HStack(spacing: isPad ? 8 : 6) {
+                    Image(systemName: "bolt.fill").font(.system(size: isPad ? 26 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
                     CompactPicker(options: Array(Parameter.allCases),
                                   selection: $app.lfoParam)
                 }
-                HStack(spacing: 6) {
-                    Image(systemName: "waveform.path").font(.system(size: 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                HStack(spacing: isPad ? 8 : 6) {
+                    Image(systemName: "waveform.path").font(.system(size: isPad ? 26 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
                     CompactPicker(options: Array(LfoWave.allCases),
                                   selection: $app.lfoWave)
                 }
                 Spacer()
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, isPad ? 7 : 4)
 
             // ── 3. Rate / depth / center — centered as a group ────────────────
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
 
                 // Rate scrubber (1–8, horizontal drag matches depth/center)
-                HStack(spacing: 6) {
+                HStack(spacing: isPad ? 8 : 6) {
                     Image(systemName: "timer")
-                        .font(.system(size: 20))
+                        .font(.system(size: isPad ? 26 : 20))
                         .foregroundColor(Color(hex: "#aaaaaa"))
 
                     ScrubValue(value: Binding(
                         get: { Double(app.lfoRate) },
                         set: { app.lfoRate = max(1, min(8, Int($0.rounded()))) }
                     ), range: 1...8, sensitivity: 0.04)
-                    .frame(width: 40)
+                    .frame(width: isPad ? 54 : 40)
                 }
 
-                Spacer(minLength: 20)
+                Spacer(minLength: isPad ? 28 : 20)
 
                 // Depth
-                HStack(spacing: 6) {
+                HStack(spacing: isPad ? 8 : 6) {
                     Image(systemName: "arrow.up.and.down")
-                        .font(.system(size: 20))
+                        .font(.system(size: isPad ? 26 : 20))
                         .foregroundColor(Color(hex: "#aaaaaa"))
 
                     ScrubValue(value: $app.lfoDepth, range: 0...99)
-                        .frame(width: 58)
+                        .frame(width: isPad ? 78 : 58)
                 }
 
-                Spacer(minLength: 20)
+                Spacer(minLength: isPad ? 28 : 20)
 
                 // Center
-                HStack(spacing: 6) {
+                HStack(spacing: isPad ? 8 : 6) {
                     Image(systemName: "arrow.up.and.down.circle")
-                        .font(.system(size: 20))
+                        .font(.system(size: isPad ? 26 : 20))
                         .foregroundColor(Color(hex: "#aaaaaa"))
 
                     ScrubValue(value: $app.lfoCenter,
                                range: app.lfoParam == .tempo ? 20...300 : 0...99,
                                decimals: app.lfoParam == .tempo ? 1 : 0)
-                        .frame(width: 74)
+                        .frame(width: isPad ? 100 : 74)
 
                     Button { snapCenter() } label: {
                         Image(systemName: "scope")
-                            .font(.system(size: 13))
+                            .font(.system(size: isPad ? 17 : 13))
                             .foregroundColor(Color(hex: "#aaaaaa"))
-                            .frame(width: 28, height: 36)
+                            .frame(width: isPad ? 38 : 28, height: isPad ? 48 : 36)
                             .background(C.bg3)
                             .cornerRadius(3)
                     }
@@ -150,7 +150,7 @@ struct LFOPanelView: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, isPad ? 7 : 4)
 
             // ── 4. Waveform preview — full width, scales up on iPad ──────────
             MultiWaveformView(
@@ -160,7 +160,7 @@ struct LFOPanelView: View {
                 depth: app.lfoDepth,
                 tracks: waveTracks
             )
-            .frame(height: isPad ? 160 : 90)
+            .frame(height: isPad ? 130 : 90)
             .frame(maxWidth: .infinity)
             .padding(8)
 
@@ -257,7 +257,7 @@ struct LFOPanelView: View {
                 .frame(width: 44)
             }
             .frame(maxWidth: .infinity)
-            .frame(maxHeight: isPad ? 300 : .infinity)
+            .frame(maxHeight: isPad ? 220 : .infinity)
             .layoutPriority(isPad ? 1 : 0)
 
             Rectangle().fill(C.bg3).frame(height: 1)
@@ -307,6 +307,9 @@ private struct CompactPicker<T>: View
     let options: [T]
     @Binding var selection: T
     @State private var show = false
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
+    private var fontSize: CGFloat { isPad ? 20 : ctrlFontSizePhone }
 
     var body: some View {
         Button { show = true } label: {
@@ -319,10 +322,10 @@ private struct CompactPicker<T>: View
                     Text(selection.rawValue)
                         .foregroundColor(.white)
                 }
-                .font(.system(size: ctrlFontSize, weight: .bold))
+                .font(.system(size: fontSize, weight: .bold))
             }
-            .padding(.horizontal, 11)
-            .padding(.vertical, 8)
+            .padding(.horizontal, isPad ? 14 : 11)
+            .padding(.vertical, isPad ? 11 : 8)
             .background(C.bg3)
             .cornerRadius(5)
         }
@@ -337,7 +340,7 @@ private struct CompactPicker<T>: View
                         // Text fills full width (tap anywhere on the row) and is centered.
                         // Checkmark overlaid on trailing edge so it doesn't shift text off-center.
                         Text(opt.rawValue)
-                            .font(.system(size: ctrlFontSize, weight: .bold, design: .monospaced))
+                            .font(.system(size: fontSize, weight: .bold, design: .monospaced))
                             .foregroundColor(selection == opt ? .accentColor : C.text)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 10)
@@ -374,6 +377,9 @@ private struct ScrubValue: View {
     let range: ClosedRange<Double>
     var sensitivity: Double = 0.15
     var decimals: Int = 0
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
+    private var fontSize: CGFloat { isPad ? 20 : ctrlFontSizePhone }
 
     @GestureState private var isActive: Bool = false
     @State private var base: Double = 0
@@ -402,9 +408,9 @@ private struct ScrubValue: View {
                     RoundedRectangle(cornerRadius: 3)
                         .stroke(isActive ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
                 )
-                .frame(height: 36)
+                .frame(height: isPad ? 48 : 36)
             Text(displayText)
-                .font(.system(size: ctrlFontSize, weight: .bold, design: .monospaced))
+                .font(.system(size: fontSize, weight: .bold, design: .monospaced))
                 .foregroundColor(isActive ? C.green : .white)
         }
         .gesture(
@@ -479,15 +485,17 @@ private struct TrackToggleButton: View {
     let state: Int
     let disabled: Bool
     let action: () -> Void
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
 
     private var color: Color { C.track(track) }
 
     var body: some View {
         Button(action: action) {
             Text("\(track)")
-                .font(.system(size: C.trackLabelSize, weight: .bold, design: .monospaced))
+                .font(.system(size: isPad ? 26 : C.trackLabelSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: 46, height: 46)
+                .frame(width: isPad ? 62 : 46, height: isPad ? 62 : 46)
                 .background(color.opacity(state == 0 ? (disabled ? 0.1 : 0.2) : (disabled ? 0.4 : 1.0)))
                 .foregroundColor(state == 0 ? color : .black)
                 .cornerRadius(7)
@@ -504,13 +512,15 @@ private struct MasterToggleButton: View {
     let state: Int
     let disabled: Bool
     let action: () -> Void
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
 
     var body: some View {
         Button(action: action) {
             Text("m")
-                .font(.system(size: C.trackLabelSize, weight: .bold, design: .monospaced))
+                .font(.system(size: isPad ? 26 : C.trackLabelSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: 46, height: 46)
+                .frame(width: isPad ? 62 : 46, height: isPad ? 62 : 46)
                 .background(C.green.opacity(state == 0 ? (disabled ? 0.1 : 0.2) : (disabled ? 0.4 : 1.0)))
                 .foregroundColor(state == 0 ? C.green : .black)
                 .cornerRadius(7)
