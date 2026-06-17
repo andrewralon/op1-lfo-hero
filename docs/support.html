@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>op1 lfo hero</title>
+  <title>op1 lfo hero — support</title>
   <style>
     * {
       box-sizing: border-box;
@@ -94,32 +94,40 @@
 <body>
 
   <h1>op1 lfo hero</h1>
-  <p class="tagline"><code>make music fun</code> - custom midi lfos for the <strong>op-1 field</strong> by teenage
-    engineering</p>
+  <p class="meta">support &nbsp;·&nbsp; because reasons</p>
 
-  <h2>connection</h2>
+  <h2>troubleshooting</h2>
   <ul>
-    <li>connect iphone to op1 via usb-c or bluetooth (ble midi)</li>
-    <li>open the app — automatically connects to op1</li>
-    <li>status bar shows <code>op-1 field (usb)</code> or <code>op-1 field (ble)</code></li>
-  </ul>
-
-  <h2>tempo modes</h2>
-  <ul>
-    <li><code>app (midi sync)</code> — app is master. app controls basic op1 tape transport (play/stop/back/forward).
-      <ul style="margin-top:6px">
-        <li><code>tempo</code> lfo requires usb-c. bluetooth doesn't send high-resolution tempo changes.</li>
-      </ul>
+    <li>
+      <strong>app shows "no device found"</strong><br>
+      make sure the op1 is powered on. for usb: try a different cable — some usb-c cables are charge-only and carry no
+      data. for bluetooth: confirm <code>bluetooth: on</code> is set on the op1.
     </li>
-    <li><code>op1 (beat match)</code> — op1 is master. app syncs lfos to op1's tempo.</li>
-  </ul>
-  <p>toggle the app's tempo mode with the <code>metronome</code> button in the transport column, then change the op1 to
-    match.</p>
+    <li>
+      <strong>controls send but op1 doesn't respond</strong><br>
+      unplug and replug the op1, or restart lfo hero. if using bluetooth, toggle <code>bluetooth: off</code> then back
+      <code>on</code> on the op1.
+    </li>
+    <li>
+      <strong>tape doesn't respond to play / stop</strong><br>
+      confirm the op1 is in <code>midi sync</code> mode and the app is in <code>app</code> clock mode. the op1's BPM
+      display should show <code>--</code> while waiting for clock.
+    </li>
+    <li>
+      <strong>op1 tempo doesn't match the app</strong><br>
+      the op1 needs a few seconds of continuous clock to lock in after a tempo change. note: bluetooth cannot handle
+      high-resolution tempo changes (LFO tempo modulation requires usb).
+    </li>
+    <li>
+      <strong>left / right tape buttons stop playback</strong><br>
+      this is normal op1 behavior — receiving a song position pointer while playing causes it to pause. press play to
+      resume.
+    </li>
 
-  <footer>
-    op1 lfo hero &nbsp;·&nbsp; <a href="support.html">troubleshooting</a> &nbsp;·&nbsp; <a href="privacy.html">privacy
-      policy</a>
-  </footer>
+    <footer>
+      op1 lfo hero &nbsp;·&nbsp; <a href="support.html">troubleshooting</a> &nbsp;·&nbsp; <a href="privacy.html">privacy
+        policy</a>
+    </footer>
 
 </body>
 
