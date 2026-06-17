@@ -16,6 +16,9 @@ final class HelpSettingsUITests: XCTestCase {
 
         XCTAssertTrue(app.navigationBars["help"].waitForExistence(timeout: 5))
 
+        let screenshot = XCUIScreen.main.screenshot()
+        try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/help_modal_ipad.png"))
+
         app.buttons["done"].tap()
         XCTAssertFalse(app.navigationBars["help"].waitForExistence(timeout: 2))
     }

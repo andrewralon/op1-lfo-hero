@@ -58,6 +58,10 @@ python -m src.app
 
 When a task originates from one of these files, check the box (`- [ ]` → `- [x]`) and move the item under `## Done` as part of the same change — don't leave completed items unchecked.
 
+## Screenshots and simulator testing
+
+All testing/Xcode/simulator screenshots go in `/tmp/claude-ss/`. Create the directory if it doesn't exist (`mkdir -p /tmp/claude-ss`) before writing. Use this path in `xcrun simctl io` commands, UITest screenshot saves, and any other screenshot output.
+
 ## MIDI reference
 
 CC mapping, transport messages, and the OP-1 MIDI spec link are documented in `README.md` — refer there rather than duplicating the tables here.

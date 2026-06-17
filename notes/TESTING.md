@@ -25,7 +25,7 @@ xcrun simctl install <UDID> "$APP"
 xcrun simctl terminate <UDID> com.andrewralon.op1-lfo-hero
 xcrun simctl launch <UDID> com.andrewralon.op1-lfo-hero
 sleep 2.5   # wait past 2.0s splash + 0.4s fade
-xcrun simctl io <UDID> screenshot /tmp/screenshot.png
+xcrun simctl io <UDID> screenshot /tmp/claude-ss/screenshot.png
 ```
 
 ## App Store screenshot sizes

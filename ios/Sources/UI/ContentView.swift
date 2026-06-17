@@ -84,6 +84,8 @@ struct DevicePickerView: View {
 
 struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
 
     private let sections: [(String, String)] = [
         ("mute buttons", "tap a track's colored number to mute/unmute it. solid color with black text = unmuted; dim color with colored text = muted."),
@@ -106,17 +108,17 @@ struct HelpView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(sections, id: \.0) { title, body in
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: isPad ? 10 : 6) {
                             Text(title)
-                                .font(.subheadline.weight(.semibold))
+                                .font(.system(size: isPad ? 18 : 13, weight: .semibold))
                                 .foregroundColor(C.dim)
-                                .padding(.top, 20)
-                                .padding(.horizontal, 16)
+                                .padding(.top, isPad ? 28 : 20)
+                                .padding(.horizontal, isPad ? 24 : 16)
                             Text(body)
-                                .font(.body)
+                                .font(.system(size: isPad ? 17 : 15))
                                 .foregroundColor(C.text)
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 12)
+                                .padding(.horizontal, isPad ? 24 : 16)
+                                .padding(.bottom, isPad ? 18 : 12)
                             Divider()
                         }
                     }
@@ -132,6 +134,8 @@ struct HelpView: View {
                 }
             }
         }
+        .presentationDetents([.large])
+        .presentationSizing(.page)
         .preferredColorScheme(.dark)
     }
 }
