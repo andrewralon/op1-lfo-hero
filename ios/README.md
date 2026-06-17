@@ -125,8 +125,8 @@ New UI buttons/screens should get an `.accessibilityIdentifier(...)` so they can
 
 | Mode | Use when |
 |------|----------|
-| **mstr** (master) | App generates clock → OP-1 in MIDI Sync mode |
-| **slv** (slave) | OP-1 generates clock → OP-1 in Beat Match mode |
+| **app** | `app` sends clock → op1 in `midi sync` mode |
+| **op1** | `op1` sends clock → op1 in `beat match` mode |
 
 Toggle with the metronome button in the transport column. The app starts in master mode so the transport buttons work immediately.
 
