@@ -92,8 +92,7 @@ struct HelpView: View {
         ("pan knobs", Text("drag up/down on a knob to pan right/left. release near the top to snap to center. [vertical scrubbing for a horizontal control like pan is weird. i'm open to better ideas...]")),
         ("volume faders", Text("drag up/down on a fader to set that track's volume; the digits below update live while dragging.")),
         ("transport buttons", Text("play/stop control op1 tape playback (play only works when the app is the clock master). left/right arrow buttons step the op1 tape position backward/forward.")),
-        ("metronome / tempo mode",
-            Text("tap the metronome icon to switch the clock source. then change the op1 to match.\n")
+        ("metronome / tempo mode", Text("tap the metronome icon to switch the clock source. then change the op1 to match.\n")
             + Text("op1 (beat match)").foregroundColor(C.track(1))
             + Text(" — op1 is master\n")
             + Text("· app's lfos follow op1's tempo.\n")
@@ -101,9 +100,12 @@ struct HelpView: View {
             + Text(" — app is master\n")
             + Text("· app controls op1 tape transport (play/stop/back/forward).\n")
             + Text("· note: ").bold()
-            + Text("tempo lfo requires usb-c; bluetooth does not send high-resolution tempo changes.")
+            + Text("tempo control requires 'app (midi sync)' mode **and** usb-c; bluetooth does not send high-resolution tempo changes.")
         ),
-        ("bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.")),
+        ("bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.\n")
+            + Text("· note: ").bold()
+            + Text("tempo control requires 'app (midi sync)' mode **and** usb-c; bluetooth does not send high-resolution tempo changes.")
+        ),
         ("track / master buttons", Text("tap to cycle off → on → inverted. tracks apply the lfo to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
         ("parameter / wave", Text("choose which parameter the lfo modulates, and which waveform shape it follows.")),
         ("rate / depth / center", Text("drag up/down on a box to scrub its value. rate sets lfo speed, depth sets its range, center sets its midpoint.")),
