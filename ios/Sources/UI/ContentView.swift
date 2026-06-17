@@ -91,7 +91,7 @@ struct HelpView: View {
         ("mute buttons", Text("tap a track's colored number to mute/unmute it. bright colored background = unmuted; dark background = muted.")),
         ("pan knobs", Text("drag up/down on a knob to pan right/left. release near the top to snap to center. [vertical scrubbing for a horizontal control like pan is weird. i'm open to better ideas...]")),
         ("volume faders", Text("drag up/down on a fader to set that track's volume; the digits below update live while dragging.")),
-        ("transport buttons", Text("play/stop start and stop playback (play only works when the app is the clock master). the left/right arrows step the op1's tape position backward/forward.")),
+        ("transport buttons", Text("play/stop control op1 tape playback (play only works when the app is the clock master). left/right arrow buttons step the op1 tape position backward/forward.")),
         ("metronome / tempo mode",
             Text("tap the metronome icon to switch the clock source: ")
             + Text("app (midi sync)").foregroundColor(C.green)
@@ -100,12 +100,12 @@ struct HelpView: View {
             + Text(" follows the op1 tempo instead.")
         ),
         ("bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.")),
-        ("track / master buttons", Text("tap to cycle off → on → inverted. tracks apply the LFO to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
-        ("parameter / wave", Text("choose which parameter the LFO modulates, and which waveform shape it follows.")),
-        ("rate / depth / center", Text("drag up/down on a box to scrub its value. rate sets LFO speed, depth sets its range, center sets its midpoint.")),
-        ("waveform preview", Text("shows the shape of the LFO that will be sent, colored per active track/master.")),
-        ("repeat / 1x / trash", Text("start the LFO looping, start it once, or delete all currently active LFOs.")),
-        ("active LFOs", Text("tap an entry to preview it on the waveform; tap the x to stop just that one.")),
+        ("track / master buttons", Text("tap to cycle off → on → inverted. tracks apply the lfo to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
+        ("parameter / wave", Text("choose which parameter the lfo modulates, and which waveform shape it follows.")),
+        ("rate / depth / center", Text("drag up/down on a box to scrub its value. rate sets lfo speed, depth sets its range, center sets its midpoint.")),
+        ("waveform preview", Text("shows the shape of the lfo that will be sent, colored per active track/master.")),
+        ("repeat / 1x / trash", Text("start the lfo looping, start it once, or delete all currently active lfos.")),
+        ("active lfos", Text("tap an entry to preview it on the waveform; tap the x to stop just that one.")),
         ("status bar", Text("shows the current midi connection and clock source; tap it to choose a ble midi device."))
     ]
 
