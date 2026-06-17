@@ -4,7 +4,7 @@
 
 the op-1 field is perfect. almost.
 
-op1 lfo hero connects to your op-1 field to create custom lfos to modulate op1 parameters synced to the beat of your music. pick a thing to automate — volume, pan, mute, fx — set a waveform and a speed, and make music fun.
+op1 lfo hero connects to your op-1 field to create custom lfos to modulate op1 parameters synced to the beat of your music. pick a thing to automate — volume, pan, mute, fx — set a waveform and a speed, and let your ears enjoy. make music fun!
 
 that's about it. it's mildly fantastic, just like midi.
 
@@ -24,10 +24,10 @@ requirements:
 
 stuff it doesn't do:
 · include an op-1 field - just consider it a $2000 accessory to this app
-· explain what an lfo is (google it, it'll be worth it)
-· pick the waveform for you — some decisions are yours to make
+· explain how midi works or what an lfo is
+· pick the waveform for you — make some decisions on your own, man
+· fix your timing or inability to carry a tune
 · record audio, generate melodies, or do anything else remotely useful
-· fix your timing
 · get you a record deal (results may vary)
 
 ---
