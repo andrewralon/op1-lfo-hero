@@ -58,6 +58,12 @@ python -m src.app
 
 When a task originates from one of these files, check the box (`- [ ]` → `- [x]`) and move the item under `## Done` as part of the same change — don't leave completed items unchecked.
 
+## Known iOS crash: List inside sheet on iPad
+
+Never use `List` inside a `NavigationStack` inside a `.sheet` (or `.fullScreenCover`). On iPad, the UIKit focus system recursively traverses `UITableView` focus containers and hits an assertion, crashing the app (and sometimes Springboard). This has bitten us twice.
+
+**Fix:** replace `List { ... }` with `ScrollView { VStack { ... } }`. Style section headers manually with `Text(...).font(.subheadline)` and `Divider()`. See `HelpView`, `DevicePickerView`, and `SettingsView` in `ContentView.swift` for examples.
+
 ## Screenshots and simulator testing
 
 All testing/Xcode/simulator screenshots go in `/tmp/claude-ss/`. Create the directory if it doesn't exist (`mkdir -p /tmp/claude-ss`) before writing. Use this path in `xcrun simctl io` commands, UITest screenshot saves, and any other screenshot output.

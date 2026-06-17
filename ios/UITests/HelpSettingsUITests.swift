@@ -38,7 +38,8 @@ final class HelpSettingsUITests: XCTestCase {
 
         sleep(1)
         let screenshot = XCUIScreen.main.screenshot()
-        try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/param_picker.png"))
+        let name = ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] ?? "device"
+        try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/param_picker_\(name).png"))
     }
 
     func testSettingsModalOpensAndDismisses() throws {
