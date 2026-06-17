@@ -64,9 +64,9 @@
 
   <h2>setup</h2>
   <ul>
-    <li>connect your OP-1 Field via USB-C or pair it over Bluetooth</li>
-    <li>for transport control and clock sync, set the OP-1 to <strong>midi sync</strong> mode (com → midi → sync: midi)</li>
-    <li>for the OP-1 to drive the app's tempo, set sync to <strong>beat match / op1</strong> mode instead</li>
+    <li>connect your op1 via usb-c or bluetooth (ble midi)</li>
+    <li>for the app to drive the clock, use <code>midi sync</code> mode - aka <code>app mode</code></li>
+    <li>for the op1 to drive the clock, use <code>beat match / op1</code> mode - aka <code>op1 mode</code></li>
     <li>the app auto-detects and connects — no manual selection needed</li>
   </ul>
 
@@ -74,26 +74,26 @@
   <ul>
     <li>
       <strong>app shows "no device found"</strong><br>
-      make sure the OP-1 is powered on and connected via USB-C (or paired via Bluetooth).
-      try a different cable — some USB-C cables are charge-only and carry no data.
+      make sure the op1 is powered on and connected via usb-c (or paired via bluetooth).
+      try a different cable — some usb-c cables are charge-only and carry no data.
     </li>
     <li>
-      <strong>controls send but OP-1 doesn't respond</strong><br>
-      macOS CoreMIDI can get stuck. fix: run <code>sudo pkill -9 coremidi</code> in terminal,
-      then unplug and replug the OP-1. no restart needed.
+      <strong>controls send but op1 doesn't respond</strong><br>
+      macOS coremidi can get stuck. fix: run <code>sudo pkill -9 coremidi</code> in terminal,
+      then unplug and replug the op1. no restart needed.
     </li>
     <li>
       <strong>tape doesn't respond to play / stop</strong><br>
-      confirm the OP-1 is in midi sync mode. the BPM display should show <code>--</code>
+      confirm the op1 is in midi sync mode. the BPM display should show <code>--</code>
       while waiting for clock — if it shows an internal tempo, sync mode isn't active.
     </li>
     <li>
-      <strong>BPM on the OP-1 doesn't match the app</strong><br>
-      the OP-1 needs a few seconds of continuous clock signal to lock in after a tempo change.
+      <strong>op1 tempo doesn't match the app</strong><br>
+      restart the app. power cycle the op1. note: bluetooth (ble midi) cannot handle high-resolution tempo changes.
     </li>
     <li>
       <strong>left / right tape buttons stop playback</strong><br>
-      this is normal OP-1 behavior — receiving a song position pointer while playing causes
+      this is normal op1 behavior — receiving a song position pointer while playing causes
       it to pause. press play to resume.
     </li>
   </ul>
