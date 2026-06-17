@@ -3,21 +3,25 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        VStack(spacing: 0) {
-            TracksView()
-                .frame(height: 280)
-                .padding(.bottom, 5)
+        GeometryReader { geo in
+            let tracksH = min(max(280, geo.size.height * 0.32), 440)
+            VStack(spacing: 0) {
+                TracksView()
+                    .frame(height: tracksH)
+                    .padding(.bottom, 5)
 
-            Rectangle().fill(C.bg3).frame(height: 1)
+                Rectangle().fill(C.bg3).frame(height: 1)
 
-            TransportBarView()
-                .frame(height: 58)
+                TransportBarView()
+                    .frame(height: 58)
 
-            LFOPanelView()
-                .frame(maxHeight: .infinity)
+                LFOPanelView()
+                    .frame(maxHeight: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(C.bg)
+            .preferredColorScheme(.dark)
         }
-        .background(C.bg)
-        .preferredColorScheme(.dark)
     }
 }
 

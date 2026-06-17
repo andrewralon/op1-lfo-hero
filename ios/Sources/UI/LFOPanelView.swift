@@ -4,11 +4,14 @@ private let ctrlFontSize: CGFloat = 15  // dropdowns + scrub boxes always match
 
 struct LFOPanelView: View {
     @EnvironmentObject var app: AppState
+    @Environment(\.horizontalSizeClass) private var hSize
     @State private var selectedLfoID: UUID? = nil
     @State private var showDevicePicker = false
     @State private var showDeleteConfirm = false
     @State private var showHelp = false
     @State private var showSettings = false
+
+    private var isPad: Bool { hSize == .regular }
 
     private var previewLfos: [LfoClip] {
         if let id = selectedLfoID, let lfo = app.activeLfos.first(where: { $0.id == id }) {
@@ -149,7 +152,7 @@ struct LFOPanelView: View {
             }
             .padding(.vertical, 4)
 
-            // ── 4. Waveform preview — full width, fixed (shorter) height ──────
+            // ── 4. Waveform preview — full width, scales up on iPad ──────────
             MultiWaveformView(
                 lfos: previewLfos,
                 wave: app.lfoWave,
@@ -157,9 +160,13 @@ struct LFOPanelView: View {
                 depth: app.lfoDepth,
                 tracks: waveTracks
             )
-            .frame(height: 90)
+            .frame(height: isPad ? 160 : 90)
             .frame(maxWidth: .infinity)
             .padding(8)
+
+            // On iPad, push the action section toward the bottom so the
+            // waveform and controls aren't lost in a sea of empty space.
+            if isPad { Spacer(minLength: 0) }
 
             // ── 5. Start buttons + Active LFOs + help/settings (fills remaining space) ──
             HStack(spacing: 0) {
@@ -250,7 +257,8 @@ struct LFOPanelView: View {
                 .frame(width: 44)
             }
             .frame(maxWidth: .infinity)
-            .frame(maxHeight: .infinity)
+            .frame(maxHeight: isPad ? 300 : .infinity)
+            .layoutPriority(isPad ? 1 : 0)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
