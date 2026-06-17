@@ -87,20 +87,26 @@ struct HelpView: View {
     @Environment(\.horizontalSizeClass) private var hSize
     private var isPad: Bool { hSize == .regular }
 
-    private let sections: [(String, String)] = [
-        ("mute buttons", "tap a track's colored number to mute/unmute it. solid color with black text = unmuted; dim color with colored text = muted."),
-        ("pan knobs", "drag up/down on a knob to pan right/left (vertical drag stands in for turning it). release near center to snap back to centered."),
-        ("volume faders", "drag up/down on a fader to set that track's volume; the digits below update live while dragging."),
-        ("transport buttons", "play/stop start and stop playback (play only works when the app is the clock master). the left/right arrows step the OP-1's tape position backward/forward."),
-        ("metronome / tempo mode", "tap the metronome icon to switch the clock source: \"app (midi sync)\" [<- MAKE THIS GREEN] drives tempo from this app over MIDI sync; \"op1 (beat match)\" [<- MAKE THIS BLUE] follows the op1 tempo instead."),
-        ("bpm", "drag up/down to scrub the tempo. double-tap or long-press the box to type an exact BPM."),
-        ("track / master buttons", "tap to cycle off → on → inverted. tracks apply the LFO to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks."),
-        ("parameter / wave", "choose which parameter the LFO modulates, and which waveform shape it follows."),
-        ("rate / depth / center", "drag up/down on a box to scrub its value. rate sets LFO speed, depth sets its range, center sets its midpoint."),
-        ("waveform preview", "shows the shape of the LFO that will be sent, colored per active track/master."),
-        ("repeat / 1x / trash", "start the LFO looping, start it once, or delete all currently active LFOs."),
-        ("active LFOs", "tap an entry to preview it on the waveform; tap the x to stop just that one."),
-        ("status bar", "shows the current MIDI connection and clock source; tap it to choose a BLE device.")
+    private let sections: [(String, Text)] = [
+        ("mute buttons", Text("tap a track's colored number to mute/unmute it. bright colored background = unmuted; dark background = muted.")),
+        ("pan knobs", Text("drag up/down on a knob to pan right/left. release near the top to snap to center. [vertical scrubbing for a horizontal control like pan is weird. i'm open to better ideas...]")),
+        ("volume faders", Text("drag up/down on a fader to set that track's volume; the digits below update live while dragging.")),
+        ("transport buttons", Text("play/stop start and stop playback (play only works when the app is the clock master). the left/right arrows step the op1's tape position backward/forward.")),
+        ("metronome / tempo mode",
+            Text("tap the metronome icon to switch the clock source: ")
+            + Text("app (midi sync)").foregroundColor(C.green)
+            + Text(" drives tempo from this app over MIDI sync; ")
+            + Text("op1 (beat match)").foregroundColor(C.track(1))
+            + Text(" follows the op1 tempo instead.")
+        ),
+        ("bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact BPM.")),
+        ("track / master buttons", Text("tap to cycle off → on → inverted. tracks apply the LFO to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
+        ("parameter / wave", Text("choose which parameter the LFO modulates, and which waveform shape it follows.")),
+        ("rate / depth / center", Text("drag up/down on a box to scrub its value. rate sets LFO speed, depth sets its range, center sets its midpoint.")),
+        ("waveform preview", Text("shows the shape of the LFO that will be sent, colored per active track/master.")),
+        ("repeat / 1x / trash", Text("start the LFO looping, start it once, or delete all currently active LFOs.")),
+        ("active LFOs", Text("tap an entry to preview it on the waveform; tap the x to stop just that one.")),
+        ("status bar", Text("shows the current MIDI connection and clock source; tap it to choose a BLE device."))
     ]
 
     var body: some View {
@@ -114,7 +120,7 @@ struct HelpView: View {
                                 .foregroundColor(C.dim)
                                 .padding(.top, isPad ? 28 : 20)
                                 .padding(.horizontal, isPad ? 24 : 16)
-                            Text(body)
+                            body
                                 .font(.system(size: isPad ? 17 : 15))
                                 .foregroundColor(C.text)
                                 .padding(.horizontal, isPad ? 24 : 16)
