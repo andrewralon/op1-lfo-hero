@@ -4,20 +4,22 @@
 
 the op-1 field is perfect. almost.
 
-op1 lfo hero connects to your op-1 field over usb or bluetooth and adds beat-synced lfos that automatically move your parameters in time with the music. pick something to automate — volume, pan, effects, mutes — set a waveform and a rate, and let it run.
+op1 lfo hero connects to your op-1 field to create custom lfos to modulate op1 parameters synced to the beat of your music. pick a thing to automate — volume, pan, mute, fx — set a waveform and a speed, and make music fun.
 
-that's basically it. it's great.
+that's about it. it's mildly fantastic, just like midi.
 
-· lfo parameters for each track + the master bus
+· lfo parameters for all tracks and the master bus - who knew?
+· plus a few things the op1 can't control on its own ....
 · a satisfying number of waveforms
-· rates synced to the beat, from fast to glacially slow
+· rates synced to the beat, from fast to glacially slow [thanks AI]
 · loop, one-shot, invert — the usual options
-· midi clock master or slave — you decide who's in charge
-· runs in the background, screen locked, looking effortless
+· tempo modes: beat sync (op1 master) and midi sync (app master) — you decide who's in charge [thanks again]
+· runs in the background, screen locked, like a boss
 
 requirements
 · teenage engineering op-1 field
-· iphone running ios 16 or later
+· iphone - ios 16 or later
+· connect via usb-c or bluetooth ble midi
 
 ---
 
