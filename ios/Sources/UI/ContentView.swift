@@ -93,11 +93,15 @@ struct HelpView: View {
         ("volume faders", Text("drag up/down on a fader to set that track's volume; the digits below update live while dragging.")),
         ("transport buttons", Text("play/stop control op1 tape playback (play only works when the app is the clock master). left/right arrow buttons step the op1 tape position backward/forward.")),
         ("metronome / tempo mode",
-            Text("tap the metronome icon to switch the clock source. ")
+            Text("tap the metronome icon to switch the clock source. then change the op1 to match.\n")
             + Text("op1 (beat match)").foregroundColor(C.track(1))
-            + Text(" — op1 is master. app's lfos follow op1's tempo. ")
+            + Text(" — op1 is master\n")
+            + Text("· app's lfos follow op1's tempo.\n")
             + Text("app (midi sync)").foregroundColor(C.green)
-            + Text(" — app is master. app controls op1 tape transport (play/stop/back/forward). tempo lfo requires usb-c; bluetooth does not send high-resolution tempo changes. toggle with the metronome button, then change the op1 to match.")
+            + Text(" — app is master\n")
+            + Text("· app controls op1 tape transport (play/stop/back/forward).\n")
+            + Text("note: ")
+            + Text("tempo lfo requires usb-c; bluetooth does not send high-resolution tempo changes.")
         ),
         ("bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.")),
         ("track / master buttons", Text("tap to cycle off → on → inverted. tracks apply the lfo to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
