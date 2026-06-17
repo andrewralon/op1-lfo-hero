@@ -41,7 +41,7 @@ struct DevicePickerView: View {
                 Section("discovered devices") {
                     if app.ble.discovered.isEmpty {
                         Label("scanning for BLE MIDI devices…", systemImage: "wave.3.right")
-                            .foregroundColor(C.dim)
+                            .foregroundColor(C.text)
                     } else {
                         ForEach(app.ble.discovered, id: \.identifier) { p in
                             Button {
@@ -54,7 +54,7 @@ struct DevicePickerView: View {
                                         .foregroundColor(C.text)
                                     Spacer()
                                     Image(systemName: "chevron.right")
-                                        .foregroundColor(C.dim)
+                                        .foregroundColor(C.text)
                                 }
                             }
                         }
@@ -117,7 +117,7 @@ struct HelpView: View {
                         VStack(alignment: .leading, spacing: isPad ? 10 : 6) {
                             Text(title)
                                 .font(.system(size: isPad ? 18 : 13, weight: .semibold))
-                                .foregroundColor(C.dim)
+                                .foregroundColor(C.text)
                                 .padding(.top, isPad ? 28 : 20)
                                 .padding(.horizontal, isPad ? 24 : 16)
                             body
@@ -154,7 +154,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Text("no settings yet").foregroundColor(C.dim)
+                Text("no settings yet").foregroundColor(C.text)
             }
             .navigationTitle("settings")
             .navigationBarTitleDisplayMode(.inline)
