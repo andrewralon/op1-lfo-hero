@@ -1,5 +1,32 @@
 # App Store Metadata
 
+## Name
+
+(30 chars max — already set in App Store Connect)
+
+op1 lfo hero
+
+---
+
+## Subtitle
+
+(30 chars max)
+
+options:
+· "lfo automation for op-1 field"  — 29 chars
+· "beat-synced lfos for your op-1" — 30 chars
+· "make your op-1 field move"      — 25 chars
+
+---
+
+## Promotional Text
+
+(170 chars max — optional, but can be updated any time without submitting a new build)
+
+add beat-synced lfo automation to your op-1 field. any parameter (kinda). any track (even master stuff). any waveform. music just got slightly more interesting. or nerdy.
+
+---
+
 ## Description
 
 the op-1 field is perfect. almost.
@@ -35,20 +62,25 @@ requirements:
 
 ## Keywords
 
-(100 chars max, comma-separated)
+(100 chars max, comma-separated — 96 chars currently)
 
 op-1, op1, teenage engineering, midi, lfo, automation, synthesizer, controller, music, sequencer
 
 ---
 
-## Subtitle
+## Copyright
 
-(30 chars max)
-
-Beat-synced LFOs for OP-1 Field
+2026 team ralon
 
 ---
 
 ## What's New (v1.0)
 
-Initial release.
+initial release.
+
+---
+
+## Notes
+
+- remove the [thanks AI] / [also AI] / [you guessed it] tags from the description before pasting into App Store Connect
+- support URL and privacy policy URL are set directly in App Store Connect, not stored here
