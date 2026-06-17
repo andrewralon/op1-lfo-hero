@@ -76,31 +76,31 @@ struct LFOPanelView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, isPad ? 7 : 4)
+            .padding(.vertical, isPad ? 10 : 4)
 
             // ── 2. Param + wave dropdowns — fitted width, centered ────────────
-            HStack(spacing: isPad ? 40 : 30) {
+            HStack(spacing: isPad ? 48 : 30) {
                 Spacer()
-                HStack(spacing: isPad ? 8 : 6) {
-                    Image(systemName: "bolt.fill").font(.system(size: isPad ? 26 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                HStack(spacing: isPad ? 10 : 6) {
+                    Image(systemName: "bolt.fill").font(.system(size: isPad ? 32 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
                     CompactPicker(options: Array(Parameter.allCases),
                                   selection: $app.lfoParam)
                 }
-                HStack(spacing: isPad ? 8 : 6) {
-                    Image(systemName: "waveform.path").font(.system(size: isPad ? 26 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                HStack(spacing: isPad ? 10 : 6) {
+                    Image(systemName: "waveform.path").font(.system(size: isPad ? 32 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
                     CompactPicker(options: Array(LfoWave.allCases),
                                   selection: $app.lfoWave)
                 }
                 Spacer()
             }
-            .padding(.vertical, isPad ? 7 : 4)
+            .padding(.vertical, isPad ? 10 : 4)
 
             // ── 3. Rate / depth / center — centered as a group ────────────────
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
 
                 // Rate scrubber (1–8, horizontal drag matches depth/center)
-                HStack(spacing: isPad ? 8 : 6) {
+                HStack(spacing: isPad ? 10 : 6) {
                     Image(systemName: "timer")
                         .font(.system(size: isPad ? 26 : 20))
                         .foregroundColor(Color(hex: "#aaaaaa"))
@@ -109,25 +109,25 @@ struct LFOPanelView: View {
                         get: { Double(app.lfoRate) },
                         set: { app.lfoRate = max(1, min(8, Int($0.rounded()))) }
                     ), range: 1...8, sensitivity: 0.04)
-                    .frame(width: isPad ? 54 : 40)
+                    .frame(width: isPad ? 64 : 40)
                 }
 
-                Spacer(minLength: isPad ? 28 : 20)
+                Spacer(minLength: isPad ? 36 : 20)
 
                 // Depth
-                HStack(spacing: isPad ? 8 : 6) {
+                HStack(spacing: isPad ? 10 : 6) {
                     Image(systemName: "arrow.up.and.down")
                         .font(.system(size: isPad ? 26 : 20))
                         .foregroundColor(Color(hex: "#aaaaaa"))
 
                     ScrubValue(value: $app.lfoDepth, range: 0...99)
-                        .frame(width: isPad ? 78 : 58)
+                        .frame(width: isPad ? 92 : 58)
                 }
 
-                Spacer(minLength: isPad ? 28 : 20)
+                Spacer(minLength: isPad ? 36 : 20)
 
                 // Center
-                HStack(spacing: isPad ? 8 : 6) {
+                HStack(spacing: isPad ? 10 : 6) {
                     Image(systemName: "arrow.up.and.down.circle")
                         .font(.system(size: isPad ? 26 : 20))
                         .foregroundColor(Color(hex: "#aaaaaa"))
@@ -135,13 +135,13 @@ struct LFOPanelView: View {
                     ScrubValue(value: $app.lfoCenter,
                                range: app.lfoParam == .tempo ? 20...300 : 0...99,
                                decimals: app.lfoParam == .tempo ? 1 : 0)
-                        .frame(width: isPad ? 100 : 74)
+                        .frame(width: isPad ? 116 : 74)
 
                     Button { snapCenter() } label: {
                         Image(systemName: "scope")
-                            .font(.system(size: isPad ? 17 : 13))
+                            .font(.system(size: isPad ? 20 : 13))
                             .foregroundColor(Color(hex: "#aaaaaa"))
-                            .frame(width: isPad ? 38 : 28, height: isPad ? 48 : 36)
+                            .frame(width: isPad ? 44 : 28, height: isPad ? 56 : 36)
                             .background(C.bg3)
                             .cornerRadius(3)
                     }
@@ -150,7 +150,7 @@ struct LFOPanelView: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, isPad ? 7 : 4)
+            .padding(.vertical, isPad ? 10 : 4)
 
             // ── 4. Waveform preview — full width, scales up on iPad ──────────
             MultiWaveformView(
@@ -160,13 +160,9 @@ struct LFOPanelView: View {
                 depth: app.lfoDepth,
                 tracks: waveTracks
             )
-            .frame(height: isPad ? 130 : 90)
+            .frame(height: isPad ? 140 : 90)
             .frame(maxWidth: .infinity)
             .padding(8)
-
-            // On iPad, push the action section toward the bottom so the
-            // waveform and controls aren't lost in a sea of empty space.
-            if isPad { Spacer(minLength: 0) }
 
             // ── 5. Start buttons + Active LFOs + help/settings (fills remaining space) ──
             HStack(spacing: 0) {
@@ -257,8 +253,7 @@ struct LFOPanelView: View {
                 .frame(width: 44)
             }
             .frame(maxWidth: .infinity)
-            .frame(maxHeight: isPad ? 220 : .infinity)
-            .layoutPriority(isPad ? 1 : 0)
+            .frame(maxHeight: .infinity)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -309,7 +304,7 @@ private struct CompactPicker<T>: View
     @State private var show = false
     @Environment(\.horizontalSizeClass) private var hSize
     private var isPad: Bool { hSize == .regular }
-    private var fontSize: CGFloat { isPad ? 20 : ctrlFontSizePhone }
+    private var fontSize: CGFloat { isPad ? 22 : ctrlFontSizePhone }
 
     var body: some View {
         Button { show = true } label: {
@@ -324,8 +319,8 @@ private struct CompactPicker<T>: View
                 }
                 .font(.system(size: fontSize, weight: .bold))
             }
-            .padding(.horizontal, isPad ? 14 : 11)
-            .padding(.vertical, isPad ? 11 : 8)
+            .padding(.horizontal, isPad ? 16 : 11)
+            .padding(.vertical, isPad ? 13 : 8)
             .background(C.bg3)
             .cornerRadius(5)
         }
@@ -379,7 +374,7 @@ private struct ScrubValue: View {
     var decimals: Int = 0
     @Environment(\.horizontalSizeClass) private var hSize
     private var isPad: Bool { hSize == .regular }
-    private var fontSize: CGFloat { isPad ? 20 : ctrlFontSizePhone }
+    private var fontSize: CGFloat { isPad ? 22 : ctrlFontSizePhone }
 
     @GestureState private var isActive: Bool = false
     @State private var base: Double = 0
@@ -408,7 +403,7 @@ private struct ScrubValue: View {
                     RoundedRectangle(cornerRadius: 3)
                         .stroke(isActive ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
                 )
-                .frame(height: isPad ? 48 : 36)
+                .frame(height: isPad ? 56 : 36)
             Text(displayText)
                 .font(.system(size: fontSize, weight: .bold, design: .monospaced))
                 .foregroundColor(isActive ? C.green : .white)
@@ -493,9 +488,9 @@ private struct TrackToggleButton: View {
     var body: some View {
         Button(action: action) {
             Text("\(track)")
-                .font(.system(size: isPad ? 26 : C.trackLabelSize, weight: .bold, design: .monospaced))
+                .font(.system(size: isPad ? 28 : C.trackLabelSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: isPad ? 62 : 46, height: isPad ? 62 : 46)
+                .frame(width: isPad ? 70 : 46, height: isPad ? 70 : 46)
                 .background(color.opacity(state == 0 ? (disabled ? 0.1 : 0.2) : (disabled ? 0.4 : 1.0)))
                 .foregroundColor(state == 0 ? color : .black)
                 .cornerRadius(7)
@@ -518,9 +513,9 @@ private struct MasterToggleButton: View {
     var body: some View {
         Button(action: action) {
             Text("m")
-                .font(.system(size: isPad ? 26 : C.trackLabelSize, weight: .bold, design: .monospaced))
+                .font(.system(size: isPad ? 28 : C.trackLabelSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: isPad ? 62 : 46, height: isPad ? 62 : 46)
+                .frame(width: isPad ? 70 : 46, height: isPad ? 70 : 46)
                 .background(C.green.opacity(state == 0 ? (disabled ? 0.1 : 0.2) : (disabled ? 0.4 : 1.0)))
                 .foregroundColor(state == 0 ? C.green : .black)
                 .cornerRadius(7)
