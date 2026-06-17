@@ -33,7 +33,7 @@ struct LFOHeroApp: App {
                 }
             }
             .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
                     withAnimation(.easeOut(duration: 0.4)) { showSplash = false }
                 }
             }
