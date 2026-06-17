@@ -6,12 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>op1 lfo hero — support</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       background: #111111;
       color: #d8d8d8;
@@ -22,112 +17,60 @@
       max-width: 680px;
       margin: 0 auto;
     }
-
-    h1 {
-      color: #4ec94e;
-      font-size: 28px;
-      font-weight: bold;
-      margin-bottom: 4px;
-    }
-
-    .tagline {
-      color: #d8d8d8;
-      font-size: 12px;
-      margin-bottom: 40px;
-    }
-
-    h2 {
-      font-size: 17px;
-      font-weight: bold;
-      border-bottom: 1px solid #2a2a2a;
-      padding-bottom: 6px;
-      margin-top: 36px;
-      margin-bottom: 16px;
-    }
-
-    p {
-      margin-bottom: 12px;
-    }
-
-    ul {
-      padding-left: 20px;
-      margin-bottom: 12px;
-    }
-
-    li {
-      margin-bottom: 10px;
-    }
-
-    strong {
-      color: #ffffff;
-    }
-
-    code {
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 3px;
-      padding: 1px 5px;
-      font-size: 12px;
-      font-family: inherit;
-      color: #ff6a00;
-    }
-
-    a {
-      color: #4ec94e;
-      text-decoration: none;
-    }
-
-    a:hover {
-      text-decoration: underline;
-    }
-
-    footer {
-      margin-top: 60px;
-      padding-top: 16px;
-      border-top: 1px solid #2a2a2a;
-      color: #666666;
-      font-size: 12px;
-    }
+    h1 { color: #4ec94e; font-size: 28px; font-weight: bold; margin-bottom: 4px; }
+    h1 a { color: inherit; text-decoration: none; }
+    .meta { color: #d8d8d8; font-size: 12px; margin-bottom: 40px; }
+    h2 { font-size: 17px; font-weight: bold; border-bottom: 1px solid #2a2a2a;
+         padding-bottom: 6px; margin-top: 36px; margin-bottom: 16px; }
+    p { margin-bottom: 12px; }
+    ul { padding-left: 20px; margin-bottom: 12px; }
+    li { margin-bottom: 10px; }
+    strong { color: #ffffff; }
+    code { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 3px;
+           padding: 1px 5px; font-size: 12px; font-family: inherit; color: #ff6a00; }
+    a { color: #4ec94e; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    footer { margin-top: 60px; padding-top: 16px; border-top: 1px solid #2a2a2a;
+             color: #666666; font-size: 12px; }
   </style>
 </head>
 
 <body>
 
-  <h1>op1 lfo hero</h1>
-  <p class="meta">support &nbsp;·&nbsp; because reasons</p>
+  <h1><a href="index.html">op1 lfo hero</a></h1>
+  <p class="meta">troubleshooting &nbsp;·&nbsp; support</p>
 
   <h2>troubleshooting</h2>
   <ul>
     <li>
-      <strong>app shows "no device found"</strong><br>
-      make sure the op1 is powered on. for usb: try a different cable — some usb-c cables are charge-only and carry no
-      data. for bluetooth: confirm <code>bluetooth: on</code> is set on the op1.
+      <strong>app shows `no device found`</strong><br>
+      make sure the op1 is powered on. for usb: try a different cable — some usb-c cables are charge-only and carry no data. for bluetooth: confirm <code>bluetooth: on</code> is set on the op1.
     </li>
     <li>
       <strong>controls send but op1 doesn't respond</strong><br>
-      unplug and replug the op1, or restart lfo hero. if using bluetooth, toggle <code>bluetooth: off</code> then back
-      <code>on</code> on the op1.
+      unplug and replug the op1, or restart lfo hero. if using bluetooth, toggle <code>bluetooth: off</code> then back <code>on</code> on the op1.
     </li>
     <li>
       <strong>tape doesn't respond to play / stop</strong><br>
-      confirm the op1 is in <code>midi sync</code> mode and the app is in <code>app</code> clock mode. the op1's BPM
-      display should show <code>--</code> while waiting for clock.
+      confirm the op1 is in <code>midi sync</code> mode and the app is in <code>app</code> clock mode. the op1's bpm display should show <code>--</code> while waiting for clock.
     </li>
     <li>
       <strong>op1 tempo doesn't match the app</strong><br>
-      the op1 needs a few seconds of continuous clock to lock in after a tempo change. note: bluetooth cannot handle
-      high-resolution tempo changes (LFO tempo modulation requires usb).
+      restart the app. power cycle the op1. <strong>note:</strong> bluetooth (ble midi) does not send high-resolution tempo changes.
     </li>
     <li>
       <strong>left / right tape buttons stop playback</strong><br>
-      this is normal op1 behavior — receiving a song position pointer while playing causes it to pause. press play to
-      resume.
+      this is normal op1 behavior — receiving a song position pointer while playing causes it to pause. press play to resume.
     </li>
+  </ul>
 
-    <footer>
-      op1 lfo hero &nbsp;·&nbsp; <a href="support.html">troubleshooting</a> &nbsp;·&nbsp; <a href="privacy.html">privacy
-        policy</a>
-    </footer>
+  <h2>contact</h2>
+  <p>open an issue on github and we'll get back to you:</p>
+  <p><a href="https://github.com/andrewralon/op1-lfo-hero/issues">github.com/andrewralon/op1-lfo-hero/issues</a></p>
+
+  <footer>
+    op1 lfo hero &nbsp;·&nbsp; <a href="index.html">home</a> &nbsp;·&nbsp; <a href="privacy.html">privacy policy</a>
+  </footer>
 
 </body>
 
