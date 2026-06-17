@@ -5,34 +5,39 @@ struct SplashScreenView: View {
     @State private var wavePhase: Double = 0
 
     var body: some View {
-        VStack(spacing: 22) {
-            Spacer()
+        GeometryReader { geo in
+            // Scale proportionally to screen size relative to baseline iPhone dimensions.
+            // Works for any device without branching — larger screens get larger elements.
+            let s = min(geo.size.width / 390, geo.size.height / 844)
+            VStack(spacing: 22 * s) {
+                Spacer()
 
-            // Full-resolution 1024×1024 source art (not the small system-generated icon
-            // file, which looks blurry once stretched up to this size).
-            Image("AppIconArt")
-                .resizable()
-                .interpolation(.high)
-                .frame(width: 140, height: 140)
-                .clipShape(RoundedRectangle(cornerRadius: 28))
-                .overlay(RoundedRectangle(cornerRadius: 28).stroke(C.border, lineWidth: 0.5))
-                .shadow(color: .black.opacity(0.5), radius: 18, y: 8)
+                // Full-resolution 1024×1024 source art (not the small system-generated icon
+                // file, which looks blurry once stretched up to this size).
+                Image("AppIconArt")
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 140 * s, height: 140 * s)
+                    .clipShape(RoundedRectangle(cornerRadius: 28 * s))
+                    .overlay(RoundedRectangle(cornerRadius: 28 * s).stroke(C.border, lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.5), radius: 18, y: 8)
 
-            Text("op1 lfo hero")
-                .font(.system(size: 40, weight: .bold, design: .monospaced))
-                .foregroundColor(C.white)
+                Text("op1 lfo hero")
+                    .font(.system(size: 40 * s, weight: .bold, design: .monospaced))
+                    .foregroundColor(C.white)
 
-            Text("make music fun")
-                .font(.system(size: 18, weight: .medium, design: .monospaced))
-                .foregroundColor(C.text)
+                Text("make music fun")
+                    .font(.system(size: 18 * s, weight: .medium, design: .monospaced))
+                    .foregroundColor(C.text)
 
-            ColorfulSplashWave(phase: wavePhase)
-                .frame(width: 240, height: 52)
+                ColorfulSplashWave(phase: wavePhase)
+                    .frame(width: 240 * s, height: 52 * s)
 
-            Spacer()
-            Spacer()
+                Spacer()
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(C.bg)
         .onAppear {
             withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {

@@ -103,13 +103,27 @@ struct HelpView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(sections, id: \.0) { title, body in
-                    Section(title) {
-                        Text(body).foregroundColor(C.text)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(sections, id: \.0) { title, body in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(C.dim)
+                                .padding(.top, 20)
+                                .padding(.horizontal, 16)
+                            Text(body)
+                                .font(.body)
+                                .foregroundColor(C.text)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 12)
+                            Divider()
+                        }
                     }
                 }
+                .padding(.bottom, 20)
             }
+            .background(C.bg)
             .navigationTitle("help")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
