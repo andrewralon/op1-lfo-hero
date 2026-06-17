@@ -40,7 +40,7 @@ struct DevicePickerView: View {
             List {
                 Section("discovered devices") {
                     if app.ble.discovered.isEmpty {
-                        Label("scanning for BLE MIDI devices…", systemImage: "wave.3.right")
+                        Label("scanning for ble midi devices…", systemImage: "wave.3.right")
                             .foregroundColor(C.text)
                     } else {
                         ForEach(app.ble.discovered, id: \.identifier) { p in
@@ -68,7 +68,7 @@ struct DevicePickerView: View {
                     .foregroundColor(C.red)
                 }
             }
-            .navigationTitle("BLE MIDI device")
+            .navigationTitle("ble midi device")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -95,18 +95,18 @@ struct HelpView: View {
         ("metronome / tempo mode",
             Text("tap the metronome icon to switch the clock source: ")
             + Text("app (midi sync)").foregroundColor(C.green)
-            + Text(" drives tempo from this app over MIDI sync; ")
+            + Text(" drives tempo from this app over midi sync; ")
             + Text("op1 (beat match)").foregroundColor(C.track(1))
             + Text(" follows the op1 tempo instead.")
         ),
-        ("bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact BPM.")),
+        ("bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.")),
         ("track / master buttons", Text("tap to cycle off → on → inverted. tracks apply the LFO to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
         ("parameter / wave", Text("choose which parameter the LFO modulates, and which waveform shape it follows.")),
         ("rate / depth / center", Text("drag up/down on a box to scrub its value. rate sets LFO speed, depth sets its range, center sets its midpoint.")),
         ("waveform preview", Text("shows the shape of the LFO that will be sent, colored per active track/master.")),
         ("repeat / 1x / trash", Text("start the LFO looping, start it once, or delete all currently active LFOs.")),
         ("active LFOs", Text("tap an entry to preview it on the waveform; tap the x to stop just that one.")),
-        ("status bar", Text("shows the current MIDI connection and clock source; tap it to choose a BLE device."))
+        ("status bar", Text("shows the current midi connection and clock source; tap it to choose a ble midi device."))
     ]
 
     var body: some View {
