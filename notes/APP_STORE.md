@@ -67,6 +67,10 @@ requirements:
 
 op-1, op1, teenage engineering, midi, lfo, automation, synthesizer, controller, music, sequencer
 
+(what i had before)
+
+op1, op-1, field, midi, lfo, synth, music, audio, production, sound, teenage engineering, music
+
 ---
 
 ## Copyright
