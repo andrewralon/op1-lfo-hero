@@ -100,7 +100,7 @@ struct HelpView: View {
             + Text("app (midi sync)").foregroundColor(C.green)
             + Text(" — app is master\n")
             + Text("· app controls op1 tape transport (play/stop/back/forward).\n")
-            + Text("note: ")
+            + Text("· note: ").bold()
             + Text("tempo lfo requires usb-c; bluetooth does not send high-resolution tempo changes.")
         ),
         ("bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.")),
