@@ -22,17 +22,12 @@ struct SplashScreenView: View {
                 .font(.system(size: 40, weight: .bold, design: .monospaced))
                 .foregroundColor(C.white)
 
-            Spacer()
+            Text("make music fun")
+                .font(.system(size: 18, weight: .medium, design: .monospaced))
+                .foregroundColor(C.text)
 
             ColorfulSplashWave(phase: wavePhase)
                 .frame(width: 240, height: 52)
-
-            SplashWave(phase: wavePhase)
-                .frame(width: 240, height: 52)
-
-            Text("make music fun")
-                .font(.system(size: 18, weight: .medium, design: .monospaced))
-                .foregroundColor(C.dim)
 
             Spacer()
             Spacer()
