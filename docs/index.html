@@ -71,12 +71,14 @@
     <li>status bar shows <code>op-1 field (usb)</code> or <code>op-1 field (ble)</code></li>
   </ul>
 
-  <h2>clock modes</h2>
+  <h2>tempo modes</h2>
   <ul>
-    <li><code>app (midi sync)</code> — app is master. transport (play / stop / tape nav) works in this mode.</li>
-    <li><code>op1 (beat match)</code> — op1 is master. app follows op1 tempo automatically.</li>
+    <li><code>app (midi sync)</code> — app is master. app controls basic op1 tape transport (play/stop/back/forward).
+      <ul style="margin-top:6px"><li><code>tempo</code> lfo requires usb-c. bluetooth doesn't send high-resolution tempo changes.</li></ul>
+    </li>
+    <li><code>op1 (beat match)</code> — op1 is master. app syncs lfos to op1's tempo.</li>
   </ul>
-  <p>toggle clock mode with the metronome button in the transport column. the app starts in <code>app</code> mode.</p>
+  <p>toggle the app's tempo mode with the <code>metronome</code> button in the transport column, then change the op1 to match.</p>
 
   <h2>troubleshooting</h2>
   <ul>
