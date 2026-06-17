@@ -52,6 +52,7 @@ stuff it doesn't do:
 · pick the waveform for you — choose your own adventure, bruh
 · fix your timing or inability to carry a tune
 · record audio, generate melodies, or do anything else remotely useful
+· your laundry
 
 requirements:
 · teenage engineering op-1 field - incompatible with the original, as far as i know
