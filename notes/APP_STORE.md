@@ -8,6 +8,7 @@ op1 lfo hero connects to your op-1 field to create custom lfos to modulate op1 p
 
 that's about it. it's mildly fantastic, just like midi.
 
+stuff it does:
 · lfo parameters for all tracks and the master bus - who knew?
 · plus a few things the op1 can't control on its own ....
 · a satisfying number of waveforms
@@ -16,10 +17,18 @@ that's about it. it's mildly fantastic, just like midi.
 · tempo modes: beat sync (op1 master) and midi sync (app master) — you decide who's in charge [thanks again]
 · runs in the background, screen locked, like a boss
 
-requirements
+requirements:
 · teenage engineering op-1 field
 · iphone - ios 16 or later
 · connect via usb-c or bluetooth ble midi
+
+stuff it doesn't do:
+· include an op-1 field - just consider it a $2000 accessory to this app
+· explain what an lfo is (google it, it'll be worth it)
+· pick the waveform for you — some decisions are yours to make
+· record audio, generate melodies, or do anything else remotely useful
+· fix your timing
+· get you a record deal (results may vary)
 
 ---
 
