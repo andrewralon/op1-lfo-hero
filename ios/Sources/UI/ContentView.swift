@@ -92,7 +92,7 @@ struct HelpView: View {
         ("pan knobs", "drag up/down on a knob to pan right/left (vertical drag stands in for turning it). release near center to snap back to centered."),
         ("volume faders", "drag up/down on a fader to set that track's volume; the digits below update live while dragging."),
         ("transport buttons", "play/stop start and stop playback (play only works when the app is the clock master). the left/right arrows step the OP-1's tape position backward/forward."),
-        ("metronome / tempo mode", "tap the metronome icon to switch the clock source: \"app\" (green) drives tempo from this app over MIDI sync; \"op1\" (blue) follows the OP-1's own tempo instead."),
+        ("metronome / tempo mode", "tap the metronome icon to switch the clock source: \"app (midi sync)\" [<- MAKE THIS GREEN] drives tempo from this app over MIDI sync; \"op1 (beat match)\" [<- MAKE THIS BLUE] follows the op1 tempo instead."),
         ("bpm", "drag up/down to scrub the tempo. double-tap or long-press the box to type an exact BPM."),
         ("track / master buttons", "tap to cycle off → on → inverted. tracks apply the LFO to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks."),
         ("parameter / wave", "choose which parameter the LFO modulates, and which waveform shape it follows."),
