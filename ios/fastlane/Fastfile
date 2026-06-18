@@ -50,11 +50,12 @@ platform :ios do
       skip_waiting_for_build_processing: true,
       changelog: <<~NOTES
         o hai beta tester!
-        -test all UI components - do they do what you expect? slide, change, etc
-        -does anything look weird? does anything overlap? is anything skewed or morphed? like if a circle wasn't fully round, etc
-        -how quickly does it start up? it should be around 3-5 seconds after clicking that the app is fully responding to inputs
+        -unless you have an op1, there's no audio
+        -test all UI components - do they do what you expect? slide, change, ...
+        -does it look good visually? is anything skewed or morphed? a non-round circle, etc
+        -how fast does it open? should be ~3 seconds after clicking to respond like normal
         -are the UI elements big enough?
-        -do you notice anything off? is there anything that doesn't do what you expect?
+        -is anything weird? does anything *not* do what you expect?
 
         #{commits}
       NOTES
