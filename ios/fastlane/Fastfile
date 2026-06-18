@@ -33,6 +33,15 @@ platform :ios do
     sh("open ./screenshots/screenshots.html")
   end
 
+  desc "Preview what the next beta changelog would look like"
+  lane :whatif do
+    commits = changelog_from_git_commits(
+      merge_commit_filtering: "exclude_merges",
+      pretty: "- %s"
+    )
+    UI.message(commits)
+  end
+
   desc "Print commits since a beta build number: fastlane changelog since:7"
   lane :changelog do |options|
     since = options[:since] || UI.input("Since build number: ")
@@ -45,7 +54,7 @@ platform :ios do
   end
 
   desc "Build and upload to TestFlight"
-  lane :beta do
+  lane :beta do |options|
     match(type: "appstore", readonly: true)
     increment_build_number(xcodeproj: "op1-lfo-hero.xcodeproj")
     build_app(
@@ -53,10 +62,9 @@ platform :ios do
       scheme: "op1-lfo-hero",
       export_method: "app-store"
     )
-    commits = changelog_from_git_commits(
-      merge_commit_filtering: "exclude_merges",
-      pretty: "- %s"
-    )
+    commit_options = { merge_commit_filtering: "exclude_merges", pretty: "- %s" }
+    commit_options[:between] = ["beta/#{options[:since]}", "HEAD"] if options[:since]
+    commits = changelog_from_git_commits(commit_options)
     upload_to_testflight(
       skip_waiting_for_build_processing: true,
       changelog: <<~NOTES
