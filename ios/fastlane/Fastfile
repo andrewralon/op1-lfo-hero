@@ -53,7 +53,7 @@ platform :ios do
         -unless you have an op1, there's no audio
         -test all UI components - do they do what you expect? slide, change, ...
         -does it look good visually? is anything skewed or morphed? a non-round circle, etc
-        -how fast does it open? should be ~3 seconds after clicking to respond like normal
+        -how fast does it open? should be ~3 seconds after clicking to respond like normal. try 2-3 times pls.
         -are the UI elements big enough?
         -is anything weird? does anything *not* do what you expect?
 
