@@ -225,5 +225,17 @@ xcuserdata/
 .claude
 .DS_Store
 
+# Fastlane — never commit API keys or build artifacts
+*.p8
+ios/fastlane/report.xml
+ios/fastlane/test_output/
+ios/fastlane/Preview.html
+ios/fastlane/screenshots/
+
+# Build artifacts
+*.ipa
+*.dSYM.zip
+*.dSYM/
+
 # Custom Includes
 

@@ -1,0 +1,15 @@
+scheme("op1-lfo-hero")
+project("op1-lfo-hero.xcodeproj")
+
+devices([
+  "iPhone 17 Pro Max",  # 6.9" — satisfies App Store requirement
+])
+
+languages(["en-US"])
+
+output_directory("./fastlane/screenshots")
+clear_previous_screenshots(true)
+stop_after_first_error(false)
+
+# Use the dedicated screenshot test class only
+only_testing("op1-lfo-heroUITests/ScreenshotTests")

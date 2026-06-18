@@ -1,0 +1,9 @@
+app_identifier("com.andrewralon.op1-lfo-hero")
+username(ENV["APPLE_ID"])
+
+default_language("en-US")
+metadata_path("./fastlane/metadata")
+screenshots_path("./fastlane/screenshots")
+
+automatic_release(false)
+submit_for_review(false)

@@ -1,0 +1,64 @@
+default_platform(:ios)
+
+platform :ios do
+  before_all do
+    app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_ISSUER_ID"],
+      key_filepath: ENV["APP_STORE_CONNECT_KEY_PATH"],
+      duration: 1200,
+      in_house: false
+    )
+  end
+
+  desc "Sync certificates and provisioning profiles to ~/Library/MobileDevice"
+  lane :certs do
+    match(type: "development")
+    match(type: "appstore")
+  end
+
+  desc "Capture App Store screenshots on simulators"
+  lane :screenshots do
+    capture_screenshots(
+      project: "op1-lfo-hero.xcodeproj",
+      scheme: "op1-lfo-hero",
+      output_directory: "./fastlane/screenshots",
+      clear_previous_screenshots: true,
+      skip_open_summary: true,
+      html_template: "./fastlane/screenshots_template.html.erb"
+    )
+    frame_screenshots(
+      path: "./fastlane/screenshots"
+    )
+    sh("open ./screenshots/screenshots.html")
+  end
+
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    match(type: "appstore", readonly: true)
+    increment_build_number(xcodeproj: "op1-lfo-hero.xcodeproj")
+    build_app(
+      project: "op1-lfo-hero.xcodeproj",
+      scheme: "op1-lfo-hero",
+      export_method: "app-store"
+    )
+    upload_to_testflight(skip_waiting_for_build_processing: true)
+  end
+
+  desc "Full release: build + upload metadata + screenshots + submit for review"
+  lane :release do
+    match(type: "appstore", readonly: true)
+    increment_build_number(xcodeproj: "op1-lfo-hero.xcodeproj")
+    build_app(
+      project: "op1-lfo-hero.xcodeproj",
+      scheme: "op1-lfo-hero",
+      export_method: "app-store"
+    )
+    deliver(
+      submit_for_review: true,
+      automatic_release: false,
+      force: true,
+      precheck_include_in_app_purchases: false
+    )
+  end
+end

@@ -29,6 +29,8 @@
 		F303F7E32FDE4BC80060AA2D /* MidiRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7E22FDE4BC80060AA2D /* MidiRouter.swift */; };
 		F303F7E52FDE4BC80060AA2D /* CoreMIDI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F303F7E42FDE4BC80060AA2D /* CoreMIDI.framework */; };
 		F33102832FE07989008CF623 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F33102822FE07989008CF623 /* Assets.xcassets */; };
+		F350020E2FE371CE00C6E1AF /* SnapshotHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F350020D2FE371CE00C6E1AF /* SnapshotHelper.swift */; };
+		F35002102FE371D800C6E1AF /* ScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F350020F2FE371D800C6E1AF /* ScreenshotTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +69,8 @@
 		F303F7E42FDE4BC80060AA2D /* CoreMIDI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMIDI.framework; path = System/Library/Frameworks/CoreMIDI.framework; sourceTree = SDKROOT; };
 		F33102822FE07989008CF623 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F33102842FE07994008CF623 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F350020D2FE371CE00C6E1AF /* SnapshotHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SnapshotHelper.swift; path = UITests/SnapshotHelper.swift; sourceTree = "<group>"; };
+		F350020F2FE371D800C6E1AF /* ScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ScreenshotTests.swift; path = UITests/ScreenshotTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -93,6 +97,8 @@
 			isa = PBXGroup;
 			children = (
 				D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */,
+				F350020D2FE371CE00C6E1AF /* SnapshotHelper.swift */,
+				F350020F2FE371D800C6E1AF /* ScreenshotTests.swift */,
 			);
 			name = UITests;
 			sourceTree = SOURCE_ROOT;
@@ -273,6 +279,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				4B2D1C66F4F73C31243ED771 /* HelpSettingsUITests.swift in Sources */,
+				F350020E2FE371CE00C6E1AF /* SnapshotHelper.swift in Sources */,
+				F35002102FE371D800C6E1AF /* ScreenshotTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -476,9 +484,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 8RG5QJVST3;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 8RG5QJVST3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
@@ -497,6 +507,8 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.andrewralon.op1-lfo-hero";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "match AppStore com.andrewralon.op1-lfo-hero";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -512,9 +524,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 8RG5QJVST3;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 8RG5QJVST3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
@@ -533,6 +547,8 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.andrewralon.op1-lfo-hero";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "match AppStore com.andrewralon.op1-lfo-hero";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
