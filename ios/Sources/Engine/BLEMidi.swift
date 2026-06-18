@@ -42,6 +42,7 @@ final class BLEMidi: NSObject, ObservableObject {
     private let queue = DispatchQueue(label: "ble.midi", qos: .userInteractive)
     private var scanTimeout: DispatchWorkItem?
     private var connectTimeout: DispatchWorkItem?
+    private var discoveredIds = Set<UUID>()   // guarded by `queue`
 
     override init() {
         super.init()
@@ -52,6 +53,7 @@ final class BLEMidi: NSObject, ObservableObject {
 
     func startScan() {
         scanTimeout?.cancel()
+        discoveredIds.removeAll()                              // sync on queue — cleared before scan starts
         DispatchQueue.main.async { self.discovered.removeAll() }
         guard central.state == .poweredOn else { return }
         DispatchQueue.main.async { self.state = .scanning }
@@ -158,7 +160,7 @@ extension BLEMidi: CBCentralManagerDelegate {
     func centralManager(_ c: CBCentralManager, didDiscover p: CBPeripheral,
                         advertisementData: [String: Any], rssi: NSNumber) {
         scanTimeout?.cancel()
-        guard !discovered.contains(p) else { return }
+        guard discoveredIds.insert(p.identifier).inserted else { return }
         DispatchQueue.main.async { self.discovered.append(p) }
         // Auto-connect to first OP-1 found
         if (p.name ?? "").lowercased().contains("op-1") {
@@ -175,11 +177,9 @@ extension BLEMidi: CBCentralManagerDelegate {
 
     func centralManager(_ c: CBCentralManager, didDisconnectPeripheral p: CBPeripheral, error: Error?) {
         midiChar = nil
-        DispatchQueue.main.async {
-            self.state = .disconnected(p.name ?? "device")
-            self.peripheral = nil
-        }
-        DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) { self.startScan() }
+        peripheral = nil
+        DispatchQueue.main.async { self.state = .disconnected(p.name ?? "device") }
+        startScan()
     }
 
     func centralManager(_ c: CBCentralManager, didFailToConnect p: CBPeripheral, error: Error?) {

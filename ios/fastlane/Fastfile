@@ -42,6 +42,10 @@ platform :ios do
       scheme: "op1-lfo-hero",
       export_method: "app-store"
     )
+    commits = changelog_from_git_commits(
+      merge_commit_filtering: "exclude_merges",
+      pretty: "- %s"
+    )
     upload_to_testflight(
       skip_waiting_for_build_processing: true,
       changelog: <<~NOTES
@@ -51,6 +55,8 @@ platform :ios do
         -how quickly does it start up? it should be around 3-5 seconds after clicking that the app is fully responding to inputs
         -are the UI elements big enough?
         -do you notice anything off? is there anything that doesn't do what you expect?
+
+        #{commits}
       NOTES
     )
   end
