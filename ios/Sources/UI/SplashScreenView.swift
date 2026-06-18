@@ -48,7 +48,7 @@ struct SplashScreenView: View {
 }
 
 // Multi-colored segmented sine wave — each segment cycles through the 4 track colors.
-private struct ColorfulSplashWave: View {
+struct ColorfulSplashWave: View {
     let phase: Double
     private let colors: [Color] = [C.track(1), C.track(2), C.track(3), C.track(4)]
 

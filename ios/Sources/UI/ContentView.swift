@@ -103,6 +103,7 @@ struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var hSize
     private var isPad: Bool { hSize == .regular }
+    @State private var wavePhase: Double = 0
 
     private let sections: [(String, Text)] = [
         ("mute buttons", Text("tap a track's colored number to mute/unmute it. bright colored background = unmuted; dark background = muted.")),
@@ -110,7 +111,7 @@ struct HelpView: View {
         ("volume faders", Text("drag up/down on a fader to set that track's volume; the digits below update live while dragging.")),
         ("transport buttons", Text("play/stop control op1 tape playback (play only works when the app is the clock master). left/right arrow buttons step the op1 tape position backward/forward.")),
         ("metronome / tempo mode", Text("tap the metronome icon to switch the clock source. then change the op1 to match.\n\(Text("op1 (beat match)").foregroundColor(C.track(1))) — op1 is master\n· app's lfos follow op1's tempo.\n\(Text("app (midi sync)").foregroundColor(C.green)) — app is master\n· app controls op1 tape transport (play/stop/back/forward).\n\(Text("· note: ").bold())tempo control requires 'app (midi sync)' mode and usb-c; bluetooth does not send high-resolution tempo changes.")),
-        ("bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.\n\(Text("· note: ").bold())tempo control requires 'app (midi sync)' mode and usb-c; bluetooth does not send high-resolution tempo changes.")),
+        ("tempo / bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.\n\(Text("· note: ").bold())tempo control requires 'app (midi sync)' mode and usb-c; bluetooth does not send high-resolution tempo changes.")),
         ("track / master buttons", Text("tap to cycle off → on → inverted. tracks apply the lfo to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
         ("parameter / wave", Text("choose which parameter the lfo modulates, and which waveform shape it follows.")),
         ("rate / depth / center", Text("drag up/down on a box to scrub its value. rate sets lfo speed, depth sets its range, center sets its midpoint.")),
@@ -124,6 +125,25 @@ struct HelpView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    // Header: logo + title
+                    HStack(spacing: 12) {
+                        Image("AppIconArt")
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(C.border, lineWidth: 0.5))
+                        Text("op1 lfo hero")
+                            .font(.system(size: 20, weight: .bold, design: .monospaced))
+                            .foregroundColor(C.white)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 14)
+
+                    Divider()
+
                     ForEach(sections, id: \.0) { title, body in
                         VStack(alignment: .leading, spacing: isPad ? 10 : 6) {
                             Text(title)
@@ -139,8 +159,15 @@ struct HelpView: View {
                             Divider()
                         }
                     }
+
+                    // Wave footer
+                    ColorfulSplashWave(phase: wavePhase)
+                        .frame(height: 48)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 20)
+                        .padding(.bottom, 36)
                 }
-                .padding(.bottom, 20)
             }
             .background(C.bg)
             .navigationTitle("help")
@@ -148,6 +175,11 @@ struct HelpView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("done") { dismiss() }
+                }
+            }
+            .onAppear {
+                withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {
+                    wavePhase = 1
                 }
             }
         }
@@ -160,15 +192,85 @@ struct HelpView: View {
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
+    @State private var wavePhase: Double = 0
+
+    @State private var quantumSync     = false
+    @State private var defiantJazzMode = false
+    @State private var yoloVelocity    = false
+    @State private var retrograde      = false
+    @State private var cowbell         = true
+    @State private var aiVibeCheck     = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                Text("no settings yet")
-                    .foregroundColor(C.dim)
-                    .padding(16)
+                VStack(alignment: .leading, spacing: 0) {
+                    // Header: logo + title
+                    HStack(spacing: 12) {
+                        Image("AppIconArt")
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(C.border, lineWidth: 0.5))
+                        Text("op1 lfo hero")
+                            .font(.system(size: 20, weight: .bold, design: .monospaced))
+                            .foregroundColor(C.white)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 14)
+
+                    Divider()
+
+                    settingRow(
+                        "quantum tempo sync",
+                        "aligns your bpm with the heat death of the universe. results may vary.",
+                        $quantumSync
+                    )
+                    settingRow(
+                        "defiant jazz mode",
+                        "randomly replaces your notes with more sophisticated choices. you're welcome.",
+                        $defiantJazzMode
+                    )
+                    settingRow(
+                        "yolo velocity",
+                        "sends every midi message at velocity 127. subtlety is a crutch.",
+                        $yoloVelocity
+                    )
+                    settingRow(
+                        "retrograde playback",
+                        "reverses tape direction in ways the op-1 doesn't actually support.",
+                        $retrograde
+                    )
+                    settingRow(
+                        "cowbell boost",
+                        "too much is never enough.",
+                        $cowbell
+                    )
+                    settingRow(
+                        "ai vibe check",
+                        "silently judges you based on your musical decisions. it is not impressed.",
+                        $aiVibeCheck
+                    )
+                    // Wave footer
+                    ColorfulSplashWave(phase: wavePhase)
+                        .frame(height: 48)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 20)
+                        .padding(.bottom, 36)
+                }
             }
             .background(C.bg)
+            .onAppear {
+                withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {
+                    wavePhase = 1
+                }
+            }
             .navigationTitle("settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -177,6 +279,31 @@ struct SettingsView: View {
                 }
             }
         }
+        .presentationDetents([.large])
         .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder
+    private func settingRow(_ title: String, _ desc: String, _ isOn: Binding<Bool>) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: isPad ? 6 : 4) {
+                    Text(title)
+                        .font(.system(size: isPad ? 18 : 13, weight: .semibold))
+                        .foregroundColor(C.text)
+                    Text(desc)
+                        .font(.system(size: isPad ? 17 : 15))
+                        .foregroundColor(C.text)
+                }
+                Spacer()
+                Toggle("", isOn: isOn)
+                    .labelsHidden()
+                    .tint(C.green)
+            }
+            .padding(.top, isPad ? 24 : 18)
+            .padding(.horizontal, isPad ? 24 : 16)
+            .padding(.bottom, isPad ? 18 : 12)
+            Divider()
+        }
     }
 }

@@ -68,6 +68,37 @@ Never use `List` inside a `NavigationStack` inside a `.sheet` (or `.fullScreenCo
 
 All testing/Xcode/simulator screenshots go in `/tmp/claude-ss/`. Create the directory if it doesn't exist (`mkdir -p /tmp/claude-ss`) before writing. Use this path in `xcrun simctl io` commands, UITest screenshot saves, and any other screenshot output.
 
+### UITest patterns
+
+Use XCUITest (not `cliclick` coordinate math) to drive the simulator — accessibility identifiers make taps reliable across device sizes.
+
+**Known accessibility identifiers:**
+- `helpButton` — opens HelpView sheet
+- `settingsButton` — opens SettingsView sheet
+
+**Run specific tests from the command line:**
+```bash
+cd ios
+xcodebuild test \
+  -project op1-lfo-hero.xcodeproj \
+  -scheme op1-lfo-hero \
+  -destination 'id=<simulator-udid>' \
+  -only-testing:op1-lfo-heroUITests/HelpSettingsUITests/testHelpModalOpensAndDismisses
+```
+
+**Taking screenshots inside a UITest:**
+```swift
+let screenshot = XCUIScreen.main.screenshot()
+try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/my_screen.png"))
+```
+
+**Find the booted simulator UDID:**
+```bash
+xcrun simctl list devices available | grep Booted
+# or pick any available iPhone:
+xcrun simctl list devices available | grep iPhone
+```
+
 ## MIDI reference
 
 CC mapping, transport messages, and the OP-1 MIDI spec link are documented in `README.md` — refer there rather than duplicating the tables here.

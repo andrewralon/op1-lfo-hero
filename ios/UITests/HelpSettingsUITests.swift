@@ -52,6 +52,9 @@ final class HelpSettingsUITests: XCTestCase {
 
         XCTAssertTrue(app.navigationBars["settings"].waitForExistence(timeout: 5))
 
+        let screenshot = XCUIScreen.main.screenshot()
+        try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/settings_modal.png"))
+
         app.buttons["done"].tap()
         XCTAssertFalse(app.navigationBars["settings"].waitForExistence(timeout: 2))
     }
