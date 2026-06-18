@@ -286,8 +286,22 @@ struct LFOPanelView: View {
         }
         .background(C.bg)
         .sheet(isPresented: $showDevicePicker) { DevicePickerView() }
-        .sheet(isPresented: $showHelp) { HelpView() }
-        .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: Binding(
+            get: { hSize != .regular && showHelp },
+            set: { if !$0 { showHelp = false } }
+        )) { HelpView() }
+        .fullScreenCover(isPresented: Binding(
+            get: { hSize == .regular && showHelp },
+            set: { if !$0 { showHelp = false } }
+        )) { HelpView() }
+        .sheet(isPresented: Binding(
+            get: { hSize != .regular && showSettings },
+            set: { if !$0 { showSettings = false } }
+        )) { SettingsView() }
+        .fullScreenCover(isPresented: Binding(
+            get: { hSize == .regular && showSettings },
+            set: { if !$0 { showSettings = false } }
+        )) { SettingsView() }
     }
 }
 

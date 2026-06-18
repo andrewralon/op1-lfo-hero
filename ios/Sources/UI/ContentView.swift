@@ -183,7 +183,7 @@ struct HelpView: View {
                 }
             }
         }
-        .presentationDetents([.large])
+        .presentationDetents(isPad ? [.fraction(0.92)] : [.large])
         .preferredColorScheme(.dark)
     }
 }
@@ -233,7 +233,7 @@ struct SettingsView: View {
                     )
                     settingRow(
                         "defiant jazz mode",
-                        "randomly replaces your notes with more sophisticated ones. it's giving miles davis.",
+                        "randomly replaces your notes with more sophisticated ones. ritualistic dancing is encouraged.",
                         $defiantJazzMode
                     )
                     settingRow(
@@ -279,7 +279,7 @@ struct SettingsView: View {
                 }
             }
         }
-        .presentationDetents([.large])
+        .presentationDetents(isPad ? [.fraction(0.92)] : [.large])
         .preferredColorScheme(.dark)
     }
 
