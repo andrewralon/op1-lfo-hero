@@ -228,32 +228,32 @@ struct SettingsView: View {
 
                     settingRow(
                         "quantum tempo sync",
-                        "aligns your bpm with the heat death of the universe. results may vary.",
+                        "no cap — aligns your bpm with the fabric of the universe. slay or get slayed.",
                         $quantumSync
                     )
                     settingRow(
                         "defiant jazz mode",
-                        "randomly replaces your notes with more sophisticated choices. you're welcome.",
+                        "randomly replaces your notes with more sophisticated ones. it's giving miles davis.",
                         $defiantJazzMode
                     )
                     settingRow(
                         "yolo velocity",
-                        "sends every midi message at velocity 127. subtlety is a crutch.",
+                        "sends every midi message at velocity 127. the era of nuance is dead and buried.",
                         $yoloVelocity
                     )
                     settingRow(
                         "retrograde playback",
-                        "reverses tape direction in ways the op-1 doesn't actually support.",
+                        "reverses tape direction in ways the op-1 doesn't actually support. understood the assignment.",
                         $retrograde
                     )
                     settingRow(
                         "cowbell boost",
-                        "too much is never enough.",
+                        "too much is never enough. periodt.",
                         $cowbell
                     )
                     settingRow(
                         "ai vibe check",
-                        "silently judges you based on your musical decisions. it is not impressed.",
+                        "your aura is being evaluated rn. bestie is not impressed and your rizz is cooked.",
                         $aiVibeCheck
                     )
                     // Wave footer
