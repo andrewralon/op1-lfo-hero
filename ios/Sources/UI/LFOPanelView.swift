@@ -87,17 +87,17 @@ struct LFOPanelView: View {
             // ── 2. Param + wave dropdowns — fitted width, centered ────────────
             HStack(spacing: isPad ? 48 : 30) {
                 Spacer()
-                HStack(spacing: isPad ? 10 : 6) {
+                HStack(spacing: isPad ? 15 : 9) {
                     Button { app.lfoParam = cycleNext(app.lfoParam) } label: {
-                        Image(systemName: "bolt.fill").font(.system(size: isPad ? 32 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                        Image(systemName: "bolt.fill").font(.system(size: isPad ? 38 : 24)).foregroundColor(Color(hex: "#aaaaaa"))
                     }
                     .buttonStyle(.plain)
                     CompactPicker(options: Array(Parameter.allCases),
                                   selection: $app.lfoParam)
                 }
-                HStack(spacing: isPad ? 10 : 6) {
+                HStack(spacing: isPad ? 15 : 9) {
                     Button { app.lfoWave = cycleNext(app.lfoWave) } label: {
-                        Image(systemName: "waveform.path").font(.system(size: isPad ? 32 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                        Image(systemName: "waveform.path").font(.system(size: isPad ? 38 : 24)).foregroundColor(Color(hex: "#aaaaaa"))
                     }
                     .buttonStyle(.plain)
                     CompactPicker(options: Array(LfoWave.allCases),
@@ -112,9 +112,9 @@ struct LFOPanelView: View {
                 Spacer(minLength: 0)
 
                 // Rate scrubber (1–8, horizontal drag matches depth/center)
-                HStack(spacing: isPad ? 10 : 6) {
+                HStack(spacing: isPad ? 15 : 9) {
                     Image(systemName: "timer")
-                        .font(.system(size: isPad ? 26 : 20))
+                        .font(.system(size: isPad ? 32 : 24))
                         .foregroundColor(Color(hex: "#aaaaaa"))
 
                     ScrubValue(value: Binding(
@@ -127,9 +127,9 @@ struct LFOPanelView: View {
                 Spacer(minLength: isPad ? 36 : 20)
 
                 // Depth
-                HStack(spacing: isPad ? 10 : 6) {
+                HStack(spacing: isPad ? 15 : 9) {
                     Image(systemName: "arrow.up.and.down")
-                        .font(.system(size: isPad ? 26 : 20))
+                        .font(.system(size: isPad ? 32 : 24))
                         .foregroundColor(Color(hex: "#aaaaaa"))
 
                     ScrubValue(value: $app.lfoDepth, range: 0...99)
@@ -139,9 +139,9 @@ struct LFOPanelView: View {
                 Spacer(minLength: isPad ? 36 : 20)
 
                 // Center
-                HStack(spacing: isPad ? 10 : 6) {
+                HStack(spacing: isPad ? 15 : 9) {
                     Image(systemName: "arrow.up.and.down.circle")
-                        .font(.system(size: isPad ? 26 : 20))
+                        .font(.system(size: isPad ? 32 : 24))
                         .foregroundColor(Color(hex: "#aaaaaa"))
 
                     ScrubValue(value: $app.lfoCenter,
