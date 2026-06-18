@@ -31,6 +31,22 @@ Sync certificates and provisioning profiles to ~/Library/MobileDevice
 
 Capture App Store screenshots on simulators
 
+### ios whatif
+
+```sh
+[bundle exec] fastlane ios whatif
+```
+
+Preview what the next beta changelog would look like
+
+### ios changelog
+
+```sh
+[bundle exec] fastlane ios changelog
+```
+
+Print commits since a beta build number: fastlane changelog since:7
+
 ### ios beta
 
 ```sh

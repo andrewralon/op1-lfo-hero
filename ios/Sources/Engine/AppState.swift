@@ -59,15 +59,83 @@ final class AppState: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
+    // MARK: - Persisted settings
+
+    private struct Settings: Codable {
+        var lfoWave: LfoWave = .sine
+        var lfoParam: Parameter = .volume
+        var lfoRate: Int = 3
+        var lfoDepth: Double = 10.0
+        var lfoCenter: Double = 90.0
+        var trackOn: [Int: Int] = [1: 1, 2: 0, 3: 0, 4: 0]
+        var masterOn: Int = 0
+        var isClockMaster: Bool = true
+        var bpm: Double = 100.0
+        var activeLfos: [LfoClip] = []
+    }
+
+    private let settingsKey = "AppSettings"
+
+    private func loadSettings() {
+        let s: Settings
+        if let data = UserDefaults.standard.data(forKey: settingsKey),
+           let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
+            s = decoded
+        } else {
+            s = Settings()
+        }
+        lfoWave   = s.lfoWave
+        lfoRate   = s.lfoRate
+        lfoDepth  = s.lfoDepth
+        lfoCenter = s.lfoCenter
+        trackOn   = s.trackOn
+        masterOn  = s.masterOn
+        bpm       = s.bpm
+        lfoParam  = s.lfoParam  // set last — didSet may adjust masterOn
+        if s.isClockMaster { enableClock() } else { disableClock() }
+        for lfo in s.activeLfos where lfo.loop {
+            automation.add(lfo)
+            activeLfos.append(lfo)
+        }
+    }
+
+    private func saveSettings() {
+        let s = Settings(lfoWave: lfoWave, lfoParam: lfoParam,
+                         lfoRate: lfoRate, lfoDepth: lfoDepth, lfoCenter: lfoCenter,
+                         trackOn: trackOn, masterOn: masterOn,
+                         isClockMaster: isClockMaster, bpm: bpm,
+                         activeLfos: activeLfos.filter { $0.loop })
+        if let data = try? JSONEncoder().encode(s) {
+            UserDefaults.standard.set(data, forKey: settingsKey)
+        }
+    }
+
+    private func wireAutoSave() {
+        Publishers.MergeMany(
+            $lfoWave.map { _ in () }.eraseToAnyPublisher(),
+            $lfoParam.map { _ in () }.eraseToAnyPublisher(),
+            $lfoRate.map { _ in () }.eraseToAnyPublisher(),
+            $lfoDepth.map { _ in () }.eraseToAnyPublisher(),
+            $lfoCenter.map { _ in () }.eraseToAnyPublisher(),
+            $trackOn.map { _ in () }.eraseToAnyPublisher(),
+            $masterOn.map { _ in () }.eraseToAnyPublisher(),
+            $isClockMaster.map { _ in () }.eraseToAnyPublisher(),
+            $bpm.map { _ in () }.eraseToAnyPublisher(),
+            $activeLfos.map { _ in () }.eraseToAnyPublisher()
+        )
+        .debounce(for: .seconds(0.5), scheduler: DispatchQueue.main)
+        .sink { [weak self] in self?.saveSettings() }
+        .store(in: &cancellables)
+    }
+
     init() {
         controller = Controller(router: router)
         automation.controller = controller
         clock.router = router
 
         wireCallbacks()
-
-        // Start in master clock mode so transport buttons work out of the box
-        enableClock()
+        wireAutoSave()
+        loadSettings()  // restores settings and calls enableClock/disableClock
     }
 
     private func wireCallbacks() {

@@ -18,7 +18,7 @@ let RATE_LABELS = ["16b", "8b", "4b", "2b", "1b", "2×", "4×", "8×"]
 
 // MARK: - LfoWave
 
-enum LfoWave: String, CaseIterable, Identifiable {
+enum LfoWave: String, CaseIterable, Identifiable, Codable {
     case sine, triangle, saw, square, log, exp
     case sweepUp = "sweep up"
     case sweepDn = "sweep dn"
@@ -67,7 +67,7 @@ enum LfoWave: String, CaseIterable, Identifiable {
 
 // MARK: - Parameter
 
-enum Parameter: String, CaseIterable, Identifiable {
+enum Parameter: String, CaseIterable, Identifiable, Codable {
     case volume, pan, mute, tempo
     case fx1 = "fx 1", fx2 = "fx 2", fx3 = "fx 3", fx4 = "fx 4"
     case lfo1 = "lfo 1", lfo2 = "lfo 2", lfo3 = "lfo 3", lfo4 = "lfo 4"
@@ -86,7 +86,7 @@ enum Parameter: String, CaseIterable, Identifiable {
 
 // MARK: - LfoClip
 
-struct LfoClip: Identifiable {
+struct LfoClip: Identifiable, Codable {
     let id = UUID()
     let track: Int           // 0 = master, 1-4 = per track
     let parameter: Parameter

@@ -363,7 +363,7 @@ private struct CompactPicker<T>: View
                         // Text fills full width (tap anywhere on the row) and is centered.
                         // Checkmark overlaid on trailing edge so it doesn't shift text off-center.
                         Text(opt.rawValue)
-                            .font(.system(size: fontSize, weight: .bold, design: .monospaced))
+                            .font(.system(size: fontSize, weight: .bold))
                             .foregroundColor(selection == opt ? .accentColor : C.text)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, isPad ? 14 : 10)
