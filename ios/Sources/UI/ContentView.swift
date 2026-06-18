@@ -152,7 +152,6 @@ struct HelpView: View {
             }
         }
         .presentationDetents([.large])
-        .presentationSizing(.page)
         .preferredColorScheme(.dark)
     }
 }
