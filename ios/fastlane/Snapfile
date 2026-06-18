@@ -2,7 +2,7 @@ scheme("op1-lfo-hero")
 project("op1-lfo-hero.xcodeproj")
 
 devices([
-  "iPhone 17 Pro Max",  # 6.9" — satisfies App Store requirement
+  "iPhone 13 Pro Max Screenshots",  # 6.7" — 1284×2778, accepted by App Store Connect
 ])
 
 languages(["en-US"])
