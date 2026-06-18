@@ -33,6 +33,17 @@ platform :ios do
     sh("open ./screenshots/screenshots.html")
   end
 
+  desc "Print commits since a beta build number: fastlane changelog since:7"
+  lane :changelog do |options|
+    since = options[:since] || UI.input("Since build number: ")
+    notes = changelog_from_git_commits(
+      between: ["beta/#{since}", "HEAD"],
+      merge_commit_filtering: "exclude_merges",
+      pretty: "- %s"
+    )
+    UI.message(notes)
+  end
+
   desc "Build and upload to TestFlight"
   lane :beta do
     match(type: "appstore", readonly: true)
@@ -60,6 +71,10 @@ platform :ios do
         #{commits}
       NOTES
     )
+    add_git_tag(
+      tag: "beta/#{get_build_number(xcodeproj: "op1-lfo-hero.xcodeproj")}"
+    )
+    push_git_tags
   end
 
   desc "Full release: build + upload metadata + screenshots + submit for review"

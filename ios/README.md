@@ -108,6 +108,39 @@ New UI buttons/screens should get an `.accessibilityIdentifier(...)` so they can
 
 ---
 
+## Release workflow (Fastlane)
+
+All lanes run from `ios/` with `bundle exec fastlane <lane>`. Credentials live in `ios/fastlane/.env` (gitignored).
+
+| Lane | What it does |
+|------|--------------|
+| `certs` | Syncs distribution cert + provisioning profile via `match` |
+| `screenshots` | Captures App Store screenshots on a 6.7" simulator, frames them |
+| `beta` | Increments build number, builds, uploads to TestFlight |
+| `release` | Increments build number, builds, uploads metadata + screenshots + binary, submits for review |
+
+### TestFlight changelog
+
+The `beta` lane sends a tester checklist followed by the git commits since the last tag:
+
+```
+o hai beta tester!
+-unless you have an op1, there's no audio
+-test all UI components - do they do what you expect? slide, change, ...
+-does it look good visually? is anything skewed or morphed? a non-round circle, etc
+-how fast does it open? should be ~3 seconds after clicking to respond like normal. try 2-3 times pls.
+-are the UI elements big enough?
+-is anything weird? does anything *not* do what you expect?
+
+- <commit subject>
+- <commit subject>
+...
+```
+
+Edit the checklist text in `fastlane/Fastfile` → `lane :beta`. Merge commits are excluded automatically.
+
+---
+
 ## Connecting to the OP-1
 
 ### USB (recommended)
