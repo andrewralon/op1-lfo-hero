@@ -39,6 +39,12 @@ struct LFOPanelView: View {
         }
     }
 
+    private func cycleNext<T: CaseIterable & Equatable>(_ value: T) -> T {
+        let all = Array(T.allCases)
+        guard let idx = all.firstIndex(of: value) else { return value }
+        return all[(idx + 1) % all.count]
+    }
+
     // (color, isInverted) per enabled track/master — each draws its own waveform
     private var waveTracks: [(Color, Bool)] {
         // Must mirror TrackToggleButton/MasterToggleButton's `disabled` conditions exactly —
@@ -82,12 +88,18 @@ struct LFOPanelView: View {
             HStack(spacing: isPad ? 48 : 30) {
                 Spacer()
                 HStack(spacing: isPad ? 10 : 6) {
-                    Image(systemName: "bolt.fill").font(.system(size: isPad ? 32 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                    Button { app.lfoParam = cycleNext(app.lfoParam) } label: {
+                        Image(systemName: "bolt.fill").font(.system(size: isPad ? 32 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                    }
+                    .buttonStyle(.plain)
                     CompactPicker(options: Array(Parameter.allCases),
                                   selection: $app.lfoParam)
                 }
                 HStack(spacing: isPad ? 10 : 6) {
-                    Image(systemName: "waveform.path").font(.system(size: isPad ? 32 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                    Button { app.lfoWave = cycleNext(app.lfoWave) } label: {
+                        Image(systemName: "waveform.path").font(.system(size: isPad ? 32 : 20)).foregroundColor(Color(hex: "#aaaaaa"))
+                    }
+                    .buttonStyle(.plain)
                     CompactPicker(options: Array(LfoWave.allCases),
                                   selection: $app.lfoWave)
                 }

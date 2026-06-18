@@ -41,6 +41,7 @@ final class BLEMidi: NSObject, ObservableObject {
     private var peripheral: CBPeripheral?
     private let queue = DispatchQueue(label: "ble.midi", qos: .userInteractive)
     private var scanTimeout: DispatchWorkItem?
+    private var connectTimeout: DispatchWorkItem?
 
     override init() {
         super.init()
@@ -69,10 +70,20 @@ final class BLEMidi: NSObject, ObservableObject {
 
     func connect(_ p: CBPeripheral) {
         scanTimeout?.cancel()
+        connectTimeout?.cancel()
         central.stopScan()
         peripheral = p
         DispatchQueue.main.async { self.state = .connecting(p.name ?? "device") }
         central.connect(p)
+        // CoreBluetooth connect() has no timeout — if the OP-1 goes away mid-handshake
+        // (e.g. BLE restarted on the device), cancel and rescan so we pick it up fresh.
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            if let p = self.peripheral { self.central.cancelPeripheralConnection(p) }
+            self.startScan()
+        }
+        connectTimeout = timeout
+        queue.asyncAfter(deadline: .now() + 5, execute: timeout)
     }
 
     func disconnect() {
@@ -156,6 +167,7 @@ extension BLEMidi: CBCentralManagerDelegate {
     }
 
     func centralManager(_ c: CBCentralManager, didConnect p: CBPeripheral) {
+        connectTimeout?.cancel()
         p.delegate = self
         p.discoverServices([bleMIDIServiceUUID])
         DispatchQueue.main.async { self.state = .connected(p.name ?? "device") }
