@@ -214,6 +214,84 @@ private struct BpmScrubber: View {
 //     }
 // }
 
+// MARK: - Transport column (landscape layouts: transport as 5th column beside the mixer)
+
+struct TransportColumnView: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 2×2 button grid — top half
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    TransColBtn(symbol: "play.fill",  active: app.isPlaying, disabled: !app.isClockMaster) { app.play() }
+                    Rectangle().fill(C.bg3).frame(width: 1)
+                    TransColBtn(symbol: "stop.fill",  active: false) { app.stop() }
+                }
+                .frame(maxHeight: .infinity)
+                Rectangle().fill(C.bg3).frame(height: 1)
+                HStack(spacing: 0) {
+                    TransColBtn(symbol: "arrow.left",  active: false) { app.tapePrev() }
+                    Rectangle().fill(C.bg3).frame(width: 1)
+                    TransColBtn(symbol: "arrow.right", active: false) { app.tapeNext() }
+                }
+                .frame(maxHeight: .infinity)
+            }
+            .frame(maxHeight: .infinity)
+
+            Rectangle().fill(C.bg3).frame(height: 1)
+
+            // Clock toggle + BPM — bottom half
+            VStack(spacing: 4) {
+                Button {
+                    if app.isClockMaster { app.disableClock() } else { app.enableClock() }
+                } label: {
+                    VStack(spacing: -2) {
+                        Image(systemName: "metronome")
+                            .font(.system(size: isPad ? 30 : 22, weight: .regular))
+                            .scaleEffect(x: 0.50, y: 1.05, anchor: .center)
+                        Text(app.isClockMaster ? "app" : "op1")
+                            .font(.system(size: isPad ? 14 : 11, weight: .semibold, design: .monospaced))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .foregroundColor(app.isClockMaster ? C.green : C.track(1))
+                }
+                .buttonStyle(.plain)
+
+                BpmScrubber()
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 6)
+            }
+            .frame(maxHeight: .infinity)
+            .padding(.vertical, 6)
+        }
+        .background(C.bg2)
+    }
+}
+
+private struct TransColBtn: View {
+    let symbol: String
+    let active: Bool
+    var disabled: Bool = false
+    let action: () -> Void
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: isPad ? 20 : 16, weight: .regular))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(active && !disabled ? C.green.opacity(0.18) : Color.clear)
+                .foregroundColor(disabled ? C.dim : active ? C.green : C.text)
+        }
+        .buttonStyle(ImmediateButtonStyle())
+        .disabled(disabled)
+    }
+}
+
 private struct TransBtn: View {
     let symbol: String
     var weight: Font.Weight = .regular

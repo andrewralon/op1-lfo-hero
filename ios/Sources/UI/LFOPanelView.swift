@@ -3,10 +3,12 @@ import SwiftUI
 private let ctrlFontSizePhone: CGFloat = 15  // base size for iPhone; views compute isPad variant themselves
 
 struct LFOPanelView: View {
+    var needsCombinedLfoRow: Bool = false  // true for iPad (both) + all landscape
+    var needsSideBySide: Bool = false      // true for iPad (both) + all landscape
+
     @EnvironmentObject var app: AppState
     @Environment(\.horizontalSizeClass) private var hSize
     @State private var selectedLfoID: UUID? = nil
-    @State private var showDevicePicker = false
     @State private var showDeleteConfirm = false
     @State private var showHelp = false
     @State private var showSettings = false
@@ -64,6 +66,154 @@ struct LFOPanelView: View {
         return result.isEmpty ? [(C.green, false)] : result
     }
 
+    // MARK: - Extracted sub-views (shared between portrait and landscape branches)
+
+    @ViewBuilder private var paramRow: some View {
+        HStack(spacing: isPad ? 15 : 9) {
+            Button { app.lfoParam = cycleNext(app.lfoParam) } label: {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: isPad ? 38 : 24))
+                    .foregroundColor(Color(hex: "#aaaaaa"))
+            }
+            .buttonStyle(.plain)
+            CompactPicker(options: Array(Parameter.allCases), selection: $app.lfoParam)
+        }
+    }
+
+    @ViewBuilder private var waveRow: some View {
+        HStack(spacing: isPad ? 15 : 9) {
+            Button { app.lfoWave = cycleNext(app.lfoWave) } label: {
+                Image(systemName: "waveform.path")
+                    .font(.system(size: isPad ? 38 : 24))
+                    .foregroundColor(Color(hex: "#aaaaaa"))
+            }
+            .buttonStyle(.plain)
+            CompactPicker(options: Array(LfoWave.allCases), selection: $app.lfoWave)
+        }
+    }
+
+    @ViewBuilder private var rateBox: some View {
+        HStack(spacing: isPad ? 15 : 9) {
+            Image(systemName: "timer")
+                .font(.system(size: isPad ? 32 : 24))
+                .foregroundColor(Color(hex: "#aaaaaa"))
+            ScrubValue(value: Binding(
+                get: { Double(app.lfoRate) },
+                set: { app.lfoRate = max(1, min(8, Int($0.rounded()))) }
+            ), range: 1...8, sensitivity: 0.04)
+            .frame(width: isPad ? 64 : 40)
+        }
+    }
+
+    @ViewBuilder private var depthBox: some View {
+        HStack(spacing: isPad ? 15 : 9) {
+            Image(systemName: "arrow.up.and.down")
+                .font(.system(size: isPad ? 32 : 24))
+                .foregroundColor(Color(hex: "#aaaaaa"))
+            ScrubValue(value: $app.lfoDepth, range: 0...99)
+                .frame(width: isPad ? 92 : 58)
+        }
+    }
+
+    @ViewBuilder private var centerBox: some View {
+        HStack(spacing: isPad ? 15 : 9) {
+            Image(systemName: "arrow.up.and.down.circle")
+                .font(.system(size: isPad ? 32 : 24))
+                .foregroundColor(Color(hex: "#aaaaaa"))
+            ScrubValue(value: $app.lfoCenter,
+                       range: app.lfoParam == .tempo ? 20...300 : 0...99,
+                       decimals: app.lfoParam == .tempo ? 1 : 0)
+                .frame(width: isPad ? 116 : 74)
+            Button { snapCenter() } label: {
+                Image(systemName: "scope")
+                    .font(.system(size: isPad ? 20 : 13))
+                    .foregroundColor(Color(hex: "#aaaaaa"))
+                    .frame(width: isPad ? 44 : 28, height: isPad ? 56 : 36)
+                    .background(C.bg3)
+                    .cornerRadius(3)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder private var repeatBtn: some View {
+        Button { app.lfoStart(loop: true) } label: {
+            Image(systemName: "repeat").font(.system(size: 16))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(C.green.opacity(0.25))
+                .foregroundColor(C.green)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder private var oneShotBtn: some View {
+        Button { app.lfoStart(loop: false) } label: {
+            Image(systemName: "arrow.forward.to.line").font(.system(size: 16))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(C.bg3)
+                .foregroundColor(C.text)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder private var trashBtn: some View {
+        Button {
+            if app.activeLfos.isEmpty { return }
+            showDeleteConfirm = true
+        } label: {
+            Image(systemName: "trash").font(.system(size: 16))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(C.red.opacity(0.18))
+                .foregroundColor(C.red)
+        }
+        .buttonStyle(.plain)
+        .confirmationDialog("delete all active LFOs?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("delete all", role: .destructive) {
+                app.stopAllLfos(); selectedLfoID = nil
+            }
+        }
+    }
+
+    @ViewBuilder private var lfoListScroll: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(app.activeLfos) { lfo in
+                    ActiveLfoChip(lfo: lfo, selected: selectedLfoID == lfo.id) {
+                        selectedLfoID = selectedLfoID == lfo.id ? nil : lfo.id
+                    } onStop: {
+                        if selectedLfoID == lfo.id { selectedLfoID = nil }
+                        app.stopLfo(lfo)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 5)
+            .padding(.leading, 5)
+        }
+    }
+
+    @ViewBuilder private var helpBtn: some View {
+        Button { showHelp = true } label: {
+            Image(systemName: "questionmark.circle").font(.system(size: 16))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(C.bg3)
+                .foregroundColor(C.text)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("helpButton")
+    }
+
+    @ViewBuilder private var settingsBtn: some View {
+        Button { showSettings = true } label: {
+            Image(systemName: "gearshape").font(.system(size: 16))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(C.bg3)
+                .foregroundColor(C.text)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("settingsButton")
+    }
+
     var body: some View {
         VStack(spacing: 0) {
 
@@ -87,217 +237,131 @@ struct LFOPanelView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, isPad ? 10 : 4)
 
-            // ── 2. Param + wave dropdowns — fitted width, centered ────────────
-            HStack(spacing: isPad ? 48 : 30) {
-                Spacer()
-                HStack(spacing: isPad ? 15 : 9) {
-                    Button { app.lfoParam = cycleNext(app.lfoParam) } label: {
-                        Image(systemName: "bolt.fill").font(.system(size: isPad ? 38 : 24)).foregroundColor(Color(hex: "#aaaaaa"))
-                    }
-                    .buttonStyle(.plain)
-                    CompactPicker(options: Array(Parameter.allCases),
-                                  selection: $app.lfoParam)
+            // ── 2+3. Param + wave + rate/depth/center controls ────────────────
+            if needsCombinedLfoRow {
+                // All controls in one row (iPad + all landscape)
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    paramRow
+                    Spacer(minLength: isPad ? 20 : 12)
+                    waveRow
+                    Spacer(minLength: isPad ? 24 : 16)
+                    rateBox
+                    Spacer(minLength: isPad ? 16 : 10)
+                    depthBox
+                    Spacer(minLength: isPad ? 16 : 10)
+                    centerBox
+                    Spacer(minLength: 0)
                 }
-                HStack(spacing: isPad ? 15 : 9) {
-                    Button { app.lfoWave = cycleNext(app.lfoWave) } label: {
-                        Image(systemName: "waveform.path").font(.system(size: isPad ? 38 : 24)).foregroundColor(Color(hex: "#aaaaaa"))
-                    }
-                    .buttonStyle(.plain)
-                    CompactPicker(options: Array(LfoWave.allCases),
-                                  selection: $app.lfoWave)
+                .padding(.vertical, isPad ? 10 : 6)
+            } else {
+                // Original two-row layout (iPhone portrait only)
+                HStack(spacing: isPad ? 48 : 30) {
+                    Spacer()
+                    paramRow
+                    waveRow
+                    Spacer()
                 }
-                Spacer()
+                .padding(.vertical, isPad ? 10 : 4)
+
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    rateBox
+                    Spacer(minLength: isPad ? 36 : 20)
+                    depthBox
+                    Spacer(minLength: isPad ? 36 : 20)
+                    centerBox
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, isPad ? 10 : 4)
             }
-            .padding(.vertical, isPad ? 10 : 4)
 
-            // ── 3. Rate / depth / center — centered as a group ────────────────
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
+            // ── 4+5. Waveform + action buttons + LFO list ─────────────────────
+            if needsSideBySide {
+                // Waveform fills available height; right column has buttons + list
+                HStack(spacing: 0) {
+                    MultiWaveformView(
+                        lfos: previewLfos,
+                        wave: app.lfoWave,
+                        rateTicks: RATE_TICKS[app.lfoRate] ?? (4 * PPQN),
+                        depth: app.lfoDepth,
+                        tracks: waveTracks
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(C.bg2)
+                    .cornerRadius(3)
+                    .padding(8)
 
-                // Rate scrubber (1–8, horizontal drag matches depth/center)
-                HStack(spacing: isPad ? 15 : 9) {
-                    Image(systemName: "timer")
-                        .font(.system(size: isPad ? 32 : 24))
-                        .foregroundColor(Color(hex: "#aaaaaa"))
+                    Rectangle().fill(C.bg3).frame(width: 1)
 
-                    ScrubValue(value: Binding(
-                        get: { Double(app.lfoRate) },
-                        set: { app.lfoRate = max(1, min(8, Int($0.rounded()))) }
-                    ), range: 1...8, sensitivity: 0.04)
-                    .frame(width: isPad ? 64 : 40)
-                }
-
-                Spacer(minLength: isPad ? 36 : 20)
-
-                // Depth
-                HStack(spacing: isPad ? 15 : 9) {
-                    Image(systemName: "arrow.up.and.down")
-                        .font(.system(size: isPad ? 32 : 24))
-                        .foregroundColor(Color(hex: "#aaaaaa"))
-
-                    ScrubValue(value: $app.lfoDepth, range: 0...99)
-                        .frame(width: isPad ? 92 : 58)
-                }
-
-                Spacer(minLength: isPad ? 36 : 20)
-
-                // Center
-                HStack(spacing: isPad ? 15 : 9) {
-                    Image(systemName: "arrow.up.and.down.circle")
-                        .font(.system(size: isPad ? 32 : 24))
-                        .foregroundColor(Color(hex: "#aaaaaa"))
-
-                    ScrubValue(value: $app.lfoCenter,
-                               range: app.lfoParam == .tempo ? 20...300 : 0...99,
-                               decimals: app.lfoParam == .tempo ? 1 : 0)
-                        .frame(width: isPad ? 116 : 74)
-
-                    Button { snapCenter() } label: {
-                        Image(systemName: "scope")
-                            .font(.system(size: isPad ? 20 : 13))
-                            .foregroundColor(Color(hex: "#aaaaaa"))
-                            .frame(width: isPad ? 44 : 28, height: isPad ? 56 : 36)
-                            .background(C.bg3)
-                            .cornerRadius(3)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, isPad ? 10 : 4)
-
-            // ── 4. Waveform preview — full width, scales up on iPad ──────────
-            MultiWaveformView(
-                lfos: previewLfos,
-                wave: app.lfoWave,
-                rateTicks: RATE_TICKS[app.lfoRate] ?? (4 * PPQN),
-                depth: app.lfoDepth,
-                tracks: waveTracks
-            )
-            .frame(height: isPad ? 140 : 90)
-            .frame(maxWidth: .infinity)
-            .padding(8)
-
-            // ── 5. Start buttons + Active LFOs + help/settings (fills remaining space) ──
-            HStack(spacing: 0) {
-                // Left: three action buttons stacked vertically
-                VStack(spacing: 0) {
-                    Button { app.lfoStart(loop: true) } label: {
-                        Image(systemName: "repeat").font(.system(size: 16))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(C.green.opacity(0.25))
-                            .foregroundColor(C.green)
-                    }
-                    .buttonStyle(.plain)
-
-                    Rectangle().fill(C.bg3).frame(height: 1)
-
-                    Button { app.lfoStart(loop: false) } label: {
-                        Image(systemName: "arrow.forward.to.line").font(.system(size: 16))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(C.bg3)
-                            .foregroundColor(C.text)
-                    }
-                    .buttonStyle(.plain)
-
-                    Rectangle().fill(C.bg3).frame(height: 1)
-
-                    Button {
-                        if app.activeLfos.isEmpty { return }
-                        showDeleteConfirm = true
-                    } label: {
-                        Image(systemName: "trash").font(.system(size: 16))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(C.red.opacity(0.18))
-                            .foregroundColor(C.red)
-                    }
-                    .buttonStyle(.plain)
-                    .confirmationDialog("delete all active LFOs?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-                        Button("delete all", role: .destructive) {
-                            app.stopAllLfos(); selectedLfoID = nil
+                    VStack(spacing: 0) {
+                        HStack(spacing: 0) {
+                            repeatBtn
+                            Rectangle().fill(C.bg3).frame(width: 1)
+                            oneShotBtn
+                            Rectangle().fill(C.bg3).frame(width: 1)
+                            trashBtn
                         }
-                    }
-                }
-                .frame(width: 76)
+                        .frame(height: 52)
 
-                Rectangle().fill(C.bg3).frame(width: 1)
+                        Rectangle().fill(C.bg3).frame(height: 1)
 
-                // Middle: active LFO chips — scrollable, fills remaining width
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(app.activeLfos) { lfo in
-                            ActiveLfoChip(lfo: lfo, selected: selectedLfoID == lfo.id) {
-                                selectedLfoID = selectedLfoID == lfo.id ? nil : lfo.id
-                            } onStop: {
-                                if selectedLfoID == lfo.id { selectedLfoID = nil }
-                                app.stopLfo(lfo)
-                            }
+                        lfoListScroll
+                            .frame(maxHeight: .infinity)
+
+                        Rectangle().fill(C.bg3).frame(height: 1)
+
+                        HStack(spacing: 0) {
+                            helpBtn
+                            Rectangle().fill(C.bg3).frame(width: 1)
+                            settingsBtn
                         }
+                        .frame(height: 44)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 5)
-                    .padding(.leading, 5)
+                    .frame(width: 220)
+                }
+                .frame(maxHeight: .infinity)
+            } else {
+                // Original: fixed-height waveform, then action+LFOs fills remaining space
+                MultiWaveformView(
+                    lfos: previewLfos,
+                    wave: app.lfoWave,
+                    rateTicks: RATE_TICKS[app.lfoRate] ?? (4 * PPQN),
+                    depth: app.lfoDepth,
+                    tracks: waveTracks
+                )
+                .frame(height: isPad ? 140 : 90)
+                .frame(maxWidth: .infinity)
+                .padding(8)
+
+                HStack(spacing: 0) {
+                    VStack(spacing: 0) {
+                        repeatBtn
+                        Rectangle().fill(C.bg3).frame(height: 1)
+                        oneShotBtn
+                        Rectangle().fill(C.bg3).frame(height: 1)
+                        trashBtn
+                    }
+                    .frame(width: 76)
+
+                    Rectangle().fill(C.bg3).frame(width: 1)
+
+                    lfoListScroll
+
+                    Rectangle().fill(C.bg3).frame(width: 1)
+
+                    VStack(spacing: 0) {
+                        helpBtn
+                        Rectangle().fill(C.bg3).frame(height: 1)
+                        settingsBtn
+                    }
+                    .frame(width: 44)
                 }
                 .frame(maxWidth: .infinity)
-
-                Rectangle().fill(C.bg3).frame(width: 1)
-
-                // Right: skinny help / settings icon column
-                VStack(spacing: 0) {
-                    Button { showHelp = true } label: {
-                        Image(systemName: "questionmark.circle").font(.system(size: 16))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(C.bg3)
-                            .foregroundColor(C.text)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("helpButton")
-
-                    Rectangle().fill(C.bg3).frame(height: 1)
-
-                    Button { showSettings = true } label: {
-                        Image(systemName: "gearshape").font(.system(size: 16))
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(C.bg3)
-                            .foregroundColor(C.text)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("settingsButton")
-                }
-                .frame(width: 44)
+                .frame(maxHeight: .infinity)
             }
-            .frame(maxWidth: .infinity)
-            .frame(maxHeight: .infinity)
 
             Rectangle().fill(C.bg3).frame(height: 1)
-
-            // ── 6. Status bar — at the bottom (matches Python layout) ─────────
-            HStack(spacing: 6) {
-                Button { showDevicePicker = true } label: {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(app.isConnected ? C.green : C.yellow)
-                            .frame(width: 7, height: 7)
-                        Text(app.connectionLabel)
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                    }
-                }
-                .buttonStyle(.plain)
-                Spacer()
-                HStack(spacing: 0) {
-                    Text("tempo: ")
-                        .foregroundColor(.white)
-                    Text(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")
-                        .foregroundColor(app.isClockMaster ? C.green : C.track(1))
-                }
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 2)
-            .background(C.bg2)
         }
         .background(C.bg)
         .onChange(of: app.lfoParam)  { _, _ in app.updatePreviewIfActive() }
@@ -305,7 +369,6 @@ struct LFOPanelView: View {
         .onChange(of: app.lfoRate)   { _, _ in app.updatePreviewIfActive() }
         .onChange(of: app.lfoDepth)  { _, _ in app.updatePreviewIfActive() }
         .onChange(of: app.lfoCenter) { _, _ in app.updatePreviewIfActive() }
-        .sheet(isPresented: $showDevicePicker) { DevicePickerView() }
         .sheet(isPresented: Binding(
             get: { hSize != .regular && showHelp },
             set: { if !$0 { showHelp = false } }

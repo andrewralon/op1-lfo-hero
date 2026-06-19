@@ -58,4 +58,28 @@ final class HelpSettingsUITests: XCTestCase {
         app.buttons["done"].tap()
         XCTAssertFalse(app.navigationBars["settings"].waitForExistence(timeout: 2))
     }
+
+    func testLandscapeLayout() throws {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launch()
+        let helpButton = app.buttons["helpButton"]
+        XCTAssertTrue(helpButton.waitForExistence(timeout: 8))
+        sleep(1)
+        let screenshot = XCUIScreen.main.screenshot()
+        let device = ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] ?? "device"
+        try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/landscape_\(device).png"))
+    }
+
+    func testPortraitLayout() throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launch()
+        let helpButton = app.buttons["helpButton"]
+        XCTAssertTrue(helpButton.waitForExistence(timeout: 8))
+        sleep(1)
+        let screenshot = XCUIScreen.main.screenshot()
+        let device = ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] ?? "device"
+        try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/portrait_\(device).png"))
+    }
 }

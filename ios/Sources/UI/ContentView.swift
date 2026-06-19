@@ -2,25 +2,49 @@ import CoreBluetooth
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.horizontalSizeClass) private var hSize
+
     var body: some View {
         GeometryReader { geo in
-            // Match iPhone proportions on every screen size:
-            //   tracksH   ≈ 37% of usable height (280pt on iPhone, ~412pt on iPad 11")
-            //   transportH ≈ 7.6% of usable height (58pt on iPhone, ~85pt on iPad 11")
-            let tracksH    = min(max(280, geo.size.height * 0.37), 500)
-            let transportH = min(max(58,  geo.size.height * 0.076), 90)
+            let isLandscape          = geo.size.width > geo.size.height
+            let isIpad               = hSize == .regular
+            let needsCombinedLfoRow  = isIpad || isLandscape
+            let needsSideBySide      = isIpad || isLandscape
+            let transportColW: CGFloat = isIpad ? 150 : 120
+
+            // Track section height — shorter in landscape to reclaim vertical space
+            let tracksH: CGFloat = isLandscape && !isIpad
+                ? min(max(160, geo.size.height * 0.40), 200)   // iPhone landscape: short faders
+                : min(max(280, geo.size.height * 0.37), 500)   // portrait + iPad landscape
+
+            let transportH = min(max(58, geo.size.height * 0.076), 90)
+
             VStack(spacing: 0) {
-                TracksView()
+                if isLandscape {
+                    // Landscape: transport as 5th column beside the mixer
+                    HStack(spacing: 0) {
+                        TracksView()
+                            .frame(maxWidth: isIpad ? 820 : .infinity)
+                        if isIpad { Spacer(minLength: 0) }
+                        Rectangle().fill(C.bg3).frame(width: 1)
+                        TransportColumnView()
+                            .frame(width: transportColW)
+                    }
                     .frame(height: tracksH)
-                    .padding(.bottom, 5)
+                } else {
+                    // Portrait: original stacked layout
+                    TracksView()
+                        .frame(height: tracksH)
+                        .padding(.bottom, 5)
+                    Rectangle().fill(C.bg3).frame(height: 1)
+                    TransportBarView()
+                        .frame(height: transportH)
+                }
 
-                Rectangle().fill(C.bg3).frame(height: 1)
-
-                TransportBarView()
-                    .frame(height: transportH)
-
-                LFOPanelView()
+                LFOPanelView(needsCombinedLfoRow: needsCombinedLfoRow, needsSideBySide: needsSideBySide)
                     .frame(maxHeight: .infinity)
+
+                StatusBarView()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(C.bg)
@@ -29,7 +53,43 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Device picker sheet (used by LFOPanelView)
+// MARK: - Status bar (connection + tempo mode) — always at the root level so it can't be clipped
+
+struct StatusBarView: View {
+    @EnvironmentObject var app: AppState
+    @State private var showDevicePicker = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button { showDevicePicker = true } label: {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(app.isConnected ? C.green : C.yellow)
+                        .frame(width: 7, height: 7)
+                    Text(app.connectionLabel)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+            }
+            .buttonStyle(.plain)
+            Spacer()
+            HStack(spacing: 0) {
+                Text("tempo: ")
+                    .foregroundColor(.white)
+                Text(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")
+                    .foregroundColor(app.isClockMaster ? C.green : C.track(1))
+            }
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 2)
+        .background(C.bg2)
+        .sheet(isPresented: $showDevicePicker) { DevicePickerView() }
+    }
+}
+
+// MARK: - Device picker sheet (used by StatusBarView)
 
 struct DevicePickerView: View {
     @EnvironmentObject var app: AppState
