@@ -80,6 +80,9 @@ struct LFOPanelView: View {
                                    disabled: !app.lfoParam.isMasterCapable) {
                     app.cycleMaster()
                 }
+                PreviewToggleButton(active: app.isPreview) {
+                    app.togglePreview()
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, isPad ? 10 : 4)
@@ -297,6 +300,11 @@ struct LFOPanelView: View {
             .background(C.bg2)
         }
         .background(C.bg)
+        .onChange(of: app.lfoParam)  { _, _ in app.updatePreviewIfActive() }
+        .onChange(of: app.lfoWave)   { _, _ in app.updatePreviewIfActive() }
+        .onChange(of: app.lfoRate)   { _, _ in app.updatePreviewIfActive() }
+        .onChange(of: app.lfoDepth)  { _, _ in app.updatePreviewIfActive() }
+        .onChange(of: app.lfoCenter) { _, _ in app.updatePreviewIfActive() }
         .sheet(isPresented: $showDevicePicker) { DevicePickerView() }
         .sheet(isPresented: Binding(
             get: { hSize != .regular && showHelp },
@@ -551,5 +559,27 @@ private struct MasterToggleButton: View {
         }
         .buttonStyle(ImmediateButtonStyle())
         .disabled(disabled)
+    }
+}
+
+// MARK: - Preview toggle button
+// "p" — light purple; active = solid fill, inactive = tinted outline
+
+private struct PreviewToggleButton: View {
+    let active: Bool
+    let action: () -> Void
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
+
+    var body: some View {
+        Button(action: action) {
+            Text("p")
+                .font(.system(size: isPad ? 28 : C.trackLabelSize, weight: .bold, design: .monospaced))
+                .frame(width: isPad ? 70 : 46, height: isPad ? 70 : 46)
+                .background(C.purple.opacity(active ? 1.0 : 0.2))
+                .foregroundColor(active ? .black : C.purple)
+                .cornerRadius(7)
+        }
+        .buttonStyle(ImmediateButtonStyle())
     }
 }

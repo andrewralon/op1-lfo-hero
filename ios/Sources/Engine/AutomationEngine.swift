@@ -17,6 +17,13 @@ final class AutomationEngine {
     private var randomPhase:  [UUID: Double] = [:]
     private var randomValue:  [UUID: Double] = [:]
 
+    // Preview LFOs — run continuously, never appear in activeLfos
+    private var previewLfos:      [LfoClip] = []
+    private var previewStartTicks: [UUID: Int]    = [:]
+    private var previewLastSent:   [UUID: Double] = [:]
+    private var previewRandPhase:  [UUID: Double] = [:]
+    private var previewRandValue:  [UUID: Double] = [:]
+
     func add(_ lfo: LfoClip) {
         lock.lock(); lfos.append(lfo); lock.unlock()
     }
@@ -36,6 +43,25 @@ final class AutomationEngine {
         lfos.removeAll()
         startTicks.removeAll(); lastSent.removeAll()
         randomPhase.removeAll(); randomValue.removeAll()
+        lock.unlock()
+    }
+
+    func setPreview(_ clips: [LfoClip]) {
+        lock.lock()
+        previewLfos = clips
+        let ids = Set(clips.map { $0.id })
+        previewStartTicks = previewStartTicks.filter { ids.contains($0.key) }
+        previewLastSent   = previewLastSent.filter   { ids.contains($0.key) }
+        previewRandPhase  = previewRandPhase.filter  { ids.contains($0.key) }
+        previewRandValue  = previewRandValue.filter  { ids.contains($0.key) }
+        lock.unlock()
+    }
+
+    func clearPreview() {
+        lock.lock()
+        previewLfos.removeAll()
+        previewStartTicks.removeAll(); previewLastSent.removeAll()
+        previewRandPhase.removeAll();  previewRandValue.removeAll()
         lock.unlock()
     }
 
@@ -89,9 +115,58 @@ final class AutomationEngine {
             remove(lfo)
             finishedCallback?(lfo)
         }
+
+        // Preview LFOs — continuous, never finish or appear in activeLfos
+        lock.lock()
+        let currentPreview = previewLfos
+        for lfo in currentPreview where previewStartTicks[lfo.id] == nil {
+            previewStartTicks[lfo.id] = tickCount
+        }
+        lock.unlock()
+
+        for lfo in currentPreview {
+            lock.lock()
+            let pStart = previewStartTicks[lfo.id] ?? tickCount
+            lock.unlock()
+
+            let pPhase = Double((tickCount - pStart) % (8 * PPQN)) / Double(lfo.rateTicks)
+            let pValue = evaluatePreview(lfo, phase: pPhase)
+
+            lock.lock()
+            let pPrev = previewLastSent[lfo.id]
+            guard pPrev != pValue else { lock.unlock(); continue }
+            previewLastSent[lfo.id] = pValue
+            lock.unlock()
+
+            dispatch(lfo: lfo, value: pValue)
+        }
     }
 
     // MARK: - Private
+
+    private func evaluatePreview(_ lfo: LfoClip, phase: Double) -> Double {
+        var y: Double
+        if lfo.wave == .random {
+            let p = phase.truncatingRemainder(dividingBy: 1.0)
+            lock.lock()
+            let prev = previewRandPhase[lfo.id] ?? -1
+            if prev < 0 || p < prev {
+                let step = Int(p * 8) % 8
+                let h = UInt32(bitPattern: Int32(bitPattern: UInt32(step + 1) &* 2654435761))
+                previewRandValue[lfo.id] = Double(h) / Double(UInt32.max) * 2.0 - 1.0
+            }
+            previewRandPhase[lfo.id] = p
+            y = previewRandValue[lfo.id] ?? 0
+            lock.unlock()
+        } else {
+            y = lfo.wave.value(at: phase)
+        }
+        if lfo.inverted { y = -y }
+        if lfo.parameter == .tempo {
+            return max(20, min(300, lfo.centerValue + y * lfo.depth))
+        }
+        return max(0, min(127, (lfo.centerValue + y * lfo.depth).rounded()))
+    }
 
     private func evaluate(_ lfo: LfoClip, phase: Double) -> Double {
         var y: Double

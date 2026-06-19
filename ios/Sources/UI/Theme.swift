@@ -9,6 +9,7 @@ enum C {
     static let white   = Color(hex: "#FFFFFF")
     static let dim     = Color(hex: "#666666")
     static let green   = Color(hex: "#4ec94e")
+    static let purple  = Color(hex: "#aa66cc")
     static let red     = Color(hex: "#c04040")
     static let orange  = Color(hex: "#e09030")
     static let yellow  = Color(hex: "#FFE500")

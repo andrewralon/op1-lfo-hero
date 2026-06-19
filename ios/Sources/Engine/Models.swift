@@ -87,7 +87,7 @@ enum Parameter: String, CaseIterable, Identifiable, Codable {
 // MARK: - LfoClip
 
 struct LfoClip: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     let track: Int           // 0 = master, 1-4 = per track
     let parameter: Parameter
     let wave: LfoWave

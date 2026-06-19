@@ -49,6 +49,7 @@ final class AppState: ObservableObject {
     @Published var trackOn   = [1: 1, 2: 0, 3: 0, 4: 0]  // 0=off 1=on 2=inv
     @Published var masterOn  = 0                            // 0=off 1=on 2=inv
     @Published var activeLfos: [LfoClip] = []
+    @Published var isPreview  = false
 
     // Displayed lfo range (derived)
     var lfoRange: String {
@@ -320,12 +321,49 @@ final class AppState: ObservableObject {
         activeLfos.removeAll()
     }
 
+    // MARK: - Preview
+
+    func togglePreview() {
+        isPreview.toggle()
+        if isPreview {
+            automation.setPreview(buildPreviewClips())
+        } else {
+            automation.clearPreview()
+        }
+    }
+
+    func updatePreviewIfActive() {
+        guard isPreview else { return }
+        automation.setPreview(buildPreviewClips())
+    }
+
+    private func buildPreviewClips() -> [LfoClip] {
+        let rt = RATE_TICKS[lfoRate] ?? (4 * PPQN)
+        let isTempo = lfoParam == .tempo
+        let depthMidi  = isTempo ? lfoDepth  : Double(uiToMidi(lfoDepth))
+        let centerMidi = isTempo ? lfoCenter : Double(uiToMidi(lfoCenter))
+        var clips: [LfoClip] = []
+        if lfoParam.isMasterCapable && masterOn != 0 {
+            clips.append(LfoClip(track: 0, parameter: lfoParam, wave: lfoWave,
+                                 rateTicks: rt, depth: depthMidi, centerValue: centerMidi,
+                                 inverted: masterOn == 2, loop: true))
+        } else {
+            for (t, state) in trackOn.sorted(by: { $0.key < $1.key }) where state != 0 {
+                clips.append(LfoClip(track: t, parameter: lfoParam, wave: lfoWave,
+                                     rateTicks: rt, depth: depthMidi, centerValue: centerMidi,
+                                     inverted: state == 2, loop: true))
+            }
+        }
+        return clips
+    }
+
     // MARK: - Track button cycle (0→1→2→0)
 
     func cycleTrack(_ t: Int) {
         let cur = trackOn[t] ?? 0
         if lfoParam.isMasterOnly || masterOn > 0 { return }
         trackOn[t] = (cur + 1) % 3
+        updatePreviewIfActive()
     }
 
     func cycleMaster() {
@@ -336,5 +374,6 @@ final class AppState: ObservableObject {
         } else {
             masterOn = (masterOn + 1) % 3
         }
+        updatePreviewIfActive()
     }
 }
