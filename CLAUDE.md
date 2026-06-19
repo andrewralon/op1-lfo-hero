@@ -50,6 +50,42 @@ python -m src.app
 - **All UI text is lowercase** — labels, button text, status messages (e.g. "scanning…", "no device found", "tempo mode:", window title "op1 lfo hero"). Match this in any new strings.
 - Green (`#4ec94e`-ish) marks active/centered/selected state (e.g. pan knob indicator is green at dead-center, white/text-colored off-center).
 
+## iOS UI scaling (`LayoutMetrics`)
+
+All iOS dimensions are derived from a single `LayoutMetrics` struct defined at the top of `ContentView.swift`. **Never hardcode a point value in a leaf view.** Always add a property to `LayoutMetrics` and read it via `@Environment(\.metrics)`.
+
+### Two-tier model
+
+**Tier 1 — structural:** how the screen is divided into zones. Derived directly from `geo.size`.
+- `tracksH` — height of the mixer row
+- `transportColW` — width of the transport column (landscape only)
+- `trackColW` — width of one track strip (`mixerWidth / 4`)
+- `lfoH` — height of the LFO panel (remainder after tracks + transport + status bar)
+
+**Tier 2 — content:** how elements fill their zone. Derived from Tier 1, never from `geo.size`.
+- Track strip: `muteLabelFont`, `panKnobPortrait`, `panKnobLandscape`, `panHPad`, …
+- LFO panel: `toggleBtnSize`, `scrubH`, `iconSize`, `pickerFont`, `waveformH`, …
+
+### How to tune a value
+
+Change one fraction in `LayoutMetrics` — it updates every device size at once. Common adjustments:
+
+| Feels wrong | Property to change | Direction |
+|---|---|---|
+| Mute button text too small/big | `muteLabelFont` | adjust `0.09` multiplier |
+| Pan knob too small in portrait | `panKnobPortrait` | adjust `0.30` (tracksH fraction) |
+| Track/master toggle buttons too small | `toggleBtnSize` | adjust `0.11` (lfoH fraction) |
+| Icons in control row too small | `iconSize` | adjust `0.06` |
+| ScrubValue / picker boxes too short | `scrubH` | adjust `0.08` |
+| Waveform too short in portrait | `waveformH` | adjust `0.18` |
+| Action column (repeat/1x/trash) too narrow | `actionColW` | adjust `1.4` (toggleBtnSize multiplier) |
+
+### Rules
+
+- The only allowed hardcoded point value is `max(..., 44)` to enforce Apple's minimum touch target. Everything else is a fraction.
+- `isLandscape` and `isIpad` are the only boolean branches permitted — use them to choose which Tier 1 formula applies, not to pick between two pixel values.
+- New views: add needed Tier 2 properties to `LayoutMetrics`, then read `@Environment(\.metrics) private var m` in the view. Do not reach for `@Environment(\.horizontalSizeClass)` or `isPad ? x : y`.
+
 ## Notes workflow (`notes/`)
 
 - `FEATURES.md` — iOS backlog: `## To fix` / `## Later (or not possible)` / `## Done`, each item prefixed with a severity (`HIGH`/`MED`/`LOW`)

@@ -31,7 +31,40 @@ struct LayoutMetrics {
         return mixerW / 4
     }
 
-    // ── Tier 2: track strip content — derived from Tier 1, never from screen ─
+    // ── Tier 2: LFO panel content ───────────────────────────────────────
+
+    /// Total height available to LFOPanelView (below tracks+transport, above status bar).
+    var lfoH: CGFloat {
+        let h = screen.height - tracksH - (isLandscape ? 0 : transportBarH) - 22
+        return max(h, 100)
+    }
+
+    var toggleBtnSize: CGFloat    { max(lfoH * 0.11, 44) }
+    var toggleBtnFont: CGFloat    { toggleBtnSize * 0.38 }
+    var toggleBtnSpacing: CGFloat { max(lfoH * 0.012, 6) }
+    var toggleBtnVPad: CGFloat    { max(lfoH * 0.025, 5) }
+
+    /// Height of a ScrubValue / CompactPicker box.
+    var scrubH: CGFloat           { max(lfoH * 0.08, 36) }
+    var rateW: CGFloat            { scrubH * 1.1 }
+    var depthW: CGFloat           { scrubH * 1.6 }
+    var centerW: CGFloat          { scrubH * 2.0 }
+    var scopeW: CGFloat           { scrubH * 0.78 }
+
+    var iconSize: CGFloat         { max(lfoH * 0.06, 20) }
+    var pickerFont: CGFloat       { max(lfoH * 0.04, 14) }
+    var controlVPad: CGFloat      { max(lfoH * 0.014, 5) }
+    var controlHSpacing: CGFloat  { max(lfoH * 0.018, 8) }
+
+    /// Waveform fixed height in portrait (landscape fills remaining space).
+    var waveformH: CGFloat        { lfoH * 0.18 }
+
+    /// Width of the repeat/1x/trash action column beside the LFO list.
+    var actionColW: CGFloat       { toggleBtnSize * 1.4 }
+    /// Width of the help/settings column.
+    var helpColW: CGFloat         { toggleBtnSize * 0.8 }
+
+    // ── Tier 2: track strip content ─────────────────────────────────────
 
     /// Mute button number label font size.
     var muteLabelFont: CGFloat  { min(tracksH * 0.09, 30) }
