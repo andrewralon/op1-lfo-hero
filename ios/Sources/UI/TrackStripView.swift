@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TrackStripView: View {
     let track: Int
+    var isLandscape: Bool = false
     @EnvironmentObject var app: AppState
     @Environment(\.horizontalSizeClass) private var hSize
     private var isPad: Bool { hSize == .regular }
@@ -27,24 +28,47 @@ struct TrackStripView: View {
             }
             .buttonStyle(ImmediateButtonStyle())
 
-            // ── Pan knob ──────────────────────────────────────────────────────
-            PanKnobView(
-                value: pan,
-                onLiveChange: { app.controller.setPan(track: track, value: $0 + 64) }
-            ) { app.setPan(track: track, value: $0) }
-                .padding(.horizontal, 12)
-                .frame(height: isPad ? 100 : 62)
-                .padding(.top, isPad ? 14 : 10)
-                .padding(.bottom, isPad ? 7 : 5)
+            if isLandscape {
+                // ── Landscape: pan knob left of fader, tops aligned ───────────
+                let panSize: CGFloat = isPad ? 80 : 60
+                HStack(alignment: .top, spacing: 0) {
+                    PanKnobView(
+                        value: pan,
+                        onLiveChange: { app.controller.setPan(track: track, value: $0 + 64) }
+                    ) { app.setPan(track: track, value: $0) }
+                        .frame(width: panSize, height: panSize)
+                        .padding(.top, 8)
+                        .padding(.leading, 6)
+                        .padding(.trailing, 4)
 
-            // ── Fader (digits live-update inside VolumeFaderView) ─────────────
-            VolumeFaderView(
-                value: vol,
-                onLiveChange: { app.controller.setVolume(track: track, value: uiToMidi($0)) }
-            ) { app.setVolume(track: track, value: $0) }
-                .padding(.vertical, 8)
-                .frame(maxHeight: isPad ? 220 : .infinity)
-            Spacer(minLength: 0)
+                    VolumeFaderView(
+                        value: vol,
+                        onLiveChange: { app.controller.setVolume(track: track, value: uiToMidi($0)) }
+                    ) { app.setVolume(track: track, value: $0) }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 6)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .frame(maxHeight: .infinity)
+            } else {
+                // ── Portrait: pan above fader ─────────────────────────────────
+                PanKnobView(
+                    value: pan,
+                    onLiveChange: { app.controller.setPan(track: track, value: $0 + 64) }
+                ) { app.setPan(track: track, value: $0) }
+                    .padding(.horizontal, 12)
+                    .frame(height: isPad ? 100 : 62)
+                    .padding(.top, isPad ? 14 : 10)
+                    .padding(.bottom, isPad ? 7 : 5)
+
+                VolumeFaderView(
+                    value: vol,
+                    onLiveChange: { app.controller.setVolume(track: track, value: uiToMidi($0)) }
+                ) { app.setVolume(track: track, value: $0) }
+                    .padding(.vertical, 8)
+                    .frame(maxHeight: .infinity)
+                Spacer(minLength: 0)
+            }
         }
         .clipShape(RoundedRectangle(cornerRadius: 7))
         .background(
@@ -58,9 +82,10 @@ struct TrackStripView: View {
 }
 
 struct TracksView: View {
+    var isLandscape: Bool = false
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(1...4, id: \.self) { TrackStripView(track: $0) }
+            ForEach(1...4, id: \.self) { TrackStripView(track: $0, isLandscape: isLandscape) }
         }
         .padding(.horizontal, 2)
         .padding(.vertical, 0)

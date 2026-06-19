@@ -278,7 +278,6 @@ struct LFOPanelView: View {
 
             // ── 4+5. Waveform + action buttons + LFO list ─────────────────────
             if needsSideBySide {
-                // Waveform fills available height; right column has buttons + list
                 HStack(spacing: 0) {
                     MultiWaveformView(
                         lfos: previewLfos,
@@ -294,31 +293,32 @@ struct LFOPanelView: View {
 
                     Rectangle().fill(C.bg3).frame(width: 1)
 
-                    VStack(spacing: 0) {
-                        HStack(spacing: 0) {
+                    // Action column (left) + LFO list (middle) + help/settings column (right)
+                    HStack(spacing: 0) {
+                        VStack(spacing: 0) {
                             repeatBtn
-                            Rectangle().fill(C.bg3).frame(width: 1)
+                            Rectangle().fill(C.bg3).frame(height: 1)
                             oneShotBtn
-                            Rectangle().fill(C.bg3).frame(width: 1)
+                            Rectangle().fill(C.bg3).frame(height: 1)
                             trashBtn
                         }
-                        .frame(height: 52)
+                        .frame(width: 76)
 
-                        Rectangle().fill(C.bg3).frame(height: 1)
+                        Rectangle().fill(C.bg3).frame(width: 1)
 
                         lfoListScroll
                             .frame(maxHeight: .infinity)
 
-                        Rectangle().fill(C.bg3).frame(height: 1)
+                        Rectangle().fill(C.bg3).frame(width: 1)
 
-                        HStack(spacing: 0) {
+                        VStack(spacing: 0) {
                             helpBtn
-                            Rectangle().fill(C.bg3).frame(width: 1)
+                            Rectangle().fill(C.bg3).frame(height: 1)
                             settingsBtn
                         }
-                        .frame(height: 44)
+                        .frame(width: 44)
                     }
-                    .frame(width: 220)
+                    .frame(maxWidth: .infinity)
                 }
                 .frame(maxHeight: .infinity)
             } else {

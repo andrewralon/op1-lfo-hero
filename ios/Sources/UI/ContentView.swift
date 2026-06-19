@@ -9,23 +9,23 @@ struct ContentView: View {
             let isLandscape          = geo.size.width > geo.size.height
             let isIpad               = hSize == .regular
             let needsCombinedLfoRow  = isIpad || isLandscape
-            let needsSideBySide      = isIpad || isLandscape
-            let transportColW: CGFloat = isIpad ? 150 : 120
+            let needsSideBySide      = isLandscape   // side-by-side only in landscape; iPad portrait uses stacked
+            let transportColW: CGFloat = isIpad ? 240 : 120
 
             // Track section height — shorter in landscape to reclaim vertical space
-            let tracksH: CGFloat = isLandscape && !isIpad
-                ? min(max(160, geo.size.height * 0.40), 200)   // iPhone landscape: short faders
-                : min(max(280, geo.size.height * 0.37), 500)   // portrait + iPad landscape
+            let tracksH: CGFloat = {
+                if isLandscape && !isIpad { return min(max(160, geo.size.height * 0.40), 200) }  // iPhone landscape
+                if isLandscape            { return min(max(320, geo.size.height * 0.40), 460) }  // iPad landscape
+                return min(max(220, geo.size.height * 0.28), 340)                                // portrait — shorter sliders, more room for transport
+            }()
 
-            let transportH = min(max(58, geo.size.height * 0.076), 90)
+            let transportH = min(max(80, geo.size.height * 0.10), 120)
 
             VStack(spacing: 0) {
                 if isLandscape {
                     // Landscape: transport as 5th column beside the mixer
                     HStack(spacing: 0) {
-                        TracksView()
-                            .frame(maxWidth: isIpad ? 820 : .infinity)
-                        if isIpad { Spacer(minLength: 0) }
+                        TracksView(isLandscape: true)
                         Rectangle().fill(C.bg3).frame(width: 1)
                         TransportColumnView()
                             .frame(width: transportColW)
@@ -33,7 +33,7 @@ struct ContentView: View {
                     .frame(height: tracksH)
                 } else {
                     // Portrait: original stacked layout
-                    TracksView()
+                    TracksView(isLandscape: false)
                         .frame(height: tracksH)
                         .padding(.bottom, 5)
                     Rectangle().fill(C.bg3).frame(height: 1)
