@@ -1,44 +1,95 @@
 import CoreBluetooth
 import SwiftUI
 
+// MARK: - Layout metrics (single source of truth for all dimensional values)
+
+struct LayoutMetrics {
+    let screen: CGSize
+    let isLandscape: Bool
+    let isIpad: Bool
+
+    // ── Tier 1: structural — how the screen is divided into zones ───────────
+
+    /// Width of the transport column in landscape (5th column beside mixer).
+    var transportColW: CGFloat {
+        isIpad ? screen.width * 0.18 : screen.width * 0.22
+    }
+
+    /// Height of the mixer + track strips row.
+    var tracksH: CGFloat {
+        if isLandscape && !isIpad { return screen.height * 0.42 }
+        if isLandscape            { return screen.height * 0.45 }
+        return screen.height * 0.30
+    }
+
+    /// Height of the portrait transport bar (play/stop/BPM row).
+    var transportBarH: CGFloat { screen.height * 0.10 }
+
+    /// Width of a single track column (4 tracks share the mixer width).
+    var trackColW: CGFloat {
+        let mixerW = isLandscape ? screen.width - transportColW : screen.width
+        return mixerW / 4
+    }
+
+    // ── Tier 2: track strip content — derived from Tier 1, never from screen ─
+
+    /// Mute button number label font size.
+    var muteLabelFont: CGFloat  { min(tracksH * 0.09, 30) }
+
+    /// Vertical padding inside the mute button.
+    var muteVPad: CGFloat       { tracksH * 0.025 }
+
+    /// Pan knob square size in portrait (fits column width, capped by track height).
+    var panKnobPortrait: CGFloat  { min(trackColW - 24, tracksH * 0.30) }
+
+    /// Pan knob square size in landscape (height is the tight constraint).
+    var panKnobLandscape: CGFloat { min(tracksH * 0.52, trackColW * 0.38) }
+
+    /// Horizontal padding on either side of the pan knob in portrait.
+    var panHPad: CGFloat        { trackColW * 0.12 }
+
+    /// Top padding above the pan knob in portrait.
+    var panVPadTop: CGFloat     { tracksH * 0.04 }
+}
+
+struct LayoutMetricsKey: EnvironmentKey {
+    static let defaultValue = LayoutMetrics(
+        screen: CGSize(width: 390, height: 844), isLandscape: false, isIpad: false)
+}
+extension EnvironmentValues {
+    var metrics: LayoutMetrics {
+        get { self[LayoutMetricsKey.self] }
+        set { self[LayoutMetricsKey.self] = newValue }
+    }
+}
+
 struct ContentView: View {
     @Environment(\.horizontalSizeClass) private var hSize
 
     var body: some View {
         GeometryReader { geo in
-            let isLandscape          = geo.size.width > geo.size.height
-            let isIpad               = hSize == .regular
-            let needsCombinedLfoRow  = isLandscape   // iPad portrait uses two rows like iPhone portrait
-            let needsSideBySide      = isLandscape   // side-by-side only in landscape; iPad portrait uses stacked
-            let transportColW: CGFloat = isIpad ? 240 : 120
-
-            // Track section height — shorter in landscape to reclaim vertical space
-            let tracksH: CGFloat = {
-                if isLandscape && !isIpad { return min(max(160, geo.size.height * 0.40), 200) }  // iPhone landscape
-                if isLandscape            { return min(max(320, geo.size.height * 0.40), 460) }  // iPad landscape
-                return min(max(220, geo.size.height * 0.28), 340)                                // portrait — shorter sliders, more room for transport
-            }()
-
-            let transportH = min(max(80, geo.size.height * 0.10), 120)
+            let isLandscape         = geo.size.width > geo.size.height
+            let isIpad              = hSize == .regular
+            let needsCombinedLfoRow = isLandscape
+            let needsSideBySide     = isLandscape
+            let m = LayoutMetrics(screen: geo.size, isLandscape: isLandscape, isIpad: isIpad)
 
             VStack(spacing: 0) {
                 if isLandscape {
-                    // Landscape: transport as 5th column beside the mixer
                     HStack(spacing: 0) {
                         TracksView(isLandscape: true)
                         Rectangle().fill(C.bg3).frame(width: 1)
                         TransportColumnView()
-                            .frame(width: transportColW)
+                            .frame(width: m.transportColW)
                     }
-                    .frame(height: tracksH)
+                    .frame(height: m.tracksH)
                 } else {
-                    // Portrait: original stacked layout
                     TracksView(isLandscape: false)
-                        .frame(height: tracksH)
+                        .frame(height: m.tracksH)
                         .padding(.bottom, 5)
                     Rectangle().fill(C.bg3).frame(height: 1)
                     TransportBarView()
-                        .frame(height: transportH)
+                        .frame(height: m.transportBarH)
                 }
 
                 LFOPanelView(needsCombinedLfoRow: needsCombinedLfoRow, needsSideBySide: needsSideBySide)
@@ -47,6 +98,7 @@ struct ContentView: View {
                 StatusBarView()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .environment(\.metrics, m)
             .background(C.bg)
             .preferredColorScheme(.dark)
         }
