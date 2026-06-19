@@ -1,6 +1,16 @@
 import SwiftUI
 
-private let ctrlFontSizePhone: CGFloat = 15  // base size for iPhone; views compute isPad variant themselves
+private let ctrlFontSizePhone: CGFloat = 15  // base size; all control elements scale from this via ctrlBase
+
+// Propagates scale factor from LFOPanelView down to CompactPicker and ScrubValue.
+// 1.0 = phone, 1.6 = iPad landscape, 1.8 = iPad portrait.
+private struct ControlScaleKey: EnvironmentKey { static let defaultValue: CGFloat = 1.0 }
+extension EnvironmentValues {
+    fileprivate var controlScale: CGFloat {
+        get { self[ControlScaleKey.self] }
+        set { self[ControlScaleKey.self] = newValue }
+    }
+}
 
 struct LFOPanelView: View {
     var needsCombinedLfoRow: Bool = false  // true for iPad (both) + all landscape
@@ -14,6 +24,9 @@ struct LFOPanelView: View {
     @State private var showSettings = false
 
     private var isPad: Bool { hSize == .regular }
+    private var isIpadPortrait: Bool { isPad && !needsCombinedLfoRow }
+    // All control element sizes derive from this; avoids separate isPad ? X : Y pairs.
+    private var ctrlBase: CGFloat { isIpadPortrait ? 1.8 : isPad ? 1.6 : 1.0 }
 
     private var previewLfos: [LfoClip] {
         if let id = selectedLfoID, let lfo = app.activeLfos.first(where: { $0.id == id }) {
@@ -69,10 +82,10 @@ struct LFOPanelView: View {
     // MARK: - Extracted sub-views (shared between portrait and landscape branches)
 
     @ViewBuilder private var paramRow: some View {
-        HStack(spacing: isPad ? 15 : 9) {
+        HStack(spacing: 9 * ctrlBase) {
             Button { app.lfoParam = cycleNext(app.lfoParam) } label: {
                 Image(systemName: "bolt.fill")
-                    .font(.system(size: isPad ? 38 : 24))
+                    .font(.system(size: 24 * ctrlBase))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }
             .buttonStyle(.plain)
@@ -81,10 +94,10 @@ struct LFOPanelView: View {
     }
 
     @ViewBuilder private var waveRow: some View {
-        HStack(spacing: isPad ? 15 : 9) {
+        HStack(spacing: 9 * ctrlBase) {
             Button { app.lfoWave = cycleNext(app.lfoWave) } label: {
                 Image(systemName: "waveform.path")
-                    .font(.system(size: isPad ? 38 : 24))
+                    .font(.system(size: 24 * ctrlBase))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }
             .buttonStyle(.plain)
@@ -93,42 +106,42 @@ struct LFOPanelView: View {
     }
 
     @ViewBuilder private var rateBox: some View {
-        HStack(spacing: isPad ? 15 : 9) {
+        HStack(spacing: 9 * ctrlBase) {
             Image(systemName: "timer")
-                .font(.system(size: isPad ? 32 : 24))
+                .font(.system(size: 24 * ctrlBase))
                 .foregroundColor(Color(hex: "#aaaaaa"))
             ScrubValue(value: Binding(
                 get: { Double(app.lfoRate) },
                 set: { app.lfoRate = max(1, min(8, Int($0.rounded()))) }
             ), range: 1...8, sensitivity: 0.04)
-            .frame(width: isPad ? 64 : 40)
+            .frame(width: 40 * ctrlBase)
         }
     }
 
     @ViewBuilder private var depthBox: some View {
-        HStack(spacing: isPad ? 15 : 9) {
+        HStack(spacing: 9 * ctrlBase) {
             Image(systemName: "arrow.up.and.down")
-                .font(.system(size: isPad ? 32 : 24))
+                .font(.system(size: 24 * ctrlBase))
                 .foregroundColor(Color(hex: "#aaaaaa"))
             ScrubValue(value: $app.lfoDepth, range: 0...99)
-                .frame(width: isPad ? 92 : 58)
+                .frame(width: 58 * ctrlBase)
         }
     }
 
     @ViewBuilder private var centerBox: some View {
-        HStack(spacing: isPad ? 15 : 9) {
+        HStack(spacing: 9 * ctrlBase) {
             Image(systemName: "arrow.up.and.down.circle")
-                .font(.system(size: isPad ? 32 : 24))
+                .font(.system(size: 24 * ctrlBase))
                 .foregroundColor(Color(hex: "#aaaaaa"))
             ScrubValue(value: $app.lfoCenter,
                        range: app.lfoParam == .tempo ? 20...300 : 0...99,
                        decimals: app.lfoParam == .tempo ? 1 : 0)
-                .frame(width: isPad ? 116 : 74)
+                .frame(width: 74 * ctrlBase)
             Button { snapCenter() } label: {
                 Image(systemName: "scope")
-                    .font(.system(size: isPad ? 20 : 13))
+                    .font(.system(size: 13 * ctrlBase))
                     .foregroundColor(Color(hex: "#aaaaaa"))
-                    .frame(width: isPad ? 44 : 28, height: isPad ? 56 : 36)
+                    .frame(width: 28 * ctrlBase, height: 36 * ctrlBase)
                     .background(C.bg3)
                     .cornerRadius(3)
             }
@@ -218,62 +231,65 @@ struct LFOPanelView: View {
         VStack(spacing: 0) {
 
             // ── 1. Track + master buttons — centered row ──────────────────────
-            HStack(spacing: 8) {
+            HStack(spacing: isIpadPortrait ? 12 : 8) {
                 ForEach(1...4, id: \.self) { t in
                     TrackToggleButton(track: t,
                                       state: app.trackOn[t] ?? 0,
+                                      size: isIpadPortrait ? 90 : nil,
                                       disabled: app.lfoParam.isMasterOnly || app.masterOn > 0) {
                         app.cycleTrack(t)
                     }
                 }
                 MasterToggleButton(state: app.masterOn,
+                                   size: isIpadPortrait ? 90 : nil,
                                    disabled: !app.lfoParam.isMasterCapable) {
                     app.cycleMaster()
                 }
-                PreviewToggleButton(active: app.isPreview) {
+                PreviewToggleButton(active: app.isPreview,
+                                    size: isIpadPortrait ? 90 : nil) {
                     app.togglePreview()
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, isPad ? 10 : 4)
+            .padding(.vertical, isIpadPortrait ? 20 : (isPad ? 10 : 4))
 
             // ── 2+3. Param + wave + rate/depth/center controls ────────────────
             if needsCombinedLfoRow {
-                // All controls in one row (iPad + all landscape)
+                // All controls in one row (all landscape)
                 HStack(spacing: 0) {
                     Spacer(minLength: 0)
                     paramRow
-                    Spacer(minLength: isPad ? 20 : 12)
+                    Spacer(minLength: 12 * ctrlBase)
                     waveRow
-                    Spacer(minLength: isPad ? 24 : 16)
+                    Spacer(minLength: 16 * ctrlBase)
                     rateBox
-                    Spacer(minLength: isPad ? 16 : 10)
+                    Spacer(minLength: 10 * ctrlBase)
                     depthBox
-                    Spacer(minLength: isPad ? 16 : 10)
+                    Spacer(minLength: 10 * ctrlBase)
                     centerBox
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, isPad ? 10 : 6)
+                .padding(.vertical, 6 * ctrlBase)
             } else {
-                // Original two-row layout (iPhone portrait only)
-                HStack(spacing: isPad ? 48 : 30) {
+                // Two-row layout (iPhone portrait + iPad portrait)
+                HStack(spacing: 30 * ctrlBase) {
                     Spacer()
                     paramRow
                     waveRow
                     Spacer()
                 }
-                .padding(.vertical, isPad ? 10 : 4)
+                .padding(.vertical, 6 * ctrlBase)
 
                 HStack(spacing: 0) {
                     Spacer(minLength: 0)
                     rateBox
-                    Spacer(minLength: isPad ? 36 : 20)
+                    Spacer(minLength: 20 * ctrlBase)
                     depthBox
-                    Spacer(minLength: isPad ? 36 : 20)
+                    Spacer(minLength: 20 * ctrlBase)
                     centerBox
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, isPad ? 10 : 4)
+                .padding(.vertical, 6 * ctrlBase)
             }
 
             // ── 4+5. Waveform + action buttons + LFO list ─────────────────────
@@ -364,6 +380,7 @@ struct LFOPanelView: View {
             Rectangle().fill(C.bg3).frame(height: 1)
         }
         .background(C.bg)
+        .environment(\.controlScale, ctrlBase)
         .onChange(of: app.lfoParam)  { _, _ in app.updatePreviewIfActive() }
         .onChange(of: app.lfoWave)   { _, _ in app.updatePreviewIfActive() }
         .onChange(of: app.lfoRate)   { _, _ in app.updatePreviewIfActive() }
@@ -399,9 +416,8 @@ private struct CompactPicker<T>: View
     let options: [T]
     @Binding var selection: T
     @State private var show = false
-    @Environment(\.horizontalSizeClass) private var hSize
-    private var isPad: Bool { hSize == .regular }
-    private var fontSize: CGFloat { isPad ? 22 : ctrlFontSizePhone }
+    @Environment(\.controlScale) private var ctrlScale
+    private var fontSize: CGFloat { ctrlFontSizePhone * ctrlScale }
 
     var body: some View {
         Button { show = true } label: {
@@ -416,8 +432,8 @@ private struct CompactPicker<T>: View
                 }
                 .font(.system(size: fontSize, weight: .bold))
             }
-            .padding(.horizontal, isPad ? 16 : 11)
-            .padding(.vertical, isPad ? 13 : 8)
+            .padding(.horizontal, 11 * ctrlScale)
+            .padding(.vertical, 8 * ctrlScale)
             .background(C.bg3)
             .cornerRadius(5)
         }
@@ -437,7 +453,7 @@ private struct CompactPicker<T>: View
                             .font(.system(size: fontSize, weight: .bold))
                             .foregroundColor(selection == opt ? .accentColor : C.text)
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, isPad ? 14 : 10)
+                            .padding(.vertical, 10 * ctrlScale)
                             .contentShape(Rectangle())
                             .overlay(alignment: .trailing) {
                                 if selection == opt {
@@ -472,9 +488,8 @@ private struct ScrubValue: View {
     let range: ClosedRange<Double>
     var sensitivity: Double = 0.15
     var decimals: Int = 0
-    @Environment(\.horizontalSizeClass) private var hSize
-    private var isPad: Bool { hSize == .regular }
-    private var fontSize: CGFloat { isPad ? 22 : ctrlFontSizePhone }
+    @Environment(\.controlScale) private var ctrlScale
+    private var fontSize: CGFloat { ctrlFontSizePhone * ctrlScale }
 
     @GestureState private var isActive: Bool = false
     @State private var base: Double = 0
@@ -503,7 +518,7 @@ private struct ScrubValue: View {
                     RoundedRectangle(cornerRadius: 3)
                         .stroke(isActive ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
                 )
-                .frame(height: isPad ? 56 : 36)
+                .frame(height: 36 * ctrlScale)
             Text(displayText)
                 .font(.system(size: fontSize, weight: .bold, design: .monospaced))
                 .foregroundColor(isActive ? C.green : .white)
@@ -578,19 +593,22 @@ private struct ActiveLfoChip: View {
 private struct TrackToggleButton: View {
     let track: Int
     let state: Int
+    var size: CGFloat? = nil
     let disabled: Bool
     let action: () -> Void
     @Environment(\.horizontalSizeClass) private var hSize
     private var isPad: Bool { hSize == .regular }
+    private var btnSize: CGFloat { size ?? (isPad ? 70 : 46) }
+    private var fontSize: CGFloat { size.map { $0 * 0.38 } ?? (isPad ? 28 : C.trackLabelSize) }
 
     private var color: Color { C.track(track) }
 
     var body: some View {
         Button(action: action) {
             Text("\(track)")
-                .font(.system(size: isPad ? 28 : C.trackLabelSize, weight: .bold, design: .monospaced))
+                .font(.system(size: fontSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: isPad ? 70 : 46, height: isPad ? 70 : 46)
+                .frame(width: btnSize, height: btnSize)
                 .background(color.opacity(state == 0 ? (disabled ? 0.1 : 0.2) : (disabled ? 0.4 : 1.0)))
                 .foregroundColor(state == 0 ? color : .black)
                 .cornerRadius(7)
@@ -605,17 +623,20 @@ private struct TrackToggleButton: View {
 
 private struct MasterToggleButton: View {
     let state: Int
+    var size: CGFloat? = nil
     let disabled: Bool
     let action: () -> Void
     @Environment(\.horizontalSizeClass) private var hSize
     private var isPad: Bool { hSize == .regular }
+    private var btnSize: CGFloat { size ?? (isPad ? 70 : 46) }
+    private var fontSize: CGFloat { size.map { $0 * 0.38 } ?? (isPad ? 28 : C.trackLabelSize) }
 
     var body: some View {
         Button(action: action) {
             Text("m")
-                .font(.system(size: isPad ? 28 : C.trackLabelSize, weight: .bold, design: .monospaced))
+                .font(.system(size: fontSize, weight: .bold, design: .monospaced))
                 .rotationEffect(state == 2 ? .degrees(180) : .degrees(0))
-                .frame(width: isPad ? 70 : 46, height: isPad ? 70 : 46)
+                .frame(width: btnSize, height: btnSize)
                 .background(C.green.opacity(state == 0 ? (disabled ? 0.1 : 0.2) : (disabled ? 0.4 : 1.0)))
                 .foregroundColor(state == 0 ? C.green : .black)
                 .cornerRadius(7)
@@ -630,15 +651,18 @@ private struct MasterToggleButton: View {
 
 private struct PreviewToggleButton: View {
     let active: Bool
+    var size: CGFloat? = nil
     let action: () -> Void
     @Environment(\.horizontalSizeClass) private var hSize
     private var isPad: Bool { hSize == .regular }
+    private var btnSize: CGFloat { size ?? (isPad ? 70 : 46) }
+    private var fontSize: CGFloat { size.map { $0 * 0.38 } ?? (isPad ? 28 : C.trackLabelSize) }
 
     var body: some View {
         Button(action: action) {
             Text("p")
-                .font(.system(size: isPad ? 28 : C.trackLabelSize, weight: .bold, design: .monospaced))
-                .frame(width: isPad ? 70 : 46, height: isPad ? 70 : 46)
+                .font(.system(size: fontSize, weight: .bold, design: .monospaced))
+                .frame(width: btnSize, height: btnSize)
                 .background(C.purple.opacity(active ? 1.0 : 0.2))
                 .foregroundColor(active ? .black : C.purple)
                 .cornerRadius(7)

@@ -8,7 +8,7 @@ struct ContentView: View {
         GeometryReader { geo in
             let isLandscape          = geo.size.width > geo.size.height
             let isIpad               = hSize == .regular
-            let needsCombinedLfoRow  = isIpad || isLandscape
+            let needsCombinedLfoRow  = isLandscape   // iPad portrait uses two rows like iPhone portrait
             let needsSideBySide      = isLandscape   // side-by-side only in landscape; iPad portrait uses stacked
             let transportColW: CGFloat = isIpad ? 240 : 120
 
