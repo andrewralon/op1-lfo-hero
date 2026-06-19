@@ -30,6 +30,7 @@ final class USBMidi: NSObject, ObservableObject {
     private static let virtualEndpointNames = ["network session", "bluetooth", "iac driver"]
 
     @Published var state: State = .disconnected
+    @Published var discovered: [String] = []   // all named, non-virtual destinations
 
     var onClock: (() -> Void)?
     var onStart: (() -> Void)?
@@ -41,9 +42,11 @@ final class USBMidi: NSObject, ObservableObject {
     private var inPort     = MIDIPortRef()
     private var destRef    = MIDIEndpointRef()
     private var srcRef     = MIDIEndpointRef()
-    private var pollTimer:    DispatchSourceTimer?
-    private var midiThread:   Thread?
-    private var midiRunLoop:  RunLoop?
+    private var pollTimer:       DispatchSourceTimer?
+    private var midiThread:      Thread?
+    private var midiRunLoop:     RunLoop?
+    private var manualTarget:    String?  // user-picked device; prevents auto-reconnect override
+    private var suppressAutoScan = false  // set on explicit disconnect; cleared when hardware changes
 
     override init() {
         super.init()
@@ -84,7 +87,7 @@ final class USBMidi: NSObject, ObservableObject {
         let t = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
         t.schedule(deadline: .now() + 2.0, repeating: 2.0, leeway: .milliseconds(500))
         t.setEventHandler { [weak self] in
-            guard let self, !self.state.isConnected else { return }
+            guard let self, !self.state.isConnected, !self.suppressAutoScan else { return }
             self.midiRunLoop?.perform { self.recreateClient() }
         }
         t.resume()
@@ -108,6 +111,8 @@ final class USBMidi: NSObject, ObservableObject {
         MIDIClientCreateWithBlock("LFOHeroUSB" as CFString, &client) { [weak self] notifPtr in
             let id = notifPtr.pointee.messageID
             guard id == .msgSetupChanged || id == .msgObjectAdded || id == .msgObjectRemoved else { return }
+            // A new physical device appeared — clear the suppress flag so polling resumes.
+            if id == .msgObjectAdded { self?.suppressAutoScan = false }
             // MIDIGetNumberOfDestinations() inside scanForOP1() is a blocking IPC call to
             // MIDIServer. If MIDIServer is still starting up it can block for 5–15 seconds.
             // Run on background queue to keep the main thread free.
@@ -138,30 +143,75 @@ final class USBMidi: NSObject, ObservableObject {
     // MARK: - Device discovery
 
     private func scanForOP1() {
+        var allNamed: [String] = []
         var otherNames: [String] = []
+        var op1Dest: MIDIEndpointRef = 0
+        var op1Name: String?
+
         for i in 0..<MIDIGetNumberOfDestinations() {
             let dest = MIDIGetDestination(i)
             guard let name = midiName(dest) else { continue }
-            if isOP1(name) {
-                if destRef != dest {
-                    destRef = dest
-                    DispatchQueue.main.async { self.state = .connected(name) }
-                }
-                connectSource()
-                return
-            }
-            // Skip known virtual/network endpoints — they're never real hardware.
             let lower = name.lowercased()
-            let isVirtual = USBMidi.virtualEndpointNames.contains { lower.contains($0) }
-            if !isVirtual { otherNames.append(name) }
+            guard !USBMidi.virtualEndpointNames.contains(where: { lower.contains($0) }) else { continue }
+            allNamed.append(name)
+            if isOP1(name) {
+                op1Dest = dest; op1Name = name
+            } else {
+                otherNames.append(name)
+            }
         }
-        // OP-1 not found — clear refs and report what we did find (if anything).
+
+        DispatchQueue.main.async { self.discovered = allNamed }
+
+        // Don't auto-reconnect over a device the user explicitly picked.
+        if let target = manualTarget {
+            if allNamed.contains(target) { return }
+            manualTarget = nil  // target disappeared — fall through to normal scan
+        }
+
+        if let name = op1Name {
+            if destRef != op1Dest {
+                destRef = op1Dest
+                DispatchQueue.main.async { self.state = .connected(name) }
+            }
+            connectSource()
+            return
+        }
         srcRef = 0
         if destRef != 0 { destRef = 0 }
         let names = otherNames
         DispatchQueue.main.async {
             self.state = names.isEmpty ? .disconnected : .found(names)
         }
+    }
+
+    func connectTo(_ targetName: String) {
+        midiRunLoop?.perform { [weak self] in self?.connectToImpl(targetName) }
+    }
+
+    private func connectToImpl(_ targetName: String) {
+        for i in 0..<MIDIGetNumberOfDestinations() {
+            let dest = MIDIGetDestination(i)
+            guard let name = midiName(dest), name == targetName else { continue }
+            manualTarget = targetName
+            suppressAutoScan = false
+            destRef = dest
+            connectSource()
+            DispatchQueue.main.async { self.state = .connected(targetName) }
+            return
+        }
+    }
+
+    func disconnect() {
+        manualTarget = nil
+        suppressAutoScan = true
+        midiRunLoop?.perform { [weak self] in self?.disconnectImpl() }
+    }
+
+    private func disconnectImpl() {
+        if srcRef != 0 { MIDIPortDisconnectSource(inPort, srcRef); srcRef = 0 }
+        destRef = 0
+        DispatchQueue.main.async { self.state = .disconnected }
     }
 
     private func connectSource() {

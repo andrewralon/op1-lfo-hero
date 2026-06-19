@@ -39,10 +39,49 @@ struct DevicePickerView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("discovered devices")
+
+                    // MARK: USB / Network MIDI
+                    Text("usb / network midi")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(C.dim)
                         .padding(.top, 20)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+
+                    if app.usb.discovered.isEmpty {
+                        Text("no usb midi devices found")
+                            .foregroundColor(C.dim)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 12)
+                    } else {
+                        ForEach(app.usb.discovered, id: \.self) { name in
+                            Button {
+                                app.usb.connectTo(name)
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    Image(systemName: "cable.connector").foregroundColor(C.text)
+                                    Text(name)
+                                        .foregroundColor(C.text)
+                                    Spacer()
+                                    Image(systemName: "chevron.right").foregroundColor(C.dim)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            Divider()
+                        }
+                    }
+
+                    // MARK: BLE MIDI
+                    Divider().padding(.top, 8)
+
+                    Text("bluetooth midi")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(C.dim)
+                        .padding(.top, 16)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
 
@@ -54,11 +93,12 @@ struct DevicePickerView: View {
                     } else {
                         ForEach(app.ble.discovered, id: \.identifier) { p in
                             Button {
+                                app.usb.disconnect()   // yield routing priority to BLE
                                 app.ble.connect(p)
                                 dismiss()
                             } label: {
                                 HStack {
-                                    Image(systemName: "pianokeys").foregroundColor(C.text)
+                                    Image(systemName: "antenna.radiowaves.left.and.right").foregroundColor(C.text)
                                     Text(p.name ?? p.identifier.uuidString)
                                         .foregroundColor(C.text)
                                     Spacer()
@@ -77,6 +117,7 @@ struct DevicePickerView: View {
 
                     Button("disconnect") {
                         app.ble.disconnect()
+                        app.usb.disconnect()
                         dismiss()
                     }
                     .foregroundColor(C.red)
@@ -85,7 +126,7 @@ struct DevicePickerView: View {
                 }
             }
             .background(C.bg)
-            .navigationTitle("ble midi device")
+            .navigationTitle("midi device")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

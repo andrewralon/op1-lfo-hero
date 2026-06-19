@@ -8,6 +8,7 @@ final class AppState: ObservableObject {
     // MARK: - Engine objects
     let router      = MidiRouter()
     var ble: BLEMidi { router.ble }   // convenience for DevicePickerView
+    var usb: USBMidi { router.usb }   // convenience for DevicePickerView
     let clock       = ClockEngine()
     let automation  = AutomationEngine()
     let controller: Controller
