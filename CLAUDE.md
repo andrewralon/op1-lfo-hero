@@ -74,11 +74,13 @@ Change one fraction in `LayoutMetrics` — it updates every device size at once.
 |---|---|---|
 | Mute button text too small/big | `muteLabelFont` | adjust `0.09` multiplier |
 | Pan knob too small in portrait | `panKnobPortrait` | adjust `0.30` (tracksH fraction) |
-| Track/master toggle buttons too small | `toggleBtnSize` | adjust `0.11` (lfoH fraction) |
-| Icons in control row too small | `iconSize` | adjust `0.06` |
-| ScrubValue / picker boxes too short | `scrubH` | adjust `0.08` |
-| Waveform too short in portrait | `waveformH` | adjust `0.18` |
+| Track/master toggle buttons too small | `toggleBtnSize` | adjust `0.18` (landscape) / `0.13` (portrait) fraction |
+| Icons in control row too small | `iconSize` | adjust `0.08` (landscape) / `0.06` (portrait) fraction |
+| ScrubValue / picker boxes too short | `scrubH` | adjust `0.14` (landscape) / `0.10` (portrait) fraction |
+| Waveform too short in portrait | `waveformH` | adjust `0.18` (lfoH fraction) |
+| Waveform section too tall in landscape | `landscapeWaveH` | adjust `0.47` (lfoH fraction) |
 | Action column (repeat/1x/trash) too narrow | `actionColW` | adjust `1.4` (toggleBtnSize multiplier) |
+| repeat/1x/trash/help/settings icons too small | `actionIconSize` | adjust `0.06` (iPad) / `0.04` (iPhone) fraction |
 
 ### Rules
 
@@ -134,6 +136,31 @@ xcrun simctl list devices available | grep Booted
 # or pick any available iPhone:
 xcrun simctl list devices available | grep iPhone
 ```
+
+### Reliable landscape screenshots (iPad)
+
+`xcrun simctl io screenshot` always captures in the device's native portrait orientation — landscape content comes out rotated. The correct workflow:
+
+1. Run the `testLandscapeLayout` UITest (which calls `XCUIDevice.shared.orientation = .landscapeLeft` and saves via `XCUIScreen.main.screenshot()`):
+```bash
+cd ios
+xcodebuild test \
+  -project op1-lfo-hero.xcodeproj \
+  -scheme op1-lfo-hero \
+  -destination 'id=F06E0387-DEAC-405C-BEC9-2F5F8DF7B144' \
+  -only-testing:op1-lfo-heroUITests/HelpSettingsUITests/testLandscapeLayout
+```
+
+2. Rotate the saved PNG 270° to get the correct orientation:
+```bash
+sips --rotate 270 "/tmp/claude-ss/landscape_iPad Pro 13-inch (M5).png" --out /tmp/claude-ss/ipad_landscape_corrected.png
+```
+
+**Known booted simulator UDIDs** (refresh with `xcrun simctl list devices available | grep Booted`):
+- iPad Pro 13-inch (M5): `F06E0387-DEAC-405C-BEC9-2F5F8DF7B144`
+- iPhone 16e: `BF7855F0-C774-4059-AD47-8D149F88DCE5`
+
+Do **not** try to rotate the simulator window via osascript + `Device > Rotate` menu items — the rotation state is unreliable across app launches and the screenshots come out in the wrong orientation regardless.
 
 ## MIDI reference
 

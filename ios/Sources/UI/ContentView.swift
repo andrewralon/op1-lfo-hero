@@ -18,7 +18,7 @@ struct LayoutMetrics {
     /// Height of the mixer + track strips row.
     var tracksH: CGFloat {
         if isLandscape && !isIpad { return screen.height * 0.42 }
-        if isLandscape            { return screen.height * 0.45 }
+        if isLandscape            { return screen.height * 0.30 }
         return screen.height * 0.30
     }
 
@@ -39,30 +39,36 @@ struct LayoutMetrics {
         return max(h, 100)
     }
 
-    var toggleBtnSize: CGFloat    { max(lfoH * 0.11, 44) }
+    // Landscape uses larger fractions: single combined row means more lfoH per element.
+    var toggleBtnSize: CGFloat    { isLandscape ? max(lfoH * 0.18, 44) : max(lfoH * 0.13, 44) }
     var toggleBtnFont: CGFloat    { toggleBtnSize * 0.38 }
     var toggleBtnSpacing: CGFloat { max(lfoH * 0.012, 6) }
-    var toggleBtnVPad: CGFloat    { max(lfoH * 0.025, 5) }
+    var toggleBtnVPad: CGFloat    { max(lfoH * 0.030, 8) }
 
     /// Height of a ScrubValue / CompactPicker box.
-    var scrubH: CGFloat           { max(lfoH * 0.08, 36) }
+    var scrubH: CGFloat           { isLandscape ? max(lfoH * 0.14, 36) : max(lfoH * 0.10, 36) }
     var rateW: CGFloat            { scrubH * 1.1 }
     var depthW: CGFloat           { scrubH * 1.6 }
     var centerW: CGFloat          { scrubH * 2.0 }
     var scopeW: CGFloat           { scrubH * 0.78 }
 
-    var iconSize: CGFloat         { max(lfoH * 0.06, 20) }
-    var pickerFont: CGFloat       { max(lfoH * 0.04, 14) }
-    var controlVPad: CGFloat      { max(lfoH * 0.014, 5) }
+    var iconSize: CGFloat         { isLandscape ? max(lfoH * 0.08, 20) : max(lfoH * 0.06, 20) }
+    var pickerFont: CGFloat       { isLandscape ? max(lfoH * 0.058, 14) : max(lfoH * 0.04, 14) }
+    var controlVPad: CGFloat      { max(lfoH * 0.022, 5) }
     var controlHSpacing: CGFloat  { max(lfoH * 0.018, 8) }
 
-    /// Waveform fixed height in portrait (landscape fills remaining space).
+    /// Waveform fixed height in portrait (landscape uses landscapeWaveH cap instead).
     var waveformH: CGFloat        { lfoH * 0.18 }
 
+    /// Max height of the waveform+LFO section in landscape — prevents it consuming all remaining space.
+    var landscapeWaveH: CGFloat   { lfoH * 0.47 }
+
     /// Width of the repeat/1x/trash action column beside the LFO list.
-    var actionColW: CGFloat       { toggleBtnSize * 1.4 }
+    var actionColW: CGFloat       { toggleBtnSize * 0.8 }
     /// Width of the help/settings column.
     var helpColW: CGFloat         { toggleBtnSize * 0.8 }
+    /// Icon size inside repeat/1x/trash/help/settings buttons — larger on iPad to fill the taller cells.
+    var actionIconSize: CGFloat   { isIpad ? max(lfoH * 0.06, 24) : max(lfoH * 0.04, 16) }
 
     // ── Tier 2: track strip content ─────────────────────────────────────
 

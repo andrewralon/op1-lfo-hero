@@ -123,7 +123,7 @@ struct LFOPanelView: View {
 
     @ViewBuilder private var repeatBtn: some View {
         Button { app.lfoStart(loop: true) } label: {
-            Image(systemName: "repeat").font(.system(size: 16))
+            Image(systemName: "repeat").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.green.opacity(0.25))
                 .foregroundColor(C.green)
@@ -132,7 +132,7 @@ struct LFOPanelView: View {
 
     @ViewBuilder private var oneShotBtn: some View {
         Button { app.lfoStart(loop: false) } label: {
-            Image(systemName: "arrow.forward.to.line").font(.system(size: 16))
+            Image(systemName: "arrow.forward.to.line").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.bg3)
                 .foregroundColor(C.text)
@@ -144,7 +144,7 @@ struct LFOPanelView: View {
             if app.activeLfos.isEmpty { return }
             showDeleteConfirm = true
         } label: {
-            Image(systemName: "trash").font(.system(size: 16))
+            Image(systemName: "trash").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.red.opacity(0.18))
                 .foregroundColor(C.red)
@@ -176,7 +176,7 @@ struct LFOPanelView: View {
 
     @ViewBuilder private var helpBtn: some View {
         Button { showHelp = true } label: {
-            Image(systemName: "questionmark.circle").font(.system(size: 16))
+            Image(systemName: "questionmark.circle").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.bg3).foregroundColor(C.text)
         }
@@ -186,7 +186,7 @@ struct LFOPanelView: View {
 
     @ViewBuilder private var settingsBtn: some View {
         Button { showSettings = true } label: {
-            Image(systemName: "gearshape").font(.system(size: 16))
+            Image(systemName: "gearshape").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.bg3).foregroundColor(C.text)
         }
@@ -291,7 +291,7 @@ struct LFOPanelView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .frame(maxHeight: .infinity)
+                .frame(maxHeight: m.landscapeWaveH)
             } else {
                 MultiWaveformView(
                     lfos: previewLfos, wave: app.lfoWave,
