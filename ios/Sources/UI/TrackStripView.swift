@@ -30,13 +30,12 @@ struct TrackStripView: View {
             if isLandscape {
                 // ── Landscape: pan knob left of fader, tops aligned ──────────
                 let panSize = m.panKnobLandscape
-                HStack(alignment: .top, spacing: 0) {
+                HStack(alignment: .center, spacing: 0) {
                     PanKnobView(
                         value: pan,
                         onLiveChange: { app.controller.setPan(track: track, value: $0 + 64) }
                     ) { app.setPan(track: track, value: $0) }
                         .frame(width: panSize, height: panSize)
-                        .padding(.top, 8)
                         .padding(.leading, 6)
                         .padding(.trailing, 4)
 

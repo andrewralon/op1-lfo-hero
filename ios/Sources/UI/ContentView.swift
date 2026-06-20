@@ -34,19 +34,19 @@ struct LayoutMetrics {
 
     /// Total height available to LFOPanelView (below tracks+transport, above status bar).
     var lfoH: CGFloat {
-        let h = screen.height - tracksH - (isLandscape ? 0 : transportBarH) - 22
+        let h = screen.height - tracksH - (isLandscape ? 0 : transportBarH) - statusBarH
         return max(h, 100)
     }
 
     // Landscape uses larger fractions: single combined row means more lfoH per element.
-    var toggleBtnSize: CGFloat    { isLandscape ? max(lfoH * 0.18, 44) : max(lfoH * 0.13, 44) }
+    var toggleBtnSize: CGFloat    { isLandscape ? max(lfoH * 0.22, 44) : max(lfoH * 0.13, 44) }
     var toggleBtnFont: CGFloat    { toggleBtnSize * 0.38 }
     var toggleBtnSpacing: CGFloat { max(lfoH * 0.012, 6) }
     // Landscape: no top/bottom pad — toggle buttons butt up directly against the mixer row.
     var toggleBtnVPad: CGFloat    { isLandscape ? 0 : max(lfoH * 0.030, 8) }
 
     /// Height of a ScrubValue / CompactPicker box.
-    var scrubH: CGFloat           { isLandscape ? max(lfoH * 0.14, 36) : max(lfoH * 0.10, 36) }
+    var scrubH: CGFloat           { isLandscape ? max(lfoH * 0.18, 36) : max(lfoH * 0.10, 36) }
     var rateW: CGFloat            { scrubH * 1.1 }
     var depthW: CGFloat           { scrubH * 1.6 }
     var centerW: CGFloat          { scrubH * 2.0 }
@@ -79,6 +79,12 @@ struct LayoutMetrics {
     // Active LFO chip text — bigger on iPad landscape for readability.
     var lfoChipFont: CGFloat     { isIpad && isLandscape ? max(lfoH * 0.038, 18) : (isIpad ? max(lfoH * 0.022, 14) : 12) }
     var lfoChipIconSize: CGFloat { isIpad && isLandscape ? max(lfoH * 0.028, 14) : (isIpad ? max(lfoH * 0.016, 11) : 11) }
+
+    // Status bar (connection + tempo row at the very bottom of the screen).
+    var statusBarFont: CGFloat { isIpad ? 12 : 9 }
+    var statusBarVPad: CGFloat { isIpad ? 4 : 1 }
+    // Estimated rendered height; used to size lfoH correctly.
+    var statusBarH: CGFloat    { statusBarFont + 2 * statusBarVPad + 8 }
 
     // ── Tier 2: track strip content ─────────────────────────────────────
 
@@ -163,6 +169,7 @@ struct ContentView: View {
 
 struct StatusBarView: View {
     @EnvironmentObject var app: AppState
+    @Environment(\.metrics) private var m
     @State private var showDevicePicker = false
 
     var body: some View {
@@ -173,7 +180,7 @@ struct StatusBarView: View {
                         .fill(app.isConnected ? C.green : C.yellow)
                         .frame(width: 7, height: 7)
                     Text(app.connectionLabel)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .font(.system(size: m.statusBarFont, weight: .medium, design: .monospaced))
                         .foregroundColor(.white)
                         .lineLimit(1)
                 }
@@ -186,10 +193,10 @@ struct StatusBarView: View {
                 Text(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")
                     .foregroundColor(app.isClockMaster ? C.green : C.track(1))
             }
-            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .font(.system(size: m.statusBarFont, weight: .medium, design: .monospaced))
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 2)
+        .padding(.vertical, m.statusBarVPad)
         .background(C.bg2)
         .sheet(isPresented: $showDevicePicker) { DevicePickerView() }
     }
