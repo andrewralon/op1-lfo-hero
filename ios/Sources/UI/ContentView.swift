@@ -18,7 +18,7 @@ struct LayoutMetrics {
     /// Height of the mixer + track strips row.
     var tracksH: CGFloat {
         if isLandscape && !isIpad { return screen.height * 0.42 }
-        if isLandscape            { return screen.height * 0.30 }
+        if isLandscape            { return screen.height * 0.34 }  // iPad landscape: slightly taller mixer
         return screen.height * 0.30
     }
 
@@ -43,7 +43,8 @@ struct LayoutMetrics {
     var toggleBtnSize: CGFloat    { isLandscape ? max(lfoH * 0.18, 44) : max(lfoH * 0.13, 44) }
     var toggleBtnFont: CGFloat    { toggleBtnSize * 0.38 }
     var toggleBtnSpacing: CGFloat { max(lfoH * 0.012, 6) }
-    var toggleBtnVPad: CGFloat    { max(lfoH * 0.030, 8) }
+    // iPad landscape: tight gap between mixer and LFO panel; other layouts keep more breathing room.
+    var toggleBtnVPad: CGFloat    { isIpad && isLandscape ? max(lfoH * 0.012, 6) : max(lfoH * 0.030, 8) }
 
     /// Height of a ScrubValue / CompactPicker box.
     var scrubH: CGFloat           { isLandscape ? max(lfoH * 0.14, 36) : max(lfoH * 0.10, 36) }
@@ -69,6 +70,15 @@ struct LayoutMetrics {
     var helpColW: CGFloat         { toggleBtnSize * 0.8 }
     /// Icon size inside repeat/1x/trash/help/settings buttons — larger on iPad to fill the taller cells.
     var actionIconSize: CGFloat   { isIpad ? max(lfoH * 0.06, 24) : max(lfoH * 0.04, 16) }
+
+    // Transport column — metronome icon bigger on iPad landscape; BPM font shrinks to match.
+    var transportMetronomeSize: CGFloat  { isIpad && isLandscape ? max(tracksH * 0.14, 28) : 22 }
+    var transportMetronomeLabel: CGFloat { isIpad && isLandscape ? max(tracksH * 0.035, 11) : (isIpad ? 14 : 11) }
+    var transportBpmFont: CGFloat        { isIpad && isLandscape ? max(tracksH * 0.06, 14) : (isIpad ? 30 : 18) }
+
+    // Active LFO chip text — scales up on iPad for readability.
+    var lfoChipFont: CGFloat     { isIpad ? max(lfoH * 0.025, 14) : 12 }
+    var lfoChipIconSize: CGFloat { isIpad ? max(lfoH * 0.018, 11) : 11 }
 
     // ── Tier 2: track strip content ─────────────────────────────────────
 
@@ -117,9 +127,12 @@ struct ContentView: View {
                 if isLandscape {
                     HStack(spacing: 0) {
                         TracksView(isLandscape: true)
-                        Rectangle().fill(C.bg3).frame(width: 1)
                         TransportColumnView()
                             .frame(width: m.transportColW)
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
+                            .overlay(RoundedRectangle(cornerRadius: 7).stroke(C.border, lineWidth: 0.5))
+                            .padding(.vertical, 2)
+                            .padding(.horizontal, 2)
                     }
                     .frame(height: m.tracksH)
                 } else {
@@ -129,6 +142,8 @@ struct ContentView: View {
                     Rectangle().fill(C.bg3).frame(height: 1)
                     TransportBarView()
                         .frame(height: m.transportBarH)
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(C.border, lineWidth: 0.5))
                 }
 
                 LFOPanelView(needsCombinedLfoRow: needsCombinedLfoRow, needsSideBySide: needsSideBySide)

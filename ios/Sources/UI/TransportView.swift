@@ -56,8 +56,7 @@ struct TransportBarView: View {
 
 private struct BpmScrubber: View {
     @EnvironmentObject var app: AppState
-    @Environment(\.horizontalSizeClass) private var hSize
-    private var isPad: Bool { hSize == .regular }
+    @Environment(\.metrics) private var m
     @State  private var base: Double  = 120
     @GestureState private var isActive: Bool = false
     @State  private var editing     = false
@@ -90,7 +89,7 @@ private struct BpmScrubber: View {
 
             if editing {
                 TextField("", text: $editText)
-                    .font(.system(size: isPad ? 30 : 18, weight: .bold, design: .monospaced))
+                    .font(.system(size: m.transportBpmFont, weight: .bold, design: .monospaced))
                     .foregroundColor(C.green)
                     .multilineTextAlignment(.center)
                     .keyboardType(.decimalPad)
@@ -109,7 +108,7 @@ private struct BpmScrubber: View {
                     ? (t == 0 ? "no clk" : t < 9 ? "sync.." : "err?\(t)")
                     : String(format: "%.1f", live)
                 Text(displayText)
-                    .font(.system(size: isPad ? 30 : 18, weight: .bold, design: .monospaced))
+                    .font(.system(size: m.transportBpmFont, weight: .bold, design: .monospaced))
                     .foregroundColor(isActive ? C.green : .white)
             }
         }
@@ -218,8 +217,7 @@ private struct BpmScrubber: View {
 
 struct TransportColumnView: View {
     @EnvironmentObject var app: AppState
-    @Environment(\.horizontalSizeClass) private var hSize
-    private var isPad: Bool { hSize == .regular }
+    @Environment(\.metrics) private var m
 
     var body: some View {
         VStack(spacing: 0) {
@@ -250,10 +248,10 @@ struct TransportColumnView: View {
                 } label: {
                     VStack(spacing: -2) {
                         Image(systemName: "metronome")
-                            .font(.system(size: isPad ? 30 : 22, weight: .regular))
+                            .font(.system(size: m.transportMetronomeSize, weight: .regular))
                             .scaleEffect(x: 0.50, y: 1.05, anchor: .center)
                         Text(app.isClockMaster ? "app" : "op1")
-                            .font(.system(size: isPad ? 14 : 11, weight: .semibold, design: .monospaced))
+                            .font(.system(size: m.transportMetronomeLabel, weight: .semibold, design: .monospaced))
                     }
                     .frame(maxWidth: .infinity)
                     .foregroundColor(app.isClockMaster ? C.green : C.track(1))

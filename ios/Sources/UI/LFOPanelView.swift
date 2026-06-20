@@ -264,9 +264,10 @@ struct LFOPanelView: View {
                         depth: app.lfoDepth, tracks: waveTracks
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(C.bg2).cornerRadius(3).padding(8)
-
-                    Rectangle().fill(C.bg3).frame(width: 1)
+                    .background(C.bg2)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
+                    .padding(8)
 
                     HStack(spacing: 0) {
                         VStack(spacing: 0) {
@@ -290,6 +291,10 @@ struct LFOPanelView: View {
                         .frame(width: m.helpColW)
                     }
                     .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
+                    .padding(.trailing, 8)
+                    .padding(.vertical, 8)
                 }
                 .frame(maxHeight: m.landscapeWaveH)
             } else {
@@ -300,6 +305,9 @@ struct LFOPanelView: View {
                 )
                 .frame(height: m.waveformH)
                 .frame(maxWidth: .infinity)
+                .background(C.bg2)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
                 .padding(8)
 
                 HStack(spacing: 0) {
@@ -325,6 +333,10 @@ struct LFOPanelView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
             }
 
             Rectangle().fill(C.bg3).frame(height: 1)
@@ -489,6 +501,7 @@ private struct ActiveLfoChip: View {
     let selected: Bool
     let onSelect: () -> Void
     let onStop: () -> Void
+    @Environment(\.metrics) private var m
 
     var body: some View {
         HStack(spacing: 5) {
@@ -496,10 +509,10 @@ private struct ActiveLfoChip: View {
                 .fill(lfo.track == 0 ? C.green : C.track(lfo.track))
                 .frame(width: 6, height: 6)
             Text(lfo.shortLabel)
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(size: m.lfoChipFont, design: .monospaced))
                 .foregroundColor(.white)
             Button { onStop() } label: {
-                Image(systemName: "xmark").font(.system(size: 11, weight: .medium)).foregroundColor(C.dim)
+                Image(systemName: "xmark").font(.system(size: m.lfoChipIconSize, weight: .medium)).foregroundColor(C.dim)
             }.buttonStyle(.plain)
         }
         .padding(.horizontal, 7).padding(.vertical, 4)
