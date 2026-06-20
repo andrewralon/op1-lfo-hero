@@ -221,28 +221,28 @@ struct TransportColumnView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 2×2 button grid — top half
-            VStack(spacing: 0) {
-                HStack(spacing: 0) {
-                    TransColBtn(symbol: "play.fill",  active: app.isPlaying, disabled: !app.isClockMaster) { app.play() }
-                    Rectangle().fill(C.bg3).frame(width: 1)
-                    TransColBtn(symbol: "stop.fill",  active: false) { app.stop() }
-                }
-                .frame(maxHeight: .infinity)
-                Rectangle().fill(C.bg3).frame(height: 1)
-                HStack(spacing: 0) {
-                    TransColBtn(symbol: "arrow.left",  active: false) { app.tapePrev() }
-                    Rectangle().fill(C.bg3).frame(width: 1)
-                    TransColBtn(symbol: "arrow.right", active: false) { app.tapeNext() }
-                }
-                .frame(maxHeight: .infinity)
+            // Row 1: play / stop
+            HStack(spacing: 0) {
+                TransColBtn(symbol: "play.fill",  active: app.isPlaying, disabled: !app.isClockMaster) { app.play() }
+                Rectangle().fill(C.bg3).frame(width: 1)
+                TransColBtn(symbol: "stop.fill",  active: false) { app.stop() }
             }
             .frame(maxHeight: .infinity)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
-            // Clock toggle + BPM — bottom half
-            VStack(spacing: 4) {
+            // Row 2: tape ← / →
+            HStack(spacing: 0) {
+                TransColBtn(symbol: "arrow.left",  active: false) { app.tapePrev() }
+                Rectangle().fill(C.bg3).frame(width: 1)
+                TransColBtn(symbol: "arrow.right", active: false) { app.tapeNext() }
+            }
+            .frame(maxHeight: .infinity)
+
+            Rectangle().fill(C.bg3).frame(height: 1)
+
+            // Row 3: metronome toggle | BPM scrubber (same row)
+            HStack(spacing: 0) {
                 Button {
                     if app.isClockMaster { app.disableClock() } else { app.enableClock() }
                 } label: {
@@ -253,17 +253,18 @@ struct TransportColumnView: View {
                         Text(app.isClockMaster ? "app" : "op1")
                             .font(.system(size: m.transportMetronomeLabel, weight: .semibold, design: .monospaced))
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .foregroundColor(app.isClockMaster ? C.green : C.track(1))
                 }
                 .buttonStyle(.plain)
 
+                Rectangle().fill(C.bg3).frame(width: 1)
+
                 BpmScrubber()
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 6)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(6)
             }
             .frame(maxHeight: .infinity)
-            .padding(.vertical, 6)
         }
         .background(C.bg2)
     }
@@ -274,13 +275,12 @@ private struct TransColBtn: View {
     let active: Bool
     var disabled: Bool = false
     let action: () -> Void
-    @Environment(\.horizontalSizeClass) private var hSize
-    private var isPad: Bool { hSize == .regular }
+    @Environment(\.metrics) private var m
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: isPad ? 20 : 16, weight: .regular))
+                .font(.system(size: m.transportColBtnSize, weight: .regular))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(active && !disabled ? C.green.opacity(0.18) : Color.clear)
                 .foregroundColor(disabled ? C.dim : active ? C.green : C.text)
