@@ -259,10 +259,19 @@ struct DevicePickerView: View {
                         .padding(.bottom, 8)
 
                     if app.ble.discovered.isEmpty {
-                        Label("scanning for ble midi devices…", systemImage: "wave.3.right")
-                            .foregroundColor(C.dim)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 12)
+                        Group {
+                            switch app.ble.state {
+                            case .scanning:
+                                Label("scanning for ble midi devices…", systemImage: "wave.3.right")
+                            case .off:
+                                Label("bluetooth is off", systemImage: "wifi.slash")
+                            default:
+                                Label("no ble midi devices found", systemImage: "antenna.radiowaves.left.and.right")
+                            }
+                        }
+                        .foregroundColor(C.dim)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
                     } else {
                         ForEach(app.ble.discovered, id: \.identifier) { p in
                             Button {
@@ -308,6 +317,10 @@ struct DevicePickerView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear {
+            // Restart BLE scan if it timed out before the picker was opened
+            if case .notFound = app.ble.state { app.ble.startScan() }
+        }
     }
 }
 

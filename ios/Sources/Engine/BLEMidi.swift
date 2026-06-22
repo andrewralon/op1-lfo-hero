@@ -60,8 +60,7 @@ final class BLEMidi: NSObject, ObservableObject {
         central.scanForPeripherals(withServices: [bleMIDIServiceUUID])
         let timeout = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            // Keep scanning — auto-connect still works if an OP-1 appears later.
-            // Just change the label so the user sees a clear status instead of "scanning…" forever.
+            self.central.stopScan()
             DispatchQueue.main.async {
                 if case .scanning = self.state { self.state = .notFound }
             }
