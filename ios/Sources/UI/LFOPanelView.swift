@@ -26,7 +26,7 @@ struct LFOPanelView: View {
         guard let track = (1...4).first(where: { (app.trackOn[$0] ?? 0) > 0 }) else { return }
         switch app.lfoParam {
         case .volume: app.lfoCenter = app.volumes[track] ?? 90
-        case .pan:    app.lfoCenter = midiToUI(Double((app.pans[track] ?? 0) + 64))
+        case .pan:    app.lfoCenter = (Double((app.pans[track] ?? 0) + 64) * 99 / 127).rounded()
         case .mute:   app.lfoCenter = (app.mutes[track] ?? false) ? 99 : 0
         default: break
         }
