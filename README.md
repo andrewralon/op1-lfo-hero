@@ -142,6 +142,8 @@ For **Tempo** and other master-only parameters, the track 1–4 buttons are disa
 | pan | Per-track pan | CC 10 (ch 1-4) |
 | mute | Per-track mute toggle | CC 9 (ch 1-4) |
 | tempo | App clock BPM (modulates LFO engine tempo) | — |
+| par 1–4 | Per-track patch par parameters | CC 46-49 (ch 1-4) |
+| env attack/decay/sustain/release | Per-track synth envelope | CC 50-53 (ch 1-4) |
 | fx 1–4 | Per-track patch FX parameters | CC 54-57 (ch 1-4) |
 | lfo 1–4 | Per-track patch LFO parameters | CC 58-61 (ch 1-4) |
 
@@ -256,6 +258,8 @@ This installs:
 | 7  | Volume   | 0-127 | Per channel (track 1-4 = channel 1-4) |
 | 9  | Mute     | 0-127 | ≥ 64 = muted |
 | 10 | Pan      | 0-127 | 64 = center |
+| 46-49 | Patch par params 1-4 | 0-127 | Per track |
+| 50-53 | Patch synth envelope (A/D/S/R) | 0-127 | Per track |
 | 54-57 | Patch FX params 1-4 | 0-127 | Per track |
 | 58-61 | Patch LFO params 1-4 | 0-127 | Per track |
 

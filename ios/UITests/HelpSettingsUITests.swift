@@ -23,7 +23,23 @@ final class HelpSettingsUITests: XCTestCase {
         XCTAssertFalse(app.navigationBars["help"].waitForExistence(timeout: 2))
     }
 
+    func testParamPickerLandscape() throws {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launch()
+        let helpButton = app.buttons["helpButton"]
+        XCTAssertTrue(helpButton.waitForExistence(timeout: 8))
+        let paramPicker = app.buttons["paramPicker"]
+        XCTAssertTrue(paramPicker.waitForExistence(timeout: 3))
+        paramPicker.tap()
+        sleep(1)
+        let screenshot = XCUIScreen.main.screenshot()
+        let name = ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] ?? "device"
+        try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/param_picker_landscape_\(name).png"))
+    }
+
     func testParamPickerOpens() throws {
+        XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
         app.launch()
 
@@ -31,8 +47,8 @@ final class HelpSettingsUITests: XCTestCase {
         let helpButton = app.buttons["helpButton"]
         XCTAssertTrue(helpButton.waitForExistence(timeout: 5))
 
-        // The param picker button contains the current param name as bold text
-        let paramPicker = app.buttons.matching(NSPredicate(format: "label CONTAINS 'volume'")).firstMatch
+        // The param picker button has a stable accessibilityIdentifier
+        let paramPicker = app.buttons["paramPicker"]
         XCTAssertTrue(paramPicker.waitForExistence(timeout: 3))
         paramPicker.tap()
 

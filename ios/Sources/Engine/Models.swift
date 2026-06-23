@@ -69,6 +69,8 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
 
 enum Parameter: String, CaseIterable, Identifiable, Codable {
     case volume, pan, mute, tempo
+    case par1 = "par 1", par2 = "par 2", par3 = "par 3", par4 = "par 4"
+    case envA = "env A", envD = "env D", envS = "env S", envR = "env R"
     case fx1 = "fx 1", fx2 = "fx 2", fx3 = "fx 3", fx4 = "fx 4"
     case lfo1 = "lfo 1", lfo2 = "lfo 2", lfo3 = "lfo 3", lfo4 = "lfo 4"
 

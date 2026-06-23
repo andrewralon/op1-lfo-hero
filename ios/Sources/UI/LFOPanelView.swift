@@ -63,7 +63,7 @@ struct LFOPanelView: View {
                     .font(.system(size: m.iconSize))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
-            CompactPicker(options: Array(Parameter.allCases), selection: $app.lfoParam)
+            CompactPicker(options: Array(Parameter.allCases), selection: $app.lfoParam, accessibilityId: "paramPicker")
         }
     }
 
@@ -374,8 +374,10 @@ private struct CompactPicker<T>: View
 {
     let options: [T]
     @Binding var selection: T
+    var accessibilityId: String? = nil
     @State private var show = false
     @Environment(\.metrics) private var m
+    private let isPad = UIDevice.current.userInterfaceIdiom == .pad
 
     var body: some View {
         Button { show = true } label: {
@@ -385,13 +387,16 @@ private struct CompactPicker<T>: View
             }
             .font(.system(size: m.pickerFont, weight: .bold))
             .padding(.horizontal, m.scrubH * 0.31)
-            .padding(.vertical,   m.scrubH * 0.22)
+            .frame(height: m.scrubH)
             .background(C.bg3)
             .cornerRadius(5)
+            .overlay(RoundedRectangle(cornerRadius: 5).stroke(C.dim, lineWidth: 1))
         }
         .foregroundColor(.accentColor)
+        .accessibilityIdentifier(accessibilityId ?? "")
         .popover(isPresented: $show) {
-            VStack(spacing: 0) {
+            let w: CGFloat = isPad ? 260 : 220
+            let itemList = VStack(spacing: 0) {
                 ForEach(Array(options.enumerated()), id: \.offset) { idx, opt in
                     Button {
                         selection = opt; show = false
@@ -400,7 +405,7 @@ private struct CompactPicker<T>: View
                             .font(.system(size: m.pickerFont, weight: .bold))
                             .foregroundColor(selection == opt ? .accentColor : C.text)
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, m.scrubH * 0.28)
+                            .padding(.vertical, 4)
                             .contentShape(Rectangle())
                             .overlay(alignment: .trailing) {
                                 if selection == opt {
@@ -412,13 +417,30 @@ private struct CompactPicker<T>: View
                             }
                     }
                     .buttonStyle(.plain)
+                    .id(opt.id)
                     if idx < options.count - 1 { Divider() }
                 }
             }
-            .frame(minWidth: 200)
-            .padding(.vertical, 6)
-            .presentationDetents([.height(CGFloat(options.count) * 44 + 40)])
-            .presentationDragIndicator(.visible)
+            .padding(.vertical, 8)
+
+            Group {
+                if m.isLandscape {
+                    // Landscape: UIKit caps to available height; ScrollView lets user reach cut-off items
+                    ScrollViewReader { proxy in
+                        ScrollView(showsIndicators: true) { itemList.frame(minWidth: w - 20) }
+                            .onAppear { proxy.scrollTo(selection.id, anchor: .center) }
+                    }
+                    .frame(minWidth: w, idealWidth: w, maxWidth: w,
+                           idealHeight: CGFloat(options.count) * 44 + 40,
+                           maxHeight: CGFloat(options.count) * 44 + 40)
+                } else {
+                    // Portrait / iPad: VStack has a natural height — UIHostingController
+                    // measures it directly, so UIKit sizes the popover to exactly fit the
+                    // content with no blank space.
+                    itemList.frame(width: w)
+                }
+            }
+            .presentationCompactAdaptation(.popover)
             .preferredColorScheme(.dark)
         }
     }
@@ -458,7 +480,7 @@ private struct ScrubValue: View {
                 .fill(C.bg3)
                 .overlay(
                     RoundedRectangle(cornerRadius: 3)
-                        .stroke(isActive ? C.green.opacity(0.6) : Color.clear, lineWidth: 1)
+                        .stroke(isActive ? C.green.opacity(0.6) : C.dim, lineWidth: 1)
                 )
                 .frame(height: m.scrubH)
             Text(displayText)

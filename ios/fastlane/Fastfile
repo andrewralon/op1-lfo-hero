@@ -76,6 +76,7 @@ platform :ios do
         -are the UI elements big enough?
         -is anything weird? does anything *not* do what you expect?
 
+        commits:
         #{commits}
       NOTES
     )
