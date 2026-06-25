@@ -1,6 +1,7 @@
 import Combine
 import CoreMIDI
 import Foundation
+import UIKit
 
 /// CoreMIDI USB MIDI transport. Auto-detects the OP-1 Field when plugged in via USB-C.
 /// Sends raw MIDI bytes (no BLE timestamp wrapper). Calls the same onClock/onStart/onStop/onCC
@@ -42,11 +43,11 @@ final class USBMidi: NSObject, ObservableObject {
     private var inPort     = MIDIPortRef()
     private var destRef    = MIDIEndpointRef()
     private var srcRef     = MIDIEndpointRef()
-    private var pollTimer:       DispatchSourceTimer?
     private var midiThread:      Thread?
     private var midiRunLoop:     RunLoop?
     private var manualTarget:    String?  // user-picked device; prevents auto-reconnect override
-    private var suppressAutoScan = false  // set on explicit disconnect; cleared when hardware changes
+    private var suppressAutoScan = false  // set on explicit disconnect; cleared when hardware appears
+    private var foregroundObserver: Any?
 
     override init() {
         super.init()
@@ -73,31 +74,21 @@ final class USBMidi: NSObject, ObservableObject {
         // Run on global queue — scanForOP1() dispatches state changes to main internally.
         DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 1.0) { self.scanForOP1() }
         DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 1.5) { self.scanForOP1() }
-        startPolling()
-    }
 
-    // Even with a persistent run loop, CoreMIDI's add/remove notifications have proven
-    // unreliable across repeated connect/disconnect cycles on-device — they fire
-    // sometimes and not others, with no obvious trigger. Rather than depend on them
-    // while we're searching for the OP-1, force a full client teardown/recreate on every
-    // tick: that's the one thing that has reliably produced a correct, fresh snapshot in
-    // every test (it's exactly what a cold launch does). Only do this while disconnected
-    // — recreating the client while actively connected would interrupt the MIDI stream.
-    private func startPolling() {
-        let t = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
-        t.schedule(deadline: .now() + 2.0, repeating: 2.0, leeway: .milliseconds(500))
-        t.setEventHandler { [weak self] in
-            guard let self, !self.state.isConnected, !self.suppressAutoScan else { return }
+        // Rescan when app foregrounds — catches any plug/unplug that happened while
+        // backgrounded without relying on notifications that iOS may not deliver in background.
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil, queue: nil
+        ) { [weak self] _ in
+            guard let self, !self.suppressAutoScan else { return }
             self.midiRunLoop?.perform { self.recreateClient() }
         }
-        t.resume()
-        pollTimer = t
     }
 
     // Tears down and recreates the CoreMIDI client/ports from scratch, forcing a fresh
-    // enumeration from MIDIServer instead of whatever this process's object cache
-    // currently (possibly stale) reflects. Must run on midiRunLoop's thread so the new
-    // client's notifications stay tied to the persistent run loop.
+    // enumeration from MIDIServer. Must run on midiRunLoop's thread so the new client's
+    // notifications stay tied to the persistent run loop.
     private func recreateClient() {
         if inPort != 0  { MIDIPortDispose(inPort);  inPort  = MIDIPortRef() }
         if outPort != 0 { MIDIPortDispose(outPort); outPort = MIDIPortRef() }
@@ -111,7 +102,7 @@ final class USBMidi: NSObject, ObservableObject {
         MIDIClientCreateWithBlock("LFOHeroUSB" as CFString, &client) { [weak self] notifPtr in
             let id = notifPtr.pointee.messageID
             guard id == .msgSetupChanged || id == .msgObjectAdded || id == .msgObjectRemoved else { return }
-            // A new physical device appeared — clear the suppress flag so polling resumes.
+            // A new physical device appeared — clear the suppress flag so auto-scan resumes.
             if id == .msgObjectAdded { self?.suppressAutoScan = false }
             // MIDIGetNumberOfDestinations() inside scanForOP1() is a blocking IPC call to
             // MIDIServer. If MIDIServer is still starting up it can block for 5–15 seconds.
