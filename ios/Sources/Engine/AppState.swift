@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import SwiftUI
+import UIKit
 
 @MainActor
 final class AppState: ObservableObject {
@@ -157,6 +158,23 @@ final class AppState: ObservableObject {
                     self.connectionLabel = bleState.label
                     self.isConnected = bleState.isConnected
                 }
+            }
+            .store(in: &cancellables)
+
+        // Suspend master clock timer when backgrounded with no device connected —
+        // a connected OP-1 still needs the clock for LFO sync even without tape playing.
+        NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.isClockMaster, !self.isConnected else { return }
+                self.clock.suspendMasterTimer()
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.clock.resumeMasterTimerIfSuspended()
             }
             .store(in: &cancellables)
 

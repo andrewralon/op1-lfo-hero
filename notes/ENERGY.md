@@ -85,7 +85,7 @@ uses SwiftUI `Canvas`. **not animated.** draws once when inputs change (wave sha
 | item | status |
 |---|---|
 | USB poll timer (2s recreateClient loop) | **removed** — replaced with foreground rescan |
-| master clock timer background pause | pending |
+| master clock timer background pause | **done** — suspended when no device connected |
 | timer leeway increase | superseded (poll removed entirely) |
 
 ---

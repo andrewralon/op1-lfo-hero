@@ -68,12 +68,12 @@ platform :ios do
     upload_to_testflight(
       skip_waiting_for_build_processing: true,
       changelog: <<~NOTES
-        o hai beta tester!
-        -unless you have an op1, there's no audio
-        -test all UI components - do they do what you expect? slide, change, ...
-        -does it look good visually? is anything skewed or morphed? a non-round circle, etc
-        -how fast does it open? should be ~3 seconds after clicking to respond like normal. try 2-3 times pls.
-        -are the UI elements big enough?
+        o hai, tester person
+        -thanks for testing! pls bug me with your bugs. random comments are welcome.
+        -there's no audio, unless you have an op1
+        -test all UI stuff - does it do what you expect? slide, change, ...
+        -does it look good? is anything skewed or morphed? non-round circle, ...
+        -are UI elements too big or small?
         -is anything weird? does anything *not* do what you expect?
 
         commits:

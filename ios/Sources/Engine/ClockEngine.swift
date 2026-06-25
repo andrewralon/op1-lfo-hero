@@ -21,6 +21,7 @@ final class ClockEngine {
 
     // MARK: - Master (generating) state
     private var masterTimer: DispatchSourceTimer?
+    private var masterTimerSuspended = false
     private var masterTickCount = 0
     private var masterBpm: Double = 100.0
     private let masterQueue = DispatchQueue(label: "clock.master", qos: .userInteractive)
@@ -106,7 +107,21 @@ final class ClockEngine {
         bpmCallback?(masterBpm)
     }
 
+    func suspendMasterTimer() {
+        guard isClockMaster, let t = masterTimer, !masterTimerSuspended else { return }
+        t.suspend()
+        masterTimerSuspended = true
+    }
+
+    func resumeMasterTimerIfSuspended() {
+        guard masterTimerSuspended, let t = masterTimer else { return }
+        t.resume()
+        masterTimerSuspended = false
+    }
+
     func disableClock() {
+        // DispatchSourceTimer must not be cancelled while suspended — resume first.
+        if masterTimerSuspended { masterTimer?.resume(); masterTimerSuspended = false }
         masterTimer?.cancel()
         masterTimer = nil
         lock.lock()
