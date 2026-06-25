@@ -12,10 +12,11 @@ final class AutomationEngine {
     private let lock = NSLock()
 
     // Per-clip mutable state tracked by UUID (all accessed under lock)
-    private var startTicks:   [UUID: Int]    = [:]
-    private var lastSent:     [UUID: Double] = [:]
-    private var randomPhase:  [UUID: Double] = [:]
-    private var randomValue:  [UUID: Double] = [:]
+    private var startTicks:      [UUID: Int]    = [:]
+    private var lastSent:        [UUID: Double] = [:]
+    private var randomPhase:     [UUID: Double] = [:]
+    private var randomValue:     [UUID: Double] = [:]
+    private var disabledClipIDs: Set<UUID>      = []
 
     // Preview LFOs — run continuously, never appear in activeLfos
     private var previewLfos:      [LfoClip] = []
@@ -35,6 +36,7 @@ final class AutomationEngine {
         lastSent.removeValue(forKey: lfo.id)
         randomPhase.removeValue(forKey: lfo.id)
         randomValue.removeValue(forKey: lfo.id)
+        disabledClipIDs.remove(lfo.id)
         lock.unlock()
     }
 
@@ -43,7 +45,18 @@ final class AutomationEngine {
         lfos.removeAll()
         startTicks.removeAll(); lastSent.removeAll()
         randomPhase.removeAll(); randomValue.removeAll()
+        disabledClipIDs.removeAll()
         lock.unlock()
+    }
+
+    func setEnabled(_ id: UUID, enabled: Bool) {
+        lock.lock(); defer { lock.unlock() }
+        if enabled { disabledClipIDs.remove(id) }
+        else        { disabledClipIDs.insert(id) }
+    }
+
+    func sendRestore(lfo: LfoClip, value: Double) {
+        dispatch(lfo: lfo, value: value)
     }
 
     func setPreview(_ clips: [LfoClip]) {
@@ -85,8 +98,11 @@ final class AutomationEngine {
 
         for lfo in current {
             lock.lock()
+            let isDisabled = disabledClipIDs.contains(lfo.id)
             let start = startTicks[lfo.id] ?? tickCount
             lock.unlock()
+
+            if isDisabled { continue }  // phase advances implicitly; re-enable picks up at correct phase
 
             let elapsed = tickCount - start
 

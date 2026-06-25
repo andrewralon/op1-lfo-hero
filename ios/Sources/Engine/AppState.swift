@@ -315,29 +315,56 @@ final class AppState: ObservableObject {
 
     private func addLfo(track: Int, rateTicks: Int, depth: Double, center: Double,
                         inverted: Bool, loop: Bool) {
-        // Don't add a duplicate loop LFO — same config already running continuously.
-        // One-shots (loop: false) are allowed to stack since their timing differs.
+        // Dedup: only enabled clips count as "running" — disabled chips don't block a new start.
         if loop && activeLfos.contains(where: {
-            $0.loop && $0.track == track && $0.parameter == lfoParam &&
+            $0.isEnabled && $0.loop && $0.track == track && $0.parameter == lfoParam &&
             $0.wave == lfoWave && $0.rateTicks == rateTicks &&
             $0.depth == depth && $0.centerValue == center && $0.inverted == inverted
         }) { return }
 
+        // Capture current parameter value (MIDI units) so disabling can restore it.
+        let originalValue: Double
+        if lfoParam == .tempo {
+            originalValue = bpm
+        } else {
+            switch lfoParam {
+            case .volume: originalValue = Double(uiToMidi(volumes[track] ?? 90))
+            case .pan:    originalValue = Double((pans[track] ?? 0) + 64)
+            case .mute:   originalValue = (mutes[track] ?? false) ? 127.0 : 0.0
+            default:      originalValue = center  // not tracked externally; center is best fallback
+            }
+        }
+
         let lfo = LfoClip(track: track, parameter: lfoParam, wave: lfoWave,
                           rateTicks: rateTicks, depth: depth, centerValue: center,
-                          inverted: inverted, loop: loop)
+                          inverted: inverted, loop: loop, originalValue: originalValue)
         automation.add(lfo)
         activeLfos.append(lfo)
+        updatePreviewIfActive()
     }
 
     func stopLfo(_ lfo: LfoClip) {
         automation.remove(lfo)
         activeLfos.removeAll { $0.id == lfo.id }
+        updatePreviewIfActive()
     }
 
     func stopAllLfos() {
         automation.clearAll()
         activeLfos.removeAll()
+        updatePreviewIfActive()
+    }
+
+    func toggleLfoEnabled(_ lfo: LfoClip) {
+        guard let idx = activeLfos.firstIndex(where: { $0.id == lfo.id }) else { return }
+        let nowEnabled = !activeLfos[idx].isEnabled
+        activeLfos[idx].isEnabled = nowEnabled
+        automation.setEnabled(lfo.id, enabled: nowEnabled)
+        if !nowEnabled {
+            let restores = UserDefaults.standard.object(forKey: "lfoDisableRestoresOriginal") as? Bool ?? true
+            automation.sendRestore(lfo: activeLfos[idx], value: restores ? lfo.originalValue : lfo.centerValue)
+        }
+        updatePreviewIfActive()
     }
 
     // MARK: - Preview
@@ -365,15 +392,28 @@ final class AppState: ObservableObject {
         if lfoParam.isMasterCapable && masterOn != 0 {
             clips.append(LfoClip(track: 0, parameter: lfoParam, wave: lfoWave,
                                  rateTicks: rt, depth: depthMidi, centerValue: centerMidi,
-                                 inverted: masterOn == 2, loop: true))
+                                 inverted: masterOn == 2, loop: true, originalValue: centerMidi))
         } else {
             for (t, state) in trackOn.sorted(by: { $0.key < $1.key }) where state != 0 {
                 clips.append(LfoClip(track: t, parameter: lfoParam, wave: lfoWave,
                                      rateTicks: rt, depth: depthMidi, centerValue: centerMidi,
-                                     inverted: state == 2, loop: true))
+                                     inverted: state == 2, loop: true, originalValue: centerMidi))
             }
         }
-        return clips
+        // Suppress preview on tracks where an identical enabled chip is already running —
+        // avoids two competing LFOs sending to the same parameter simultaneously.
+        return clips.filter { preview in
+            !activeLfos.contains { active in
+                active.isEnabled &&
+                active.track       == preview.track &&
+                active.parameter   == preview.parameter &&
+                active.wave        == preview.wave &&
+                active.rateTicks   == preview.rateTicks &&
+                active.depth       == preview.depth &&
+                active.centerValue == preview.centerValue &&
+                active.inverted    == preview.inverted
+            }
+        }
     }
 
     // MARK: - Track button cycle (0→1→2→0)

@@ -98,6 +98,8 @@ struct LfoClip: Identifiable, Codable {
     let centerValue: Double  // MIDI units (0-127), or BPM for tempo
     let inverted: Bool
     let loop: Bool
+    var isEnabled: Bool = true   // false = paused; chip stays in list but sends no MIDI
+    let originalValue: Double    // MIDI value of parameter captured at clip creation (for restore-on-disable)
 
     var rateLabel: String {
         let idx = RATE_TICKS.first(where: { $0.value == rateTicks })?.key ?? 3

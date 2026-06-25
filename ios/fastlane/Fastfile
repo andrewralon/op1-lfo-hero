@@ -72,9 +72,9 @@ platform :ios do
         -thanks for testing! pls bug me with your bugs. random comments are welcome.
         -there's no audio, unless you have an op1
         -test all UI stuff - does it do what you expect? slide, change, ...
-        -does it look good? is anything skewed or morphed? non-round circle, ...
-        -are UI elements too big or small?
+        -does it look good? too big or too small? is anything skewed or morphed? non-round circle, ...
         -is anything weird? does anything *not* do what you expect?
+        -NEW: lfos can be toggled on/off, better background energy usage
 
         commits:
         #{commits}

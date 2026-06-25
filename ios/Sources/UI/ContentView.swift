@@ -423,6 +423,8 @@ struct SettingsView: View {
     private var isPad: Bool { hSize == .regular }
     @State private var wavePhase: Double = 0
 
+    @AppStorage("lfoDisableRestoresOriginal") private var lfoDisableRestoresOriginal: Bool = true
+
     @State private var quantumSync     = false
     @State private var defiantJazzMode = false
     @State private var yoloVelocity    = false
@@ -452,6 +454,12 @@ struct SettingsView: View {
                     .padding(.bottom, 14)
 
                     Divider()
+
+                    settingRow(
+                        "restore value on chip disable",
+                        "when tapping a chip to pause it, send the original parameter value back to the op-1. off = snap to the lfo center value instead.",
+                        $lfoDisableRestoresOriginal
+                    )
 
                     settingRow(
                         "quantum tempo sync",

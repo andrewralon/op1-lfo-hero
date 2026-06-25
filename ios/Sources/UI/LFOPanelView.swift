@@ -163,6 +163,8 @@ struct LFOPanelView: View {
                 ForEach(app.activeLfos) { lfo in
                     ActiveLfoChip(lfo: lfo, selected: selectedLfoID == lfo.id) {
                         selectedLfoID = selectedLfoID == lfo.id ? nil : lfo.id
+                    } onToggleEnabled: {
+                        app.toggleLfoEnabled(lfo)
                     } onStop: {
                         if selectedLfoID == lfo.id { selectedLfoID = nil }
                         app.stopLfo(lfo)
@@ -522,13 +524,14 @@ private struct ActiveLfoChip: View {
     let lfo: LfoClip
     let selected: Bool
     let onSelect: () -> Void
+    let onToggleEnabled: () -> Void
     let onStop: () -> Void
     @Environment(\.metrics) private var m
 
     var body: some View {
         HStack(spacing: 5) {
             Circle()
-                .fill(lfo.track == 0 ? C.green : C.track(lfo.track))
+                .fill(lfo.isEnabled ? (lfo.track == 0 ? C.green : C.track(lfo.track)) : C.dim)
                 .frame(width: 6, height: 6)
             Text(lfo.shortLabel)
                 .font(.system(size: m.lfoChipFont, design: .monospaced))
@@ -541,7 +544,9 @@ private struct ActiveLfoChip: View {
         .background(C.bg3)
         .overlay(RoundedRectangle(cornerRadius: 3).stroke(selected ? C.green.opacity(0.7) : Color.clear, lineWidth: 1))
         .cornerRadius(3)
-        .onTapGesture { onSelect() }
+        .opacity(lfo.isEnabled ? 1.0 : 0.4)
+        .onTapGesture { onToggleEnabled() }
+        .onLongPressGesture(minimumDuration: 0.4) { onSelect() }
     }
 }
 
