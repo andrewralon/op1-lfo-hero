@@ -71,10 +71,9 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
             let q = 1 - p
             return sin(2 * .pi * 5 * (1 - q * q * q))
         case .random:
-            // Caller must handle stateful random (AutomationEngine tracks step state)
-            let step = Int(p * 8) % 8
-            let h = UInt32(bitPattern: Int32(bitPattern: UInt32(step + 1) &* 2654435761))
-            return Double(h) / Double(UInt32.max) * 2.0 - 1.0
+            // Not called directly — AutomationEngine.evaluate() handles random with per-clip
+            // stateful PRNG (xorshift64) so each clip and each cycle produces different values.
+            return 0
         }
     }
 }

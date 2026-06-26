@@ -14,14 +14,16 @@ final class AutomationEngine {
     // Per-clip mutable state tracked by UUID (all accessed under lock)
     private var startTicks:      [UUID: Int]    = [:]
     private var lastSent:        [UUID: Double] = [:]
-    private var randomPhase:     [UUID: Double] = [:]
-    private var randomValue:     [UUID: Double] = [:]
+    private var randomStep:      [UUID: Int]    = [:]   // last step index (0-7)
+    private var randomState:     [UUID: UInt64] = [:]   // xorshift64 PRNG state, seeded per clip
+    private var randomValue:     [UUID: Double] = [:]   // held output for current step
     private var disabledClipIDs: Set<UUID>      = []
 
     // Preview LFOs — run continuously, never appear in activeLfos
     private var previewLfos:     [LfoClip] = []
     private var previewLastSent: [UUID: Double] = [:]
-    private var previewRandPhase: [UUID: Double] = [:]
+    private var previewRandStep:  [UUID: Int]    = [:]
+    private var previewRandState: [UUID: UInt64] = [:]
     private var previewRandValue: [UUID: Double] = [:]
 
     func add(_ lfo: LfoClip) {
@@ -33,7 +35,8 @@ final class AutomationEngine {
         lfos.removeAll { $0.id == lfo.id }
         startTicks.removeValue(forKey: lfo.id)
         lastSent.removeValue(forKey: lfo.id)
-        randomPhase.removeValue(forKey: lfo.id)
+        randomStep.removeValue(forKey: lfo.id)
+        randomState.removeValue(forKey: lfo.id)
         randomValue.removeValue(forKey: lfo.id)
         disabledClipIDs.remove(lfo.id)
         lock.unlock()
@@ -43,7 +46,7 @@ final class AutomationEngine {
         lock.lock()
         lfos.removeAll()
         startTicks.removeAll(); lastSent.removeAll()
-        randomPhase.removeAll(); randomValue.removeAll()
+        randomStep.removeAll(); randomState.removeAll(); randomValue.removeAll()
         disabledClipIDs.removeAll()
         lock.unlock()
     }
@@ -62,9 +65,10 @@ final class AutomationEngine {
         lock.lock()
         previewLfos = clips
         let ids = Set(clips.map { $0.id })
-        previewLastSent  = previewLastSent.filter  { ids.contains($0.key) }
-        previewRandPhase = previewRandPhase.filter { ids.contains($0.key) }
-        previewRandValue = previewRandValue.filter { ids.contains($0.key) }
+        previewLastSent   = previewLastSent.filter   { ids.contains($0.key) }
+        previewRandStep   = previewRandStep.filter   { ids.contains($0.key) }
+        previewRandState  = previewRandState.filter  { ids.contains($0.key) }
+        previewRandValue  = previewRandValue.filter  { ids.contains($0.key) }
         lock.unlock()
     }
 
@@ -72,7 +76,7 @@ final class AutomationEngine {
         lock.lock()
         previewLfos.removeAll()
         previewLastSent.removeAll()
-        previewRandPhase.removeAll(); previewRandValue.removeAll()
+        previewRandStep.removeAll(); previewRandState.removeAll(); previewRandValue.removeAll()
         lock.unlock()
     }
 
@@ -113,7 +117,7 @@ final class AutomationEngine {
                 }
             }
 
-            let phase = Double(tickCount % (8 * PPQN)) / Double(lfo.rateTicks)
+            let phase = Double(tickCount % lfo.rateTicks) / Double(lfo.rateTicks)
             let value = evaluate(lfo, phase: phase)
 
             lock.lock()
@@ -138,7 +142,7 @@ final class AutomationEngine {
         lock.unlock()
 
         for lfo in currentPreview {
-            let pPhase = Double(tickCount % (8 * PPQN)) / Double(lfo.rateTicks)
+            let pPhase = Double(tickCount % lfo.rateTicks) / Double(lfo.rateTicks)
             let pValue = evaluatePreview(lfo, phase: pPhase)
 
             lock.lock()
@@ -157,14 +161,15 @@ final class AutomationEngine {
         var y: Double
         if lfo.wave == .random {
             let p = phase.truncatingRemainder(dividingBy: 1.0)
+            let curStep = Int(p * 2) % 2
             lock.lock()
-            let prev = previewRandPhase[lfo.id] ?? -1
-            if prev < 0 || p < prev {
-                let step = Int(p * 8) % 8
-                let h = UInt32(bitPattern: Int32(bitPattern: UInt32(step + 1) &* 2654435761))
-                previewRandValue[lfo.id] = Double(h) / Double(UInt32.max) * 2.0 - 1.0
+            if curStep != (previewRandStep[lfo.id] ?? -1) {
+                var state = previewRandState[lfo.id] ?? UInt64.random(in: 1...UInt64.max)
+                state ^= state << 13; state ^= state >> 7; state ^= state << 17
+                previewRandState[lfo.id] = state
+                previewRandStep[lfo.id]  = curStep
+                previewRandValue[lfo.id] = Double(state) / Double(UInt64.max) * 2.0 - 1.0
             }
-            previewRandPhase[lfo.id] = p
             y = previewRandValue[lfo.id] ?? 0
             lock.unlock()
         } else {
@@ -181,14 +186,15 @@ final class AutomationEngine {
         var y: Double
         if lfo.wave == .random {
             let p = phase.truncatingRemainder(dividingBy: 1.0)
+            let curStep = Int(p * 2) % 2
             lock.lock()
-            let prev = randomPhase[lfo.id] ?? -1
-            if prev < 0 || p < prev {
-                let step = Int(p * 8) % 8
-                let h = UInt32(bitPattern: Int32(bitPattern: UInt32(step + 1) &* 2654435761))
-                randomValue[lfo.id] = Double(h) / Double(UInt32.max) * 2.0 - 1.0
+            if curStep != (randomStep[lfo.id] ?? -1) {
+                var state = randomState[lfo.id] ?? UInt64.random(in: 1...UInt64.max)
+                state ^= state << 13; state ^= state >> 7; state ^= state << 17
+                randomState[lfo.id] = state
+                randomStep[lfo.id]  = curStep
+                randomValue[lfo.id] = Double(state) / Double(UInt64.max) * 2.0 - 1.0
             }
-            randomPhase[lfo.id] = p
             y = randomValue[lfo.id] ?? 0
             lock.unlock()
         } else {

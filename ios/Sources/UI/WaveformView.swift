@@ -40,11 +40,11 @@ struct WaveformView: View {
                     let phase = (t * nCycles).truncatingRemainder(dividingBy: 1.0)
                     var y: Double
                     if wave == .random {
-                        let step = Int(phase * 8) % 8
-                        if step != prevStep {
-                            let hh = UInt32(bitPattern: Int32(bitPattern: UInt32(step + 1) &* 2654435761))
+                        let globalStep = Int(t * nCycles * 2)
+                        if globalStep != prevStep {
+                            let hh = UInt32(bitPattern: Int32(bitPattern: UInt32(globalStep + 1) &* 2654435761))
                             stepY = Double(hh) / Double(UInt32.max) * 2.0 - 1.0
-                            prevStep = step
+                            prevStep = globalStep
                         }
                         y = stepY
                     } else {
@@ -129,11 +129,11 @@ struct MultiWaveformView: View {
             let phase = (t * nCycles).truncatingRemainder(dividingBy: 1.0)
             var y: Double
             if lfo.wave == .random {
-                let step = Int(phase * 8) % 8
-                if step != prevStep {
-                    let h = UInt32(bitPattern: Int32(bitPattern: UInt32(step + 1) &* 2654435761))
+                let globalStep = Int(t * nCycles * 2)
+                if globalStep != prevStep {
+                    let h = UInt32(bitPattern: Int32(bitPattern: UInt32(globalStep + 1) &* 2654435761))
                     stepY = Double(h) / Double(UInt32.max) * 2.0 - 1.0
-                    prevStep = step
+                    prevStep = globalStep
                 }
                 y = stepY
             } else {
