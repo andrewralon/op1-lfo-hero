@@ -19,11 +19,10 @@ final class AutomationEngine {
     private var disabledClipIDs: Set<UUID>      = []
 
     // Preview LFOs — run continuously, never appear in activeLfos
-    private var previewLfos:      [LfoClip] = []
-    private var previewStartTicks: [UUID: Int]    = [:]
-    private var previewLastSent:   [UUID: Double] = [:]
-    private var previewRandPhase:  [UUID: Double] = [:]
-    private var previewRandValue:  [UUID: Double] = [:]
+    private var previewLfos:     [LfoClip] = []
+    private var previewLastSent: [UUID: Double] = [:]
+    private var previewRandPhase: [UUID: Double] = [:]
+    private var previewRandValue: [UUID: Double] = [:]
 
     func add(_ lfo: LfoClip) {
         lock.lock(); lfos.append(lfo); lock.unlock()
@@ -63,18 +62,17 @@ final class AutomationEngine {
         lock.lock()
         previewLfos = clips
         let ids = Set(clips.map { $0.id })
-        previewStartTicks = previewStartTicks.filter { ids.contains($0.key) }
-        previewLastSent   = previewLastSent.filter   { ids.contains($0.key) }
-        previewRandPhase  = previewRandPhase.filter  { ids.contains($0.key) }
-        previewRandValue  = previewRandValue.filter  { ids.contains($0.key) }
+        previewLastSent  = previewLastSent.filter  { ids.contains($0.key) }
+        previewRandPhase = previewRandPhase.filter { ids.contains($0.key) }
+        previewRandValue = previewRandValue.filter { ids.contains($0.key) }
         lock.unlock()
     }
 
     func clearPreview() {
         lock.lock()
         previewLfos.removeAll()
-        previewStartTicks.removeAll(); previewLastSent.removeAll()
-        previewRandPhase.removeAll();  previewRandValue.removeAll()
+        previewLastSent.removeAll()
+        previewRandPhase.removeAll(); previewRandValue.removeAll()
         lock.unlock()
     }
 
@@ -132,20 +130,15 @@ final class AutomationEngine {
             finishedCallback?(lfo)
         }
 
-        // Preview LFOs — continuous, never finish or appear in activeLfos
+        // Preview LFOs — continuous, never finish or appear in activeLfos.
+        // Phase uses the same global-clock formula as active looping chips (tickCount % period),
+        // so it's always non-negative and survives slaveTick resets without any phase glitch.
         lock.lock()
         let currentPreview = previewLfos
-        for lfo in currentPreview where previewStartTicks[lfo.id] == nil {
-            previewStartTicks[lfo.id] = tickCount
-        }
         lock.unlock()
 
         for lfo in currentPreview {
-            lock.lock()
-            let pStart = previewStartTicks[lfo.id] ?? tickCount
-            lock.unlock()
-
-            let pPhase = Double((tickCount - pStart) % (8 * PPQN)) / Double(lfo.rateTicks)
+            let pPhase = Double(tickCount % (8 * PPQN)) / Double(lfo.rateTicks)
             let pValue = evaluatePreview(lfo, phase: pPhase)
 
             lock.lock()

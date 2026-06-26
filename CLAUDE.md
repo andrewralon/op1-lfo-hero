@@ -147,7 +147,7 @@ cd ios
 xcodebuild test \
   -project op1-lfo-hero.xcodeproj \
   -scheme op1-lfo-hero \
-  -destination 'id=F06E0387-DEAC-405C-BEC9-2F5F8DF7B144' \
+  -destination 'id=<ipad-simulator-udid>' \
   -only-testing:op1-lfo-heroUITests/HelpSettingsUITests/testLandscapeLayout
 ```
 
@@ -156,11 +156,37 @@ xcodebuild test \
 sips --rotate 270 "/tmp/claude-ss/landscape_iPad Pro 13-inch (M5).png" --out /tmp/claude-ss/ipad_landscape_corrected.png
 ```
 
-**Known booted simulator UDIDs** (refresh with `xcrun simctl list devices available | grep Booted`):
-- iPad Pro 13-inch (M5): `F06E0387-DEAC-405C-BEC9-2F5F8DF7B144`
-- iPhone 16e: `BF7855F0-C774-4059-AD47-8D149F88DCE5`
+**Find simulator UDIDs:**
+```bash
+xcrun simctl list devices available | grep -E "(iPad|iPhone)"
+```
 
 Do **not** try to rotate the simulator window via osascript + `Device > Rotate` menu items — the rotation state is unreliable across app launches and the screenshots come out in the wrong orientation regardless.
+
+### Deploying to a physical device
+
+`xcodebuild build` compiles the `.app` into DerivedData but does **not** install it on a physical device. Always follow with an explicit install step:
+
+```bash
+# 1. Build
+cd ios
+xcodebuild \
+  -project op1-lfo-hero.xcodeproj \
+  -scheme op1-lfo-hero \
+  -destination 'id=<device-id>' \
+  -configuration Debug \
+  build
+
+# 2. Install
+xcrun devicectl device install app \
+  --device <device-id> \
+  ~/Library/Developer/Xcode/DerivedData/op1-lfo-hero-*/Build/Products/Debug-iphoneos/op1-lfo-hero.app
+```
+
+**Find physical device IDs** (format used by both xcodebuild and devicectl install):
+```bash
+xcrun xctrace list devices 2>&1 | grep -E "(iPad|iPhone)"
+```
 
 ## MIDI reference
 
