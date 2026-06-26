@@ -11,7 +11,7 @@ struct TransportBarView: View {
 
             Spacer()
 
-            TransBtn(symbol: "play.fill",  active: app.isPlaying, disabled: !app.isClockMaster) { app.play() }
+            TransBtn(symbol: "play.fill",  active: false) { app.play() }
             TransBtn(symbol: "stop.fill",  active: false)                                        { app.stop() }
 
             Sep()
@@ -223,7 +223,7 @@ struct TransportColumnView: View {
         VStack(spacing: 0) {
             // Row 1: play / stop
             HStack(spacing: 0) {
-                TransColBtn(symbol: "play.fill",  active: app.isPlaying, disabled: !app.isClockMaster) { app.play() }
+                TransColBtn(symbol: "play.fill",  active: false) { app.play() }
                 Rectangle().fill(C.bg3).frame(width: 1)
                 TransColBtn(symbol: "stop.fill",  active: false) { app.stop() }
             }

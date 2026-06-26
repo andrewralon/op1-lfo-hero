@@ -154,6 +154,14 @@ All three ranges overlap completely (1/16 take 2 is the lowest reading overall a
 
 **Beat Match / PO Sync / 1/16 are indistinguishable via MIDI.** Functionally identical from the app's perspective: OP-1 is clock master, app follows.
 
+## Beat Match: Start/Stop are bar-position beacons, not transport state
+
+In Beat Match mode, the OP-1 sends MIDI Start (0xFA) and Stop (0xFC) at bar boundaries as a clock-position signaling mechanism — even when the tape is completely stopped. These are byte-for-byte identical to actual play/stop button presses.
+
+**Consequence:** It is impossible to track whether the OP-1 tape is actually playing by listening to Start/Stop in Beat Match mode. Any debounce or filtering approach fails because Stop arrives mid-bar and the gap between Stop and the next bar-boundary Start is several seconds (tempo-dependent) — no debounce window can span that gap without also swallowing real stop events.
+
+**App behavior:** The play button sends a MIDI signal to the OP-1 but does not attempt to reflect OP-1 transport state. User checks the OP-1 directly to know if tape is playing.
+
 ## Resolved: tape state does not affect clock output
 
 Beat Match with tape stopped:

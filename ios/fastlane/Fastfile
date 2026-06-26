@@ -70,11 +70,11 @@ platform :ios do
       changelog: <<~NOTES
         o hai, tester person
         -thanks for testing! pls bug me with your bugs. random comments are welcome.
-        -there's no audio, unless you have an op1
-        -test all UI stuff - does it do what you expect? slide, change, ...
-        -does it look good? too big or too small? is anything skewed or morphed? non-round circle, ...
+        -there's no audio without an op1
+        -UI functionality - does it do what you expect? slide, change, ...
+        -does it look good? too big or small, skewed or morphed? non-round circle, ...
         -is anything weird? does anything *not* do what you expect?
-        -NEW: lfos can be toggled on/off, better background energy usage
+        -NEW: lfos can be toggled on/off; lower energy usage
 
         commits:
         #{commits}

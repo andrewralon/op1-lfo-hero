@@ -28,10 +28,9 @@
 - [x] HIGH - reorder text for active lfo's to be same order as UI - `t1*volume*sine` (not `sine*volume*t1`)
 - [x] HIGH - volume values don't match (app to op1) - off by 1 here and there
 - [x] MED - disable all button animations / transition times. just flipping toggle the button fast! this doesn't seem to be working: ".animation(.none, value: state)"
-- [x] MED - disable PLAY button if/when it can't be used
+- [x] MED - play button enabled in all modes — sends MIDI signal regardless of clock mode; does not reflect OP-1 transport state (previously disabled in OP-1 mode; later re-enabled because it does start OP-1 tape playback in MIDI sync mode)
 - [x] MED - icons: metronome is too tall compared to row elements. remove text and center vertically?
 - [x] MED - icons: parameter umbrella??? -> replace with thunderbolt / lightning
-- [x] MED - disable PLAY button if/when it can't be used
 - [x] MED - volume fader grip shape (square at 45 degree angle) is weird and too tall. make it a flatter rhombus / baseball diamond, like what python had
 - [x] HIGH - help page: minimal instructions and information
 - [x] HIGH - settings page: in case i ever need one

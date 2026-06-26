@@ -21,7 +21,6 @@ final class AppState: ObservableObject {
     // MARK: - Transport
     @Published var bpm: Double = 100.0
     @Published var isClockMaster = false
-    @Published var isPlaying = false
     @Published var slaveTicksReceived: Int = 0  // diagnostic: counts ticks from OP-1
 
     // MARK: - Track state  (volume: 0-99 display, pan: -63..+63)
@@ -252,7 +251,6 @@ final class AppState: ObservableObject {
     }
 
     func stop() {
-        isPlaying = false
         clock.stop()
     }
 
