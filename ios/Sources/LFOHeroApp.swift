@@ -19,12 +19,14 @@ struct LFOHeroApp: App {
             ZStack {
                 ContentView()
                     .environmentObject(appState)
-                    // Keep screen on while app is active — MIDI apps need this
                     .onAppear {
-                        UIApplication.shared.isIdleTimerDisabled = true
+                        UIApplication.shared.isIdleTimerDisabled = appState.isConnected
                     }
                     .onDisappear {
                         UIApplication.shared.isIdleTimerDisabled = false
+                    }
+                    .onChange(of: appState.isConnected) { _, connected in
+                        UIApplication.shared.isIdleTimerDisabled = connected
                     }
 
                 if showSplash {

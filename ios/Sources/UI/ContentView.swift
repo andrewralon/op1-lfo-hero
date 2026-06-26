@@ -424,7 +424,7 @@ struct SettingsView: View {
     private var isPad: Bool { hSize == .regular }
     @State private var wavePhase: Double = 0
 
-    @AppStorage("chipPauseAction") private var chipPauseAction: String = "previous"
+    @AppStorage("chipPauseAction")         private var chipPauseAction: String = "previous"
     @AppStorage("oneShotFinishAction")     private var oneShotFinishAction: String = "hold"
     @AppStorage("cleanupOneShots")         private var cleanupOneShots: Bool = false
 
