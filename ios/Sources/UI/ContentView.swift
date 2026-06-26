@@ -204,6 +204,7 @@ struct StatusBarView: View {
 
 // MARK: - Device picker sheet (used by StatusBarView)
 
+
 struct DevicePickerView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
@@ -318,6 +319,7 @@ struct DevicePickerView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear {
+            app.usb.rescan()
             // Restart BLE scan if it timed out before the picker was opened
             if case .notFound = app.ble.state { app.ble.startScan() }
         }

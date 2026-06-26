@@ -63,17 +63,24 @@ final class USBMidi: NSObject, ObservableObject {
         let thread = Thread { [weak self] in
             guard let self else { return }
             self.midiRunLoop = RunLoop.current
-            self.setupMIDI()
+            // Start the run loop BEFORE creating the MIDI client. On iPad Pro (USB 4),
+            // MIDIClientCreateWithBlock blocks while MIDIServer is processing the OP-1's
+            // USB Audio Class 2.0 driver. If the run loop hasn't started yet that stall
+            // also prevents any notifications from ever being delivered — classic deadlock.
+            // Scheduling setupMIDI() via perform lets the run loop start first.
             RunLoop.current.add(Port(), forMode: .default)
+            RunLoop.current.perform { [weak self] in self?.setupMIDI() }
             RunLoop.current.run()
         }
         thread.name = "USBMidi.CoreMIDI"
         thread.start()
         midiThread = thread
+
         // Retry scans in case iOS hasn't fully enumerated the USB device yet.
         // Run on global queue — scanForOP1() dispatches state changes to main internally.
-        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 1.0) { self.scanForOP1() }
-        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 1.5) { self.scanForOP1() }
+        let q = DispatchQueue.global(qos: .userInteractive)
+        q.asyncAfter(deadline: .now() + 1.0) { self.scanForOP1() }
+        q.asyncAfter(deadline: .now() + 1.5) { self.scanForOP1() }
 
         // Rescan when app foregrounds — catches any plug/unplug that happened while
         // backgrounded without relying on notifications that iOS may not deliver in background.
@@ -100,16 +107,18 @@ final class USBMidi: NSObject, ObservableObject {
 
     private func setupMIDI() {
         MIDIClientCreateWithBlock("LFOHeroUSB" as CFString, &client) { [weak self] notifPtr in
+            guard let self else { return }
             let id = notifPtr.pointee.messageID
             guard id == .msgSetupChanged || id == .msgObjectAdded || id == .msgObjectRemoved else { return }
-            // A new physical device appeared — clear the suppress flag so auto-scan resumes.
-            if id == .msgObjectAdded { self?.suppressAutoScan = false }
-            // MIDIGetNumberOfDestinations() inside scanForOP1() is a blocking IPC call to
-            // MIDIServer. If MIDIServer is still starting up it can block for 5–15 seconds.
-            // Run on background queue to keep the main thread free.
+
+            if id == .msgObjectAdded {
+                suppressAutoScan = false
+            }
+
+            // msgSetupChanged / msgObjectRemoved — fall back to polling scans.
             let q = DispatchQueue.global(qos: .userInteractive)
-            q.asyncAfter(deadline: .now() + 0.15) { self?.scanForOP1() }
-            q.asyncAfter(deadline: .now() + 0.50) { self?.scanForOP1() }
+            q.asyncAfter(deadline: .now() + 0.15) { self.scanForOP1() }
+            q.asyncAfter(deadline: .now() + 0.50) { self.scanForOP1() }
         }
         MIDIOutputPortCreate(client, "LFOHeroOut" as CFString, &outPort)
         // MIDIInputPortCreateWithBlock is deprecated in iOS 14 but provides simple
@@ -128,7 +137,10 @@ final class USBMidi: NSObject, ObservableObject {
                 pkt = MIDIPacketNext(pkt)
             }
         }
-        scanForOP1()
+        // Dispatch the initial scan off the midiRunLoop thread. MIDIGetNumberOfDestinations()
+        // is a blocking IPC call; running it on the midiRunLoop thread would prevent CoreMIDI
+        // from delivering notifications until the scan returns.
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.3) { self.scanForOP1() }
     }
 
     // MARK: - Device discovery
@@ -174,6 +186,10 @@ final class USBMidi: NSObject, ObservableObject {
         DispatchQueue.main.async {
             self.state = names.isEmpty ? .disconnected : .found(names)
         }
+    }
+
+    func rescan() {
+        DispatchQueue.global(qos: .userInteractive).async { [weak self] in self?.scanForOP1() }
     }
 
     func connectTo(_ targetName: String) {
