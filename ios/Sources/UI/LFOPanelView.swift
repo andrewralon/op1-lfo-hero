@@ -80,14 +80,30 @@ struct LFOPanelView: View {
 
     @ViewBuilder private var rateBox: some View {
         HStack(spacing: m.controlHSpacing) {
-            Image(systemName: "timer")
-                .font(.system(size: m.iconSize))
-                .foregroundColor(Color(hex: "#aaaaaa"))
+            Button { app.lfoRate = app.lfoRate % 8 + 1 } label: {
+                Image(systemName: "timer")
+                    .font(.system(size: m.iconSize))
+                    .foregroundColor(Color(hex: "#aaaaaa"))
+            }.buttonStyle(.plain)
             ScrubValue(value: Binding(
                 get: { Double(app.lfoRate) },
                 set: { app.lfoRate = max(1, min(8, Int($0.rounded()))) }
             ), range: 1...8, sensitivity: 0.04)
             .frame(width: m.rateW)
+        }
+    }
+
+    @ViewBuilder private var centerBox: some View {
+        HStack(spacing: m.controlHSpacing) {
+            Button { snapCenter() } label: {
+                Image(systemName: "arrow.down.and.line.horizontal.and.arrow.up")
+                    .font(.system(size: m.iconSize))
+                    .foregroundColor(Color(hex: "#aaaaaa"))
+            }.buttonStyle(.plain)
+            ScrubValue(value: $app.lfoCenter,
+                       range: app.lfoParam == .tempo ? 20...300 : 0...99,
+                       decimals: app.lfoParam == .tempo ? 1 : 0)
+                .frame(width: m.depthW)
         }
     }
 
@@ -98,26 +114,6 @@ struct LFOPanelView: View {
                 .foregroundColor(Color(hex: "#aaaaaa"))
             ScrubValue(value: $app.lfoDepth, range: 0...99)
                 .frame(width: m.depthW)
-        }
-    }
-
-    @ViewBuilder private var centerBox: some View {
-        HStack(spacing: m.controlHSpacing) {
-            Image(systemName: "arrow.up.and.down.circle")
-                .font(.system(size: m.iconSize))
-                .foregroundColor(Color(hex: "#aaaaaa"))
-            ScrubValue(value: $app.lfoCenter,
-                       range: app.lfoParam == .tempo ? 20...300 : 0...99,
-                       decimals: app.lfoParam == .tempo ? 1 : 0)
-                .frame(width: m.centerW)
-            Button { snapCenter() } label: {
-                Image(systemName: "scope")
-                    .font(.system(size: m.iconSize * 0.55))
-                    .foregroundColor(Color(hex: "#aaaaaa"))
-                    .frame(width: m.scopeW, height: m.scrubH)
-                    .background(C.bg3)
-                    .cornerRadius(3)
-            }.buttonStyle(.plain)
         }
     }
 
@@ -144,7 +140,7 @@ struct LFOPanelView: View {
             if app.activeLfos.isEmpty { return }
             showDeleteConfirm = true
         } label: {
-            Image(systemName: "trash").font(.system(size: m.actionIconSize))
+            Image(systemName: "delete.left.fill").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.red.opacity(0.18))
                 .foregroundColor(C.red)
@@ -178,7 +174,7 @@ struct LFOPanelView: View {
 
     @ViewBuilder private var helpBtn: some View {
         Button { showHelp = true } label: {
-            Image(systemName: "questionmark.circle").font(.system(size: m.actionIconSize))
+            Image(systemName: "questionmark.circle.fill").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.bg3).foregroundColor(C.text)
         }
@@ -188,7 +184,7 @@ struct LFOPanelView: View {
 
     @ViewBuilder private var settingsBtn: some View {
         Button { showSettings = true } label: {
-            Image(systemName: "gearshape").font(.system(size: m.actionIconSize))
+            Image(systemName: "gearshape.fill").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.bg3).foregroundColor(C.text)
         }
@@ -230,9 +226,9 @@ struct LFOPanelView: View {
                     Spacer(minLength: m.controlHSpacing * 2)
                     rateBox
                     Spacer(minLength: m.controlHSpacing * 1.2)
-                    depthBox
-                    Spacer(minLength: m.controlHSpacing * 1.2)
                     centerBox
+                    Spacer(minLength: m.controlHSpacing * 1.2)
+                    depthBox
                     Spacer(minLength: 0)
                 }
                 .padding(.vertical, m.controlVPad)
@@ -249,9 +245,9 @@ struct LFOPanelView: View {
                     Spacer(minLength: 0)
                     rateBox
                     Spacer(minLength: m.controlHSpacing * 2)
-                    depthBox
-                    Spacer(minLength: m.controlHSpacing * 2)
                     centerBox
+                    Spacer(minLength: m.controlHSpacing * 2)
+                    depthBox
                     Spacer(minLength: 0)
                 }
                 .padding(.vertical, m.controlVPad)
@@ -528,25 +524,64 @@ private struct ActiveLfoChip: View {
     let onStop: () -> Void
     @Environment(\.metrics) private var m
 
+    // Tracks the start of each press; nil = no press active or long press already fired.
+    // The timer captures this value and only fires if it still matches (i.e. press not released).
+    @State private var pressedAt: Date? = nil
+
+    private func chipLabel() -> Text {
+        let t = lfo.track == 0 ? "m" : "t\(lfo.track)"
+        let dCenter = lfo.parameter == .tempo ? Int(lfo.centerValue.rounded()) : Int(midiToUI(lfo.centerValue))
+        let dDepth  = lfo.parameter == .tempo ? Int(lfo.depth.rounded())       : Int(midiToUI(lfo.depth))
+        var result = Text("\(t)·\(lfo.parameter.shortName)·\(lfo.wave.shortName)")
+        if lfo.inverted { result = result + Text(Image(systemName: "arrow.up.arrow.down")) }
+        result = result + Text("·s\(lfo.rateIndex)·\(dCenter)±\(dDepth)·")
+        result = result + Text(Image(systemName: lfo.loop ? "repeat" : "arrow.right.to.line"))
+        return result
+    }
+
     var body: some View {
         HStack(spacing: 5) {
             Circle()
-                .fill(lfo.isEnabled ? (lfo.track == 0 ? C.green : C.track(lfo.track)) : C.dim)
+                .fill(lfo.track == 0 ? C.green : C.track(lfo.track))
                 .frame(width: 6, height: 6)
-            Text(lfo.shortLabel)
-                .font(.system(size: m.lfoChipFont, design: .monospaced))
-                .foregroundColor(.white)
-            Button { onStop() } label: {
-                Image(systemName: "xmark").font(.system(size: m.lfoChipIconSize, weight: .medium)).foregroundColor(C.dim)
-            }.buttonStyle(.plain)
+            Group {
+                chipLabel()
+                    .font(.system(size: m.lfoChipFont, design: .monospaced))
+                    .foregroundColor(.white)
+                Button { onStop() } label: {
+                    Image(systemName: "xmark").font(.system(size: m.lfoChipIconSize, weight: .medium)).foregroundColor(C.dim)
+                }.buttonStyle(.plain)
+            }
+            .opacity(lfo.isEnabled ? 1.0 : 0.4)
         }
         .padding(.horizontal, 7).padding(.vertical, 4)
         .background(C.bg3)
         .overlay(RoundedRectangle(cornerRadius: 3).stroke(selected ? C.green.opacity(0.7) : Color.clear, lineWidth: 1))
         .cornerRadius(3)
-        .opacity(lfo.isEnabled ? 1.0 : 0.4)
-        .onTapGesture { onToggleEnabled() }
-        .onLongPressGesture(minimumDuration: 0.4) { onSelect() }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    // Cancel if the user is scrolling
+                    if abs(value.translation.height) > 8 || abs(value.translation.width) > 8 {
+                        pressedAt = nil
+                        return
+                    }
+                    guard pressedAt == nil else { return }
+                    let t = Date()
+                    pressedAt = t
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        guard pressedAt == t else { return } // released or scrolled — skip
+                        pressedAt = nil
+                        onSelect()
+                    }
+                }
+                .onEnded { value in
+                    guard pressedAt != nil else { return } // long press already fired — skip tap
+                    pressedAt = nil
+                    let moved = max(abs(value.translation.width), abs(value.translation.height))
+                    if moved < 10 { onToggleEnabled() }
+                }
+        )
     }
 }
 

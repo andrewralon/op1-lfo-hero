@@ -26,6 +26,20 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
+    var shortName: String {
+        switch self {
+        case .sine:     return "sine"
+        case .triangle: return "tri"
+        case .saw:      return "saw"
+        case .square:   return "squ"
+        case .log:      return "log"
+        case .exp:      return "exp"
+        case .sweepUp:  return "swup"
+        case .sweepDn:  return "swdn"
+        case .random:   return "rand"
+        }
+    }
+
     func value(at phase: Double) -> Double {
         let p = phase.truncatingRemainder(dividingBy: 1.0)
         switch self {
@@ -76,6 +90,16 @@ enum Parameter: String, CaseIterable, Identifiable, Codable {
 
     var id: String { rawValue }
 
+    var shortName: String {
+        switch self {
+        case .volume: return "vol"
+        case .pan:    return "pan"
+        case .mute:   return "mut"
+        case .tempo:  return "tmpo"
+        default:      return rawValue.replacingOccurrences(of: " ", with: "")
+        }
+    }
+
     var isMasterOnly: Bool { self == .tempo }
 
     var isMasterCapable: Bool {
@@ -106,12 +130,7 @@ struct LfoClip: Identifiable, Codable {
         return RATE_LABELS[idx - 1]
     }
 
-    var shortLabel: String {
-        let t = track == 0 ? "m" : "t\(track)"
-        let inv = inverted ? "·inv" : ""
-        let loopMark = loop ? "↻" : "1×"
-        return "\(t)·\(parameter.rawValue)·\(wave.rawValue)·\(rateLabel)·\(loopMark)\(inv)"
-    }
+    var rateIndex: Int { RATE_TICKS.first(where: { $0.value == rateTicks })?.key ?? 3 }
 }
 
 // MARK: - Conversion helpers

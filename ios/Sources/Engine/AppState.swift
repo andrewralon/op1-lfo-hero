@@ -218,7 +218,21 @@ final class AppState: ObservableObject {
         // One-shot LFO completed
         automation.finishedCallback = { [weak self] lfo in
             DispatchQueue.main.async {
-                self?.activeLfos.removeAll { $0.id == lfo.id }
+                guard let self else { return }
+                let action = UserDefaults.standard.string(forKey: "oneShotFinishAction") ?? "previous"
+                switch action {
+                case "center": self.automation.sendRestore(lfo: lfo, value: lfo.centerValue)
+                case "hold":   break
+                default:       self.automation.sendRestore(lfo: lfo, value: lfo.originalValue)
+                }
+                let cleanup = UserDefaults.standard.object(forKey: "cleanupOneShots") as? Bool ?? false
+                if cleanup {
+                    self.activeLfos.removeAll { $0.id == lfo.id }
+                } else {
+                    if let idx = self.activeLfos.firstIndex(where: { $0.id == lfo.id }) {
+                        self.activeLfos[idx].isEnabled = false
+                    }
+                }
             }
         }
 
@@ -357,10 +371,20 @@ final class AppState: ObservableObject {
         guard let idx = activeLfos.firstIndex(where: { $0.id == lfo.id }) else { return }
         let nowEnabled = !activeLfos[idx].isEnabled
         activeLfos[idx].isEnabled = nowEnabled
-        automation.setEnabled(lfo.id, enabled: nowEnabled)
-        if !nowEnabled {
-            let restores = UserDefaults.standard.object(forKey: "lfoDisableRestoresOriginal") as? Bool ?? true
-            automation.sendRestore(lfo: activeLfos[idx], value: restores ? lfo.originalValue : lfo.centerValue)
+        if nowEnabled {
+            // Finished one-shots are removed from the engine on finish; re-add so they run again
+            if !lfo.loop && !automation.snapshot().contains(where: { $0.id == lfo.id }) {
+                automation.add(activeLfos[idx])
+            }
+            automation.setEnabled(lfo.id, enabled: true)
+        } else {
+            automation.setEnabled(lfo.id, enabled: false)
+            let action = UserDefaults.standard.string(forKey: "chipPauseAction") ?? "previous"
+            switch action {
+            case "center": automation.sendRestore(lfo: activeLfos[idx], value: lfo.centerValue)
+            case "hold":   break  // send nothing; op-1 holds last lfo value
+            default:       automation.sendRestore(lfo: activeLfos[idx], value: lfo.originalValue)
+            }
         }
         updatePreviewIfActive()
     }

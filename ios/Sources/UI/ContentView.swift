@@ -50,7 +50,6 @@ struct LayoutMetrics {
     var rateW: CGFloat            { scrubH * 1.1 }
     var depthW: CGFloat           { scrubH * 1.6 }
     var centerW: CGFloat          { scrubH * 2.0 }
-    var scopeW: CGFloat           { scrubH * 0.78 }
 
     var iconSize: CGFloat         { isLandscape ? max(lfoH * 0.08, 20) : max(lfoH * 0.06, 20) }
     var pickerFont: CGFloat       { isLandscape ? max(lfoH * 0.058, 14) : max(lfoH * 0.04, 14) }
@@ -425,7 +424,9 @@ struct SettingsView: View {
     private var isPad: Bool { hSize == .regular }
     @State private var wavePhase: Double = 0
 
-    @AppStorage("lfoDisableRestoresOriginal") private var lfoDisableRestoresOriginal: Bool = true
+    @AppStorage("chipPauseAction") private var chipPauseAction: String = "previous"
+    @AppStorage("oneShotFinishAction")     private var oneShotFinishAction: String = "hold"
+    @AppStorage("cleanupOneShots")         private var cleanupOneShots: Bool = false
 
     @State private var quantumSync     = false
     @State private var defiantJazzMode = false
@@ -457,10 +458,24 @@ struct SettingsView: View {
 
                     Divider()
 
+                    settingRowPicker(
+                        "lfo chip: on pause",
+                        "what to send to the op-1 when any lfo chip is manually paused: previous = original value before lfo started. center = lfo center value. hold = send nothing, op-1 keeps last lfo value.",
+                        $chipPauseAction,
+                        ["previous", "center", "hold"]
+                    )
+
+                    settingRowPicker(
+                        "one-shot lfo chip: on finish",
+                        "what to send to the op-1 when a one-shot lfo chip finishes or is paused: previous = original value before lfo started. center = lfo center value. hold = send nothing, op-1 keeps last lfo value.",
+                        $oneShotFinishAction,
+                        ["previous", "center", "hold"]
+                    )
+
                     settingRow(
-                        "restore value on chip disable",
-                        "when tapping a chip to pause it, send the original parameter value back to the op-1. off = snap to the lfo center value instead.",
-                        $lfoDisableRestoresOriginal
+                        "clean up one-shot lfo chips",
+                        "when a one-shot lfo chip finishes, delete it from the list. off = keep it in a paused state; tap it to run it again.",
+                        $cleanupOneShots
                     )
 
                     settingRow(
@@ -518,6 +533,29 @@ struct SettingsView: View {
         }
         .presentationDetents(isPad ? [.fraction(0.92)] : [.large])
         .preferredColorScheme(.dark)
+    }
+
+    @ViewBuilder
+    private func settingRowPicker(_ title: String, _ desc: String, _ selection: Binding<String>, _ options: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: isPad ? 6 : 4) {
+                Text(title)
+                    .font(.system(size: isPad ? 18 : 13, weight: .semibold))
+                    .foregroundColor(C.text)
+                Text(desc)
+                    .font(.system(size: isPad ? 17 : 15))
+                    .foregroundColor(C.text)
+                Picker("", selection: selection) {
+                    ForEach(options, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .padding(.top, 4)
+            }
+            .padding(.top, isPad ? 24 : 18)
+            .padding(.horizontal, isPad ? 24 : 16)
+            .padding(.bottom, isPad ? 18 : 12)
+            Divider()
+        }
     }
 
     @ViewBuilder

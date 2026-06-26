@@ -66,7 +66,7 @@ final class BLEMidi: NSObject, ObservableObject {
             }
         }
         scanTimeout = timeout
-        queue.asyncAfter(deadline: .now() + 5.0, execute: timeout)
+        queue.asyncAfter(deadline: .now() + 10.0, execute: timeout)
     }
 
     func connect(_ p: CBPeripheral) {
@@ -84,7 +84,7 @@ final class BLEMidi: NSObject, ObservableObject {
             self.startScan()
         }
         connectTimeout = timeout
-        queue.asyncAfter(deadline: .now() + 5, execute: timeout)
+        queue.asyncAfter(deadline: .now() + 5.0, execute: timeout)
     }
 
     func disconnect() {
