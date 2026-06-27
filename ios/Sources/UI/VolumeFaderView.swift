@@ -8,9 +8,6 @@ struct VolumeFaderView: View {
     let onChange: (Double) -> Void               // called on drag end (commits to AppState)
     @Environment(\.metrics) private var m
 
-    private let trackW: CGFloat = 6
-    private let thumbW: CGFloat = 20  // rhombus width
-    private let thumbH: CGFloat = 12  // rhombus height (squished)
 
     private let precisionScrubHalvingPt: Double = 30
     private func precisionFactor(_ ortho: CGFloat) -> Double {
@@ -26,6 +23,9 @@ struct VolumeFaderView: View {
     var body: some View {
         GeometryReader { geo in
             let h       = geo.size.height
+            let trackW  = m.faderTrackW
+            let thumbW  = m.faderThumbW
+            let thumbH  = m.faderThumbH
             let travel  = max(1, h - thumbH)
             let display = max(0, min(99, base - accumulated))
             let thumbY  = CGFloat(1.0 - display / 99.0) * travel
@@ -67,12 +67,12 @@ struct VolumeFaderView: View {
                         .font(.system(size: m.volValueFont, weight: .bold, design: .monospaced))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, alignment: .trailing)
-                        .padding(.trailing, 7)
+                        .padding(.trailing, m.volValueSpacing)
                     Text(String(Int(display) % 10))
                         .font(.system(size: m.volValueFont, weight: .bold, design: .monospaced))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 7)
+                        .padding(.leading, m.volValueSpacing)
                 }
                 .allowsHitTesting(false)
             }

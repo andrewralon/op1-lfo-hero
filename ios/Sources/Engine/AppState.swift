@@ -97,6 +97,7 @@ final class AppState: ObservableObject {
         if s.isClockMaster { enableClock() } else { disableClock() }
         for lfo in s.activeLfos where lfo.loop {
             automation.add(lfo)
+            if !lfo.isEnabled { automation.setEnabled(lfo.id, enabled: false) }
             activeLfos.append(lfo)
         }
     }

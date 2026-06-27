@@ -87,7 +87,8 @@ struct LayoutMetrics {
     // ── Tier 2: track strip content ─────────────────────────────────────
 
     /// Mute button number label font size.
-    var volValueFont: CGFloat   { isIpad ? 58 : 28 }
+    var volValueFont: CGFloat    { isIpad ? 58 : 28 }
+    var volValueSpacing: CGFloat { volValueFont * 0.25 }
 
     /// Gap unit between track columns: total visual gap = 3 × trackGapUnit (right pad + spacing + left pad).
     /// Portrait: 0.5% of width → ~2pt iPhone, ~5pt iPad. Landscape: 0.24% → ~2pt iPhone, ~3pt iPad.
@@ -109,6 +110,11 @@ struct LayoutMetrics {
 
     /// Top padding above the pan knob in portrait.
     var panVPadTop: CGFloat     { tracksH * 0.04 }
+
+    // iPhone portrait reference: tracksH ≈ 253pt → trackW=6pt (2.37%), thumbW=20pt (7.90%), thumbH=12pt (4.74%)
+    var faderTrackW: CGFloat { max(tracksH * 0.0237, 4) }
+    var faderThumbW: CGFloat { max(tracksH * 0.0790, 14) }
+    var faderThumbH: CGFloat { max(tracksH * 0.0474, 8) }
 }
 
 struct LayoutMetricsKey: EnvironmentKey {
