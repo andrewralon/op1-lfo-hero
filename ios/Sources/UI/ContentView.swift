@@ -30,12 +30,15 @@ struct LayoutMetrics {
 
     // ── Tier 2: LFO panel content ───────────────────────────────────────
 
-    /// Padding on all sides of the transport section; also the gap between mixer and transport.
-    var transportPad: CGFloat { trackGapUnit }
+    /// Vertical padding above/below the portrait transport bar — gives the 6pt gap unit on iPhone.
+    var transportVPad: CGFloat { isLandscape ? trackGapUnit : 3 * trackGapUnit }
+
+    /// Horizontal padding left/right of transport bar. Portrait gets extra breathing room.
+    var transportHPad: CGFloat { isLandscape ? trackGapUnit : screen.width * 0.030 }
 
     /// Total height available to LFOPanelView (below tracks+transport, above status bar).
     var lfoH: CGFloat {
-        let transportH = isLandscape ? 0 : (transportBarH + 2 * transportPad)
+        let transportH = isLandscape ? 0 : (transportBarH + 2 * transportVPad)
         let h = screen.height - tracksH - transportH - statusBarH
         return max(h, 100)
     }
@@ -45,6 +48,8 @@ struct LayoutMetrics {
     var toggleBtnFont: CGFloat    { toggleBtnSize * 0.38 }
     var toggleBtnSpacing: CGFloat { max(lfoH * 0.012, 6) }
     var toggleBtnVPad: CGFloat    { isLandscape ? max(lfoH * 0.011, 2.5) : max(lfoH * 0.030, 8) }
+    /// Top padding of the toggle buttons row. Portrait = 0 (transport bottom gap already gives 6pt).
+    var toggleBtnTopPad: CGFloat  { isLandscape ? toggleBtnVPad : 0 }
 
     /// Height of a ScrubValue / CompactPicker box.
     var scrubH: CGFloat           { isLandscape ? max(lfoH * 0.18, 36) : max(lfoH * 0.10, 36) }
@@ -148,7 +153,7 @@ struct ContentView: View {
                             .frame(width: m.transportColW)
                             .clipShape(RoundedRectangle(cornerRadius: 7))
                             .overlay(RoundedRectangle(cornerRadius: 7).stroke(C.border, lineWidth: 0.5))
-                            .padding(.horizontal, m.transportPad)
+                            .padding(.horizontal, m.transportHPad)
                     }
                     .frame(height: m.tracksH)
                 } else {
@@ -158,7 +163,8 @@ struct ContentView: View {
                         .frame(height: m.transportBarH)
                         .clipShape(RoundedRectangle(cornerRadius: 7))
                         .overlay(RoundedRectangle(cornerRadius: 7).stroke(C.border, lineWidth: 0.5))
-                        .padding(m.transportPad)
+                        .padding(.vertical, m.transportVPad)
+                        .padding(.horizontal, m.transportHPad)
                 }
 
                 LFOPanelView(needsCombinedLfoRow: needsCombinedLfoRow, needsSideBySide: needsSideBySide)
@@ -196,13 +202,18 @@ struct StatusBarView: View {
             }
             .buttonStyle(.plain)
             Spacer()
-            HStack(spacing: 0) {
-                Text("tempo: ")
-                    .foregroundColor(.white)
-                Text(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")
-                    .foregroundColor(app.isClockMaster ? C.green : C.track(1))
+            Button {
+                if app.isClockMaster { app.disableClock() } else { app.enableClock() }
+            } label: {
+                HStack(spacing: 0) {
+                    Text("tempo: ")
+                        .foregroundColor(.white)
+                    Text(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")
+                        .foregroundColor(app.isClockMaster ? C.green : C.track(1))
+                }
+                .font(.system(size: m.statusBarFont, weight: .medium, design: .monospaced))
             }
-            .font(.system(size: m.statusBarFont, weight: .medium, design: .monospaced))
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, m.statusBarVPad)
