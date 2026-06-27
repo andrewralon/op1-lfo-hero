@@ -10,10 +10,8 @@ struct LayoutMetrics {
 
     // ── Tier 1: structural — how the screen is divided into zones ───────────
 
-    /// Width of the transport column in landscape (5th column beside mixer).
-    var transportColW: CGFloat {
-        isIpad ? screen.width * 0.18 : screen.width * 0.22
-    }
+    /// Width of the transport column in landscape — sized so all 5 columns have equal content width.
+    var transportColW: CGFloat { (screen.width - 5 * trackGapUnit) / 5 }
 
     /// Height of the mixer + track strips row.
     var tracksH: CGFloat {
@@ -32,9 +30,13 @@ struct LayoutMetrics {
 
     // ── Tier 2: LFO panel content ───────────────────────────────────────
 
+    /// Padding on all sides of the transport section; also the gap between mixer and transport.
+    var transportPad: CGFloat { trackGapUnit }
+
     /// Total height available to LFOPanelView (below tracks+transport, above status bar).
     var lfoH: CGFloat {
-        let h = screen.height - tracksH - (isLandscape ? 0 : transportBarH) - statusBarH
+        let transportH = isLandscape ? 0 : (transportBarH + 2 * transportPad)
+        let h = screen.height - tracksH - transportH - statusBarH
         return max(h, 100)
     }
 
@@ -61,10 +63,9 @@ struct LayoutMetrics {
     /// Max height of the waveform+LFO section in landscape — prevents it consuming all remaining space.
     var landscapeWaveH: CGFloat   { lfoH * 0.47 }
 
-    /// Width of the repeat/1x/trash action column beside the LFO list.
-    var actionColW: CGFloat       { toggleBtnSize * 0.8 }
-    /// Width of the help/settings column.
-    var helpColW: CGFloat         { toggleBtnSize * 0.8 }
+    // Landscape: iPhone ref 39.2pt → 4.65% screenW. Portrait: screen.height avoids 2.65× width scaling; iPad needs separate fraction.
+    var actionColW: CGFloat { isLandscape ? screen.width * 0.0465 : (isIpad ? screen.height * 0.07 : screen.height * 0.05) }
+    var helpColW: CGFloat   { isLandscape ? screen.width * 0.0465 : (isIpad ? screen.height * 0.07 : screen.height * 0.05) }
     /// Icon size inside repeat/1x/trash/help/settings buttons — larger on iPad to fill the taller cells.
     var actionIconSize: CGFloat   { isIpad ? max(lfoH * 0.06, 24) : max(lfoH * 0.04, 16) }
 
@@ -94,10 +95,10 @@ struct LayoutMetrics {
     /// Portrait: 0.5% of width → ~2pt iPhone, ~5pt iPad. Landscape: 0.24% → ~2pt iPhone, ~3pt iPad.
     var trackGapUnit: CGFloat   { isLandscape ? screen.width * 0.0024 : screen.width * 0.005 }
 
-    var muteLabelFont: CGFloat  { min(tracksH * 0.108, 30) }
+    var muteLabelFont: CGFloat  { min(tracksH * 0.09, 30) }
 
     /// Vertical padding inside the mute button.
-    var muteVPad: CGFloat       { tracksH * 0.030 }
+    var muteVPad: CGFloat       { tracksH * 0.025 }
 
     /// Pan knob square size in portrait (fits column width, capped by track height).
     var panKnobPortrait: CGFloat  { min(trackColW - 24, tracksH * 0.30) }
@@ -147,19 +148,17 @@ struct ContentView: View {
                             .frame(width: m.transportColW)
                             .clipShape(RoundedRectangle(cornerRadius: 7))
                             .overlay(RoundedRectangle(cornerRadius: 7).stroke(C.border, lineWidth: 0.5))
-                            .padding(.vertical, 2)
-                            .padding(.horizontal, 2)
+                            .padding(.horizontal, m.transportPad)
                     }
                     .frame(height: m.tracksH)
                 } else {
                     TracksView(isLandscape: false)
                         .frame(height: m.tracksH)
-                        .padding(.bottom, 5)
-                    Rectangle().fill(C.bg3).frame(height: 1)
                     TransportBarView()
                         .frame(height: m.transportBarH)
                         .clipShape(RoundedRectangle(cornerRadius: 7))
                         .overlay(RoundedRectangle(cornerRadius: 7).stroke(C.border, lineWidth: 0.5))
+                        .padding(m.transportPad)
                 }
 
                 LFOPanelView(needsCombinedLfoRow: needsCombinedLfoRow, needsSideBySide: needsSideBySide)
