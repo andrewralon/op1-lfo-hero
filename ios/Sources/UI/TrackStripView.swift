@@ -75,17 +75,18 @@ struct TrackStripView: View {
                 .overlay(RoundedRectangle(cornerRadius: 7)
                     .stroke(C.border, lineWidth: 0.5))
         )
-        .padding(.horizontal, 2)
+        .padding(.horizontal, m.trackGapUnit)
     }
 }
 
 struct TracksView: View {
     var isLandscape: Bool = false
+    @Environment(\.metrics) private var m
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: m.trackGapUnit) {
             ForEach(1...4, id: \.self) { TrackStripView(track: $0, isLandscape: isLandscape) }
         }
-        .padding(.horizontal, 2)
+        .padding(.horizontal, m.trackGapUnit)
         .padding(.vertical, 0)
     }
 }

@@ -17,7 +17,7 @@ struct LayoutMetrics {
 
     /// Height of the mixer + track strips row.
     var tracksH: CGFloat {
-        if isLandscape { return screen.height * 0.42 }  // landscape: same ratio for iPhone + iPad
+        if isLandscape { return screen.height * 0.38 }  // landscape: same ratio for iPhone + iPad
         return screen.height * 0.30
     }
 
@@ -42,8 +42,7 @@ struct LayoutMetrics {
     var toggleBtnSize: CGFloat    { isLandscape ? max(lfoH * 0.22, 44) : max(lfoH * 0.13, 44) }
     var toggleBtnFont: CGFloat    { toggleBtnSize * 0.38 }
     var toggleBtnSpacing: CGFloat { max(lfoH * 0.012, 6) }
-    // Landscape: no top/bottom pad — toggle buttons butt up directly against the mixer row.
-    var toggleBtnVPad: CGFloat    { isLandscape ? 0 : max(lfoH * 0.030, 8) }
+    var toggleBtnVPad: CGFloat    { isLandscape ? max(lfoH * 0.011, 2.5) : max(lfoH * 0.030, 8) }
 
     /// Height of a ScrubValue / CompactPicker box.
     var scrubH: CGFloat           { isLandscape ? max(lfoH * 0.18, 36) : max(lfoH * 0.10, 36) }
@@ -53,7 +52,7 @@ struct LayoutMetrics {
 
     var iconSize: CGFloat         { isLandscape ? max(lfoH * 0.08, 20) : max(lfoH * 0.06, 20) }
     var pickerFont: CGFloat       { isLandscape ? max(lfoH * 0.058, 14) : max(lfoH * 0.04, 14) }
-    var controlVPad: CGFloat      { max(lfoH * 0.022, 5) }
+    var controlVPad: CGFloat      { max(lfoH * 0.011, 2.5) }
     var controlHSpacing: CGFloat  { max(lfoH * 0.018, 8) }
 
     /// Waveform fixed height in portrait (landscape uses landscapeWaveH cap instead).
@@ -88,10 +87,16 @@ struct LayoutMetrics {
     // ── Tier 2: track strip content ─────────────────────────────────────
 
     /// Mute button number label font size.
-    var muteLabelFont: CGFloat  { min(tracksH * 0.09, 30) }
+    var volValueFont: CGFloat   { isIpad ? 58 : 28 }
+
+    /// Gap unit between track columns: total visual gap = 3 × trackGapUnit (right pad + spacing + left pad).
+    /// Portrait: 0.5% of width → ~2pt iPhone, ~5pt iPad. Landscape: 0.24% → ~2pt iPhone, ~3pt iPad.
+    var trackGapUnit: CGFloat   { isLandscape ? screen.width * 0.0024 : screen.width * 0.005 }
+
+    var muteLabelFont: CGFloat  { min(tracksH * 0.108, 30) }
 
     /// Vertical padding inside the mute button.
-    var muteVPad: CGFloat       { tracksH * 0.025 }
+    var muteVPad: CGFloat       { tracksH * 0.030 }
 
     /// Pan knob square size in portrait (fits column width, capped by track height).
     var panKnobPortrait: CGFloat  { min(trackColW - 24, tracksH * 0.30) }

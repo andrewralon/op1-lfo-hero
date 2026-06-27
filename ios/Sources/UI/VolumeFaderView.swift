@@ -6,6 +6,7 @@ struct VolumeFaderView: View {
     @Binding var value: Double  // 0-99
     var onLiveChange: ((Double) -> Void)? = nil  // called every drag frame (MIDI only, no state update)
     let onChange: (Double) -> Void               // called on drag end (commits to AppState)
+    @Environment(\.metrics) private var m
 
     private let trackW: CGFloat = 6
     private let thumbW: CGFloat = 20  // rhombus width
@@ -63,12 +64,12 @@ struct VolumeFaderView: View {
                 // ── Live digits — always 2 digits, update every drag frame ──
                 HStack(alignment: .bottom, spacing: 0) {
                     Text(String(Int(display) / 10))
-                        .font(.system(size: 38, weight: .bold, design: .monospaced))
+                        .font(.system(size: m.volValueFont, weight: .bold, design: .monospaced))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .padding(.trailing, 7)
                     Text(String(Int(display) % 10))
-                        .font(.system(size: 38, weight: .bold, design: .monospaced))
+                        .font(.system(size: m.volValueFont, weight: .bold, design: .monospaced))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.leading, 7)

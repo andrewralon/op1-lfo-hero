@@ -294,7 +294,7 @@ struct LFOPanelView: View {
                     .padding(.trailing, 8)
                     .padding(.vertical, 8)
                 }
-                .frame(maxHeight: m.isIpad ? .infinity : m.landscapeWaveH)
+                .frame(maxHeight: .infinity)
             } else {
                 MultiWaveformView(
                     lfos: previewLfos, wave: app.lfoWave,

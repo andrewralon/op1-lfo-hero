@@ -126,8 +126,15 @@ xcodebuild test \
 
 **Taking screenshots inside a UITest:**
 ```swift
-let screenshot = XCUIScreen.main.screenshot()
-try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/my_screen.png"))
+// Portrait — direct write is fine
+let raw = XCUIScreen.main.screenshot()
+try raw.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/my_screen.png"))
+
+// Landscape — use Snapshot.fixLandscapeOrientation to bake in orientation metadata
+// (requires @MainActor on the test method)
+let raw = XCUIScreen.main.screenshot()
+let image = Snapshot.fixLandscapeOrientation(image: raw.image)
+try image.pngData()?.write(to: URL(fileURLWithPath: "/tmp/claude-ss/my_screen.png"))
 ```
 
 **Find the booted simulator UDID:**
@@ -137,31 +144,26 @@ xcrun simctl list devices available | grep Booted
 xcrun simctl list devices available | grep iPhone
 ```
 
-### Reliable landscape screenshots (iPad)
+### Landscape screenshots
 
-`xcrun simctl io screenshot` always captures in the device's native portrait orientation — landscape content comes out rotated. The correct workflow:
+`XCUIScreen.main.screenshot()` always captures raw portrait pixel buffers — landscape content comes out sideways unless you fix the orientation. The UITests use `Snapshot.fixLandscapeOrientation()` (from `SnapshotHelper.swift`) to re-render the image correctly via `UIGraphicsImageRenderer`. No `sips --rotate` step needed.
 
-1. Run the `testLandscapeLayout` UITest (which calls `XCUIDevice.shared.orientation = .landscapeLeft` and saves via `XCUIScreen.main.screenshot()`):
+Run the `testLandscapeLayout` UITest to get a correctly-oriented landscape PNG:
 ```bash
 cd ios
 xcodebuild test \
   -project op1-lfo-hero.xcodeproj \
   -scheme op1-lfo-hero \
-  -destination 'id=<ipad-simulator-udid>' \
+  -destination 'id=<simulator-udid>' \
   -only-testing:op1-lfo-heroUITests/HelpSettingsUITests/testLandscapeLayout
 ```
 
-2. Rotate the saved PNG 270° to get the correct orientation:
-```bash
-sips --rotate 270 "/tmp/claude-ss/landscape_iPad Pro 13-inch (M5).png" --out /tmp/claude-ss/ipad_landscape_corrected.png
-```
+The PNG is written directly to `/tmp/claude-ss/landscape_<DeviceName>.png` in the correct landscape orientation.
 
 **Find simulator UDIDs:**
 ```bash
 xcrun simctl list devices available | grep -E "(iPad|iPhone)"
 ```
-
-Do **not** try to rotate the simulator window via osascript + `Device > Rotate` menu items — the rotation state is unreliable across app launches and the screenshots come out in the wrong orientation regardless.
 
 ### Deploying to a physical device
 

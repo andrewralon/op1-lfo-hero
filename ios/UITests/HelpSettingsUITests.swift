@@ -23,7 +23,7 @@ final class HelpSettingsUITests: XCTestCase {
         XCTAssertFalse(app.navigationBars["help"].waitForExistence(timeout: 2))
     }
 
-    func testParamPickerLandscape() throws {
+    @MainActor func testParamPickerLandscape() throws {
         XCUIDevice.shared.orientation = .landscapeLeft
         let app = XCUIApplication()
         app.launch()
@@ -33,9 +33,10 @@ final class HelpSettingsUITests: XCTestCase {
         XCTAssertTrue(paramPicker.waitForExistence(timeout: 3))
         paramPicker.tap()
         sleep(1)
-        let screenshot = XCUIScreen.main.screenshot()
+        let raw = XCUIScreen.main.screenshot()
         let name = ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] ?? "device"
-        try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/param_picker_landscape_\(name).png"))
+        let image = Snapshot.fixLandscapeOrientation(image: raw.image)
+        try image.pngData()?.write(to: URL(fileURLWithPath: "/tmp/claude-ss/param_picker_landscape_\(name).png"))
     }
 
     func testParamPickerOpens() throws {
@@ -75,16 +76,17 @@ final class HelpSettingsUITests: XCTestCase {
         XCTAssertFalse(app.navigationBars["settings"].waitForExistence(timeout: 2))
     }
 
-    func testLandscapeLayout() throws {
+    @MainActor func testLandscapeLayout() throws {
         XCUIDevice.shared.orientation = .landscapeLeft
         let app = XCUIApplication()
         app.launch()
         let helpButton = app.buttons["helpButton"]
         XCTAssertTrue(helpButton.waitForExistence(timeout: 8))
         sleep(1)
-        let screenshot = XCUIScreen.main.screenshot()
+        let raw = XCUIScreen.main.screenshot()
         let device = ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] ?? "device"
-        try screenshot.pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/claude-ss/landscape_\(device).png"))
+        let image = Snapshot.fixLandscapeOrientation(image: raw.image)
+        try image.pngData()?.write(to: URL(fileURLWithPath: "/tmp/claude-ss/landscape_\(device).png"))
     }
 
     func testPortraitLayout() throws {
