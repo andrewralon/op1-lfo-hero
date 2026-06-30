@@ -258,6 +258,7 @@ struct LFOPanelView: View {
             .frame(maxWidth: .infinity)
             .padding(.top, m.toggleBtnTopPad)
             .padding(.bottom, m.toggleBtnVPad)
+            .padding(.horizontal, m.toggleBtnHPad)
 
             // ── 2+3. Param / wave / rate / depth / center controls ────────────
             if needsCombinedLfoRow {

@@ -16,6 +16,7 @@ struct LayoutMetrics {
     /// Height of the mixer + track strips row.
     var tracksH: CGFloat {
         if isLandscape { return screen.height * 0.38 }  // landscape: same ratio for iPhone + iPad
+        if !isIpad     { return screen.height * 0.25 }  // iPhone portrait: shorter mixer row
         return screen.height * 0.30
     }
 
@@ -44,10 +45,19 @@ struct LayoutMetrics {
     }
 
     // Landscape uses larger fractions: single combined row means more lfoH per element.
-    var toggleBtnSize: CGFloat    { isLandscape ? max(lfoH * 0.22, 44) : max(lfoH * 0.13, 44) }
+    var toggleBtnSize: CGFloat    {
+        if isLandscape { return max(lfoH * 0.22, 44) }
+        if isIpad      { return max(lfoH * 0.13, 44) }
+        // iPhone portrait: fit 6 buttons + 5 gaps + 2 side margins within screen width
+        let margin  = 3 * trackGapUnit
+        let spacing = max(lfoH * 0.012, 6)
+        return max((screen.width - 2 * margin - 5 * spacing) / 6, 44)
+    }
+    /// Horizontal padding on the toggle button row — iPhone portrait only, to give side margins.
+    var toggleBtnHPad: CGFloat    { !isLandscape && !isIpad ? 3 * trackGapUnit : 0 }
     var toggleBtnFont: CGFloat    { toggleBtnSize * 0.38 }
     var toggleBtnSpacing: CGFloat { max(lfoH * 0.012, 6) }
-    var toggleBtnVPad: CGFloat    { isLandscape ? max(lfoH * 0.011, 2.5) : max(lfoH * 0.030, 8) }
+    var toggleBtnVPad: CGFloat    { isLandscape ? max(lfoH * 0.011, 2.5) : (isIpad ? max(lfoH * 0.030, 8) : 0) }
     /// Top padding of the toggle buttons row. Portrait = 0 (transport bottom gap already gives 6pt).
     var toggleBtnTopPad: CGFloat  { isLandscape ? toggleBtnVPad : 0 }
 
@@ -100,7 +110,7 @@ struct LayoutMetrics {
     /// Portrait: 0.5% of width → ~2pt iPhone, ~5pt iPad. Landscape: 0.24% → ~2pt iPhone, ~3pt iPad.
     var trackGapUnit: CGFloat   { isLandscape ? screen.width * 0.0024 : screen.width * 0.005 }
 
-    var muteLabelFont: CGFloat  { min(tracksH * 0.09, 30) }
+    var muteLabelFont: CGFloat  { pickerFont }
 
     /// Vertical padding inside the mute button.
     var muteVPad: CGFloat       { tracksH * 0.025 }

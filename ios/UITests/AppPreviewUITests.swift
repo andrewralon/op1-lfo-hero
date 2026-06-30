@@ -24,8 +24,6 @@ final class AppPreviewUITests: XCTestCase {
     //          pans sweep in opposite directions. Hold a few seconds to show the motion.
 
     @MainActor func testAppPreviewDemo() throws {
-        XCUIDevice.shared.orientation = .portrait
-        Thread.sleep(forTimeInterval: 0.5)
         let app = XCUIApplication()
         app.launchArguments = ["--uitest-reset"]
         app.launch()
