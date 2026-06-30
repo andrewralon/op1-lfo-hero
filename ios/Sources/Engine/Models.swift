@@ -142,17 +142,17 @@ enum Parameter: String, CaseIterable, Identifiable, Codable {
 
 // MARK: - LfoClip
 
-struct LfoClip: Identifiable, Codable {
+struct LfoClip: Identifiable, Codable, Equatable {
     var id = UUID()
-    let track: Int           // 0 = master, 1-4 = per track
-    let parameter: Parameter
-    let wave: LfoWave
-    let rateTicks: Int
+    var track: Int           // 0 = master, 1-4 = per track
+    var parameter: Parameter
+    var wave: LfoWave
+    var rateTicks: Int
     var freeRatePeriod: Double? = nil  // non-nil → free rate (fixed seconds, not tempo-dependent)
-    let depth: Double        // MIDI units (0-127), or BPM for tempo
-    let centerValue: Double  // MIDI units (0-127), or BPM for tempo
-    let inverted: Bool
-    let loop: Bool
+    var depth: Double        // MIDI units (0-127), or BPM for tempo
+    var centerValue: Double  // MIDI units (0-127), or BPM for tempo
+    var inverted: Bool
+    let loop: Bool           // set at creation; not editable
     var isEnabled: Bool = true   // false = paused; chip stays in list but sends no MIDI
     let originalValue: Double    // MIDI value of parameter captured at clip creation (for restore-on-disable)
 

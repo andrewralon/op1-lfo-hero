@@ -3,6 +3,16 @@ import Foundation
 import SwiftUI
 import UIKit
 
+struct EditorSnapshot {
+    let param:    Parameter
+    let wave:     LfoWave
+    let rate:     Int
+    let center:   Double
+    let depth:    Double
+    let trackOn:  [Int: Int]
+    let masterOn: Int
+}
+
 @MainActor
 final class AppState: ObservableObject {
 
@@ -79,6 +89,9 @@ final class AppState: ObservableObject {
     private let settingsKey = "AppSettings"
 
     private func loadSettings() {
+        if CommandLine.arguments.contains("--uitest-reset") {
+            UserDefaults.standard.removeObject(forKey: settingsKey)
+        }
         let s: Settings
         if let data = UserDefaults.standard.data(forKey: settingsKey),
            let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
@@ -342,9 +355,9 @@ final class AppState: ObservableObject {
 
     private func addLfo(track: Int, rateTicks: Int, freeRatePeriod: Double?, depth: Double, center: Double,
                         inverted: Bool, loop: Bool) {
-        // Dedup: only enabled clips count as "running" — disabled chips don't block a new start.
-        if loop && activeLfos.contains(where: {
-            $0.isEnabled && $0.loop && $0.track == track && $0.parameter == lfoParam &&
+        // Dedup: paused/disabled chips also count — re-enable instead of adding a duplicate.
+        if activeLfos.contains(where: {
+            $0.track == track && $0.parameter == lfoParam &&
             $0.wave == lfoWave && $0.rateTicks == rateTicks && $0.freeRatePeriod == freeRatePeriod &&
             $0.depth == depth && $0.centerValue == center && $0.inverted == inverted
         }) { return }
@@ -460,6 +473,156 @@ final class AppState: ObservableObject {
                 active.inverted    == preview.inverted
             }
         }
+    }
+
+    // MARK: - Chip editing
+
+    func chipEditorSnapshot() -> EditorSnapshot {
+        EditorSnapshot(param: lfoParam, wave: lfoWave, rate: lfoRate,
+                       center: lfoCenter, depth: lfoDepth,
+                       trackOn: trackOn, masterOn: masterOn)
+    }
+
+    func loadEditor(from lfo: LfoClip) {
+        trackOn = [1: 0, 2: 0, 3: 0, 4: 0]
+        if lfo.track == 0 {
+            masterOn = lfo.inverted ? 2 : 1
+        } else {
+            masterOn = 0
+            trackOn[lfo.track] = lfo.inverted ? 2 : 1
+        }
+        lfoWave   = lfo.wave
+        lfoRate   = lfo.rateIndex
+        if lfo.parameter == .tempo {
+            lfoDepth  = lfo.depth
+            lfoCenter = lfo.centerValue
+        } else {
+            lfoDepth  = midiToUI(lfo.depth)
+            lfoCenter = midiToUI(lfo.centerValue)
+        }
+        lfoParam = lfo.parameter  // last — didSet may adjust masterOn
+        updatePreviewIfActive()
+    }
+
+    func saveChipEdits(id: UUID) {
+        guard let idx = activeLfos.firstIndex(where: { $0.id == id }) else { return }
+        var lfo = activeLfos[idx]
+
+        lfo.parameter = lfoParam
+        lfo.wave      = lfoWave
+
+        if let secs = FREE_RATE_SECONDS[lfoRate] {
+            lfo.freeRatePeriod = secs
+            lfo.rateTicks = max(1, Int(secs * max(20, bpm) * Double(PPQN) / 60.0))
+        } else {
+            lfo.freeRatePeriod = nil
+            lfo.rateTicks = RATE_TICKS[lfoRate] ?? (4 * PPQN)
+        }
+
+        if lfoParam == .tempo {
+            lfo.depth       = lfoDepth
+            lfo.centerValue = lfoCenter
+        } else {
+            lfo.depth       = Double(uiToMidi(lfoDepth))
+            lfo.centerValue = Double(uiToMidi(lfoCenter))
+        }
+
+        // Track + inverted: master takes priority; otherwise lowest-indexed non-zero track.
+        if masterOn > 0 {
+            lfo.track    = 0
+            lfo.inverted = masterOn == 2
+        } else if let entry = trackOn.sorted(by: { $0.key < $1.key }).first(where: { $0.value > 0 }) {
+            lfo.track    = entry.key
+            lfo.inverted = entry.value == 2
+        }
+
+        activeLfos[idx] = lfo
+        automation.update(lfo)
+        updatePreviewIfActive()
+    }
+
+    // Creates additional chips for all active tracks/master beyond the primary one.
+    // Call after the primary chip has already been saved via saveChipEdits / liveUpdateChip.
+    func createAdditionalChipsOnCommit(id: UUID) {
+        guard let primary = activeLfos.first(where: { $0.id == id }) else { return }
+
+        var targets: [(track: Int, inverted: Bool)] = []
+        if masterOn > 0 {
+            targets.append((0, masterOn == 2))
+        } else {
+            for (t, state) in trackOn.sorted(by: { $0.key < $1.key }) where state != 0 {
+                targets.append((t, state == 2))
+            }
+        }
+        guard targets.count > 1 else { return }
+
+        for target in targets.dropFirst() {
+            if activeLfos.contains(where: {
+                $0.track == target.track && $0.parameter == primary.parameter &&
+                $0.wave == primary.wave && $0.rateTicks == primary.rateTicks &&
+                $0.freeRatePeriod == primary.freeRatePeriod &&
+                $0.depth == primary.depth && $0.centerValue == primary.centerValue &&
+                $0.inverted == target.inverted
+            }) { continue }
+
+            let origVal: Double
+            switch primary.parameter {
+            case .volume: origVal = Double(uiToMidi(volumes[target.track] ?? 90))
+            case .pan:    origVal = Double((pans[target.track] ?? 0) + 64)
+            case .mute:   origVal = (mutes[target.track] ?? false) ? 127.0 : 0.0
+            default:      origVal = primary.centerValue
+            }
+            let clip = LfoClip(track: target.track, parameter: primary.parameter,
+                               wave: primary.wave, rateTicks: primary.rateTicks,
+                               freeRatePeriod: primary.freeRatePeriod,
+                               depth: primary.depth, centerValue: primary.centerValue,
+                               inverted: target.inverted, loop: primary.loop,
+                               originalValue: origVal)
+            automation.add(clip)
+            activeLfos.append(clip)
+        }
+        updatePreviewIfActive()
+    }
+
+    // Removes any chips (other than `id`) that are now identical to the primary chip,
+    // including paused/disabled ones. Called before createAdditionalChipsOnCommit so the
+    // dedup there can compare against a clean list.
+    func removeChipDuplicates(of id: UUID) {
+        guard let primary = activeLfos.first(where: { $0.id == id }) else { return }
+        let dupes = activeLfos.filter {
+            $0.id != id &&
+            $0.track       == primary.track      &&
+            $0.parameter   == primary.parameter  &&
+            $0.wave        == primary.wave        &&
+            $0.rateTicks   == primary.rateTicks   &&
+            $0.freeRatePeriod == primary.freeRatePeriod &&
+            $0.depth       == primary.depth       &&
+            $0.centerValue == primary.centerValue &&
+            $0.inverted    == primary.inverted
+        }
+        guard !dupes.isEmpty else { return }
+        let dupeIDs = Set(dupes.map { $0.id })
+        for lfo in dupes { automation.remove(lfo) }
+        activeLfos.removeAll { dupeIDs.contains($0.id) }
+        updatePreviewIfActive()
+    }
+
+    func revertChipEdits(_ original: LfoClip) {
+        guard let idx = activeLfos.firstIndex(where: { $0.id == original.id }) else { return }
+        activeLfos[idx] = original
+        automation.update(original)
+        updatePreviewIfActive()
+    }
+
+    func restoreEditor(_ snap: EditorSnapshot) {
+        trackOn   = snap.trackOn
+        masterOn  = snap.masterOn
+        lfoWave   = snap.wave
+        lfoRate   = snap.rate
+        lfoCenter = snap.center
+        lfoDepth  = snap.depth
+        lfoParam  = snap.param  // last — didSet may adjust masterOn
+        updatePreviewIfActive()
     }
 
     // MARK: - Track button cycle (0→1→2→0)

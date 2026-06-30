@@ -7,16 +7,11 @@ struct LFOPanelView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.metrics) private var m
     @State private var selectedLfoID: UUID? = nil
+    @State private var editorSnapshot: EditorSnapshot? = nil
+    @State private var chipSnapshot: LfoClip? = nil
     @State private var showDeleteConfirm = false
     @State private var showHelp = false
     @State private var showSettings = false
-
-    private var previewLfos: [LfoClip] {
-        if let id = selectedLfoID, let lfo = app.activeLfos.first(where: { $0.id == id }) {
-            return [lfo]
-        }
-        return []
-    }
 
     private func snapCenter() {
         if app.lfoParam == .tempo {
@@ -30,6 +25,39 @@ struct LFOPanelView: View {
         case .mute:   app.lfoCenter = (app.mutes[track] ?? false) ? 99 : 0
         default: break
         }
+    }
+
+    // MARK: - Chip edit helpers
+
+    private func enterChipEdit(_ lfo: LfoClip) {
+        if selectedLfoID != nil { cancelChipEdit() }
+        chipSnapshot    = lfo
+        if editorSnapshot == nil { editorSnapshot = app.chipEditorSnapshot() }
+        selectedLfoID   = lfo.id
+        app.loadEditor(from: lfo)
+    }
+
+    // Long press on selected chip — keep the chip's current (live-updated) values, restore editor.
+    private func commitChipEdit() {
+        guard let id = selectedLfoID else { return }
+        app.removeChipDuplicates(of: id)           // primary may now match an existing chip
+        app.createAdditionalChipsOnCommit(id: id)  // add chips for any extra active tracks
+        selectedLfoID = nil   // clear before restoreEditor so liveUpdateChip() becomes a no-op
+        chipSnapshot  = nil
+        if let snap = editorSnapshot { app.restoreEditor(snap); editorSnapshot = nil }
+    }
+
+    // Tap empty area / stop while selected — revert chip to its state at selection time.
+    private func cancelChipEdit() {
+        selectedLfoID = nil   // clear before revert/restore so liveUpdateChip() becomes a no-op
+        if let snap = chipSnapshot { app.revertChipEdits(snap); chipSnapshot = nil }
+        if let snap = editorSnapshot { app.restoreEditor(snap); editorSnapshot = nil }
+    }
+
+    // Called from every editor-field onChange while a chip is selected — updates chip text live.
+    private func liveUpdateChip() {
+        guard let id = selectedLfoID else { return }
+        app.saveChipEdits(id: id)
     }
 
     private func cycleNext<T: CaseIterable & Equatable>(_ value: T) -> T {
@@ -74,7 +102,7 @@ struct LFOPanelView: View {
                     .font(.system(size: m.iconSize))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
-            CompactPicker(options: Array(LfoWave.allCases), selection: $app.lfoWave)
+            CompactPicker(options: Array(LfoWave.allCases), selection: $app.lfoWave, accessibilityId: "wavePicker")
         }
     }
 
@@ -85,11 +113,13 @@ struct LFOPanelView: View {
                     .font(.system(size: m.iconSize))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
+            .accessibilityIdentifier("rateStepButton")
             ScrubValue(value: Binding(
                 get: { Double(app.lfoRate) },
                 set: { app.lfoRate = max(1, min(25, Int($0.rounded()))) }
             ), range: 1...25, sensitivity: 0.04,
-               labelForValue: { rateScrubLabel(for: $0) })
+               labelForValue: { rateScrubLabel(for: $0) },
+               accessibilityId: "rateScrub")
             .frame(width: m.rateW)
         }
     }
@@ -103,7 +133,8 @@ struct LFOPanelView: View {
             }.buttonStyle(.plain)
             ScrubValue(value: $app.lfoCenter,
                        range: app.lfoParam == .tempo ? 20...300 : 0...99,
-                       decimals: app.lfoParam == .tempo ? 1 : 0)
+                       decimals: app.lfoParam == .tempo ? 1 : 0,
+                       accessibilityId: "centerScrub")
                 .frame(width: m.depthW)
         }
     }
@@ -113,7 +144,7 @@ struct LFOPanelView: View {
             Image(systemName: "arrow.up.and.down")
                 .font(.system(size: m.iconSize))
                 .foregroundColor(Color(hex: "#aaaaaa"))
-            ScrubValue(value: $app.lfoDepth, range: 0...99)
+            ScrubValue(value: $app.lfoDepth, range: 0...99, accessibilityId: "depthScrub")
                 .frame(width: m.depthW)
         }
     }
@@ -124,7 +155,9 @@ struct LFOPanelView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.green.opacity(0.25))
                 .foregroundColor(C.green)
-        }.buttonStyle(.plain)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("repeatButton")
     }
 
     @ViewBuilder private var oneShotBtn: some View {
@@ -133,7 +166,9 @@ struct LFOPanelView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.bg3)
                 .foregroundColor(C.text)
-        }.buttonStyle(.plain)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("oneShotButton")
     }
 
     @ViewBuilder private var trashBtn: some View {
@@ -147,9 +182,11 @@ struct LFOPanelView: View {
                 .foregroundColor(C.red)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("trashButton")
         .confirmationDialog("delete all active LFOs?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
             Button("delete all", role: .destructive) {
-                app.stopAllLfos(); selectedLfoID = nil
+                cancelChipEdit()
+                app.stopAllLfos()
             }
         }
     }
@@ -159,12 +196,14 @@ struct LFOPanelView: View {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(app.activeLfos) { lfo in
                     ActiveLfoChip(lfo: lfo, selected: selectedLfoID == lfo.id) {
-                        selectedLfoID = selectedLfoID == lfo.id ? nil : lfo.id
+                        // Long press: enter edit or commit if already selected
+                        if selectedLfoID == lfo.id { commitChipEdit() }
+                        else { enterChipEdit(lfo) }
                     } onToggleEnabled: {
                         app.toggleLfoEnabled(lfo)
                     } onStop: {
-                        if selectedLfoID == lfo.id { selectedLfoID = nil }
                         app.stopLfo(lfo)
+                        // onChange(of: app.activeLfos) handles cancel+restore if this was selected
                     }
                 }
             }
@@ -172,7 +211,7 @@ struct LFOPanelView: View {
             .padding(.vertical, 5).padding(.leading, 5)
         }
         .contentShape(Rectangle())
-        .onTapGesture { selectedLfoID = nil }
+        .onTapGesture { cancelChipEdit() }
     }
 
     @ViewBuilder private var helpBtn: some View {
@@ -261,7 +300,7 @@ struct LFOPanelView: View {
             if needsSideBySide {
                 HStack(spacing: 0) {
                     MultiWaveformView(
-                        lfos: previewLfos, wave: app.lfoWave,
+                        lfos: [], wave: app.lfoWave,
                         rateTicks: app.lfoDisplayRateTicks,
                         depth: app.lfoDepth, tracks: waveTracks,
                         bpm: app.bpm
@@ -302,7 +341,7 @@ struct LFOPanelView: View {
                 .frame(maxHeight: .infinity)
             } else {
                 MultiWaveformView(
-                    lfos: previewLfos, wave: app.lfoWave,
+                    lfos: [], wave: app.lfoWave,
                     rateTicks: app.lfoDisplayRateTicks,
                     depth: app.lfoDepth, tracks: waveTracks,
                     bpm: app.bpm
@@ -346,11 +385,18 @@ struct LFOPanelView: View {
             Rectangle().fill(C.bg3).frame(height: 1)
         }
         .background(C.bg)
-        .onChange(of: app.lfoParam)  { _, _ in app.updatePreviewIfActive() }
-        .onChange(of: app.lfoWave)   { _, _ in app.updatePreviewIfActive() }
-        .onChange(of: app.lfoRate)   { _, _ in app.updatePreviewIfActive() }
-        .onChange(of: app.lfoDepth)  { _, _ in app.updatePreviewIfActive() }
-        .onChange(of: app.lfoCenter) { _, _ in app.updatePreviewIfActive() }
+        .onChange(of: app.lfoParam)  { _, _ in app.updatePreviewIfActive(); liveUpdateChip() }
+        .onChange(of: app.lfoWave)   { _, _ in app.updatePreviewIfActive(); liveUpdateChip() }
+        .onChange(of: app.lfoRate)   { _, _ in app.updatePreviewIfActive(); liveUpdateChip() }
+        .onChange(of: app.lfoDepth)  { _, _ in app.updatePreviewIfActive(); liveUpdateChip() }
+        .onChange(of: app.lfoCenter) { _, _ in app.updatePreviewIfActive(); liveUpdateChip() }
+        .modifier(TrackToggleLiveUpdateModifier(onUpdate: liveUpdateChip))
+        .onChange(of: app.activeLfos) { _, lfos in
+            guard let id = selectedLfoID, !lfos.contains(where: { $0.id == id }) else { return }
+            chipSnapshot = nil
+            if let snap = editorSnapshot { app.restoreEditor(snap); editorSnapshot = nil }
+            selectedLfoID = nil
+        }
         .sheet(isPresented: Binding(
             get: { !m.isIpad && showHelp },
             set: { if !$0 { showHelp = false } }
@@ -367,6 +413,19 @@ struct LFOPanelView: View {
             get: { m.isIpad && showSettings },
             set: { if !$0 { showSettings = false } }
         )) { SettingsView() }
+    }
+}
+
+// MARK: - Track/master live-update modifier
+
+private struct TrackToggleLiveUpdateModifier: ViewModifier {
+    @EnvironmentObject var app: AppState
+    let onUpdate: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: app.trackOn)  { _, _ in onUpdate() }
+            .onChange(of: app.masterOn) { _, _ in onUpdate() }
     }
 }
 
@@ -458,6 +517,7 @@ private struct ScrubValue: View {
     var sensitivity: Double = 0.15
     var decimals: Int = 0
     var labelForValue: ((Int) -> String)? = nil
+    var accessibilityId: String? = nil
     @Environment(\.metrics) private var m
 
     @GestureState private var isActive: Bool = false
@@ -493,6 +553,9 @@ private struct ScrubValue: View {
                 .font(.system(size: m.pickerFont, weight: .bold, design: .monospaced))
                 .foregroundColor(isActive ? C.green : .white)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier(accessibilityId ?? "")
+        .accessibilityValue(displayText)
         .gesture(
             DragGesture(minimumDistance: 2)
                 .updating($isActive) { _, state, _ in state = true }
@@ -615,6 +678,7 @@ private struct TrackToggleButton: View {
         }
         .buttonStyle(ImmediateButtonStyle())
         .disabled(disabled)
+        .accessibilityIdentifier("track\(track)Button")
     }
 }
 
@@ -638,6 +702,7 @@ private struct MasterToggleButton: View {
         }
         .buttonStyle(ImmediateButtonStyle())
         .disabled(disabled)
+        .accessibilityIdentifier("masterButton")
     }
 }
 
@@ -658,5 +723,6 @@ private struct PreviewToggleButton: View {
                 .cornerRadius(7)
         }
         .buttonStyle(ImmediateButtonStyle())
+        .accessibilityIdentifier("previewButton")
     }
 }

@@ -85,6 +85,13 @@ final class AutomationEngine {
         lock.unlock()
     }
 
+    // Replace a clip's settings in-place without resetting its phase.
+    func update(_ lfo: LfoClip) {
+        lock.lock(); defer { lock.unlock() }
+        guard let idx = lfos.firstIndex(where: { $0.id == lfo.id }) else { return }
+        lfos[idx] = lfo
+    }
+
     func snapshot() -> [LfoClip] {
         lock.lock(); defer { lock.unlock() }
         return lfos
