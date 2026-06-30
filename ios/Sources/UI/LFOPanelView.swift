@@ -171,6 +171,8 @@ struct LFOPanelView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.vertical, 5).padding(.leading, 5)
         }
+        .contentShape(Rectangle())
+        .onTapGesture { selectedLfoID = nil }
     }
 
     @ViewBuilder private var helpBtn: some View {
@@ -564,6 +566,7 @@ private struct ActiveLfoChip: View {
         .background(C.bg3)
         .overlay(RoundedRectangle(cornerRadius: 3).stroke(selected ? C.green.opacity(0.7) : Color.clear, lineWidth: 1))
         .cornerRadius(3)
+        .onTapGesture { }
         .simultaneousGesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
