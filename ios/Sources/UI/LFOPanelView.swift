@@ -80,15 +80,16 @@ struct LFOPanelView: View {
 
     @ViewBuilder private var rateBox: some View {
         HStack(spacing: m.controlHSpacing) {
-            Button { app.lfoRate = app.lfoRate % 8 + 1 } label: {
+            Button { app.lfoRate = app.lfoRate % 25 + 1 } label: {
                 Image(systemName: "timer")
                     .font(.system(size: m.iconSize))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
             ScrubValue(value: Binding(
                 get: { Double(app.lfoRate) },
-                set: { app.lfoRate = max(1, min(8, Int($0.rounded()))) }
-            ), range: 1...8, sensitivity: 0.04)
+                set: { app.lfoRate = max(1, min(25, Int($0.rounded()))) }
+            ), range: 1...25, sensitivity: 0.04,
+               labelForValue: { rateScrubLabel(for: $0) })
             .frame(width: m.rateW)
         }
     }
@@ -259,8 +260,9 @@ struct LFOPanelView: View {
                 HStack(spacing: 0) {
                     MultiWaveformView(
                         lfos: previewLfos, wave: app.lfoWave,
-                        rateTicks: RATE_TICKS[app.lfoRate] ?? (4 * PPQN),
-                        depth: app.lfoDepth, tracks: waveTracks
+                        rateTicks: app.lfoDisplayRateTicks,
+                        depth: app.lfoDepth, tracks: waveTracks,
+                        bpm: app.bpm
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(C.bg2)
@@ -299,8 +301,9 @@ struct LFOPanelView: View {
             } else {
                 MultiWaveformView(
                     lfos: previewLfos, wave: app.lfoWave,
-                    rateTicks: RATE_TICKS[app.lfoRate] ?? (4 * PPQN),
-                    depth: app.lfoDepth, tracks: waveTracks
+                    rateTicks: app.lfoDisplayRateTicks,
+                    depth: app.lfoDepth, tracks: waveTracks,
+                    bpm: app.bpm
                 )
                 .frame(height: m.waveformH)
                 .frame(maxWidth: .infinity)
@@ -452,6 +455,7 @@ private struct ScrubValue: View {
     let range: ClosedRange<Double>
     var sensitivity: Double = 0.15
     var decimals: Int = 0
+    var labelForValue: ((Int) -> String)? = nil
     @Environment(\.metrics) private var m
 
     @GestureState private var isActive: Bool = false
@@ -470,7 +474,8 @@ private struct ScrubValue: View {
     }
 
     private var displayText: String {
-        decimals > 0 ? String(format: "%.\(decimals)f", live) : String(Int(live.rounded()))
+        if let label = labelForValue { return label(Int(live.rounded())) }
+        return decimals > 0 ? String(format: "%.\(decimals)f", live) : String(Int(live.rounded()))
     }
 
     var body: some View {
@@ -535,7 +540,7 @@ private struct ActiveLfoChip: View {
         let dDepth  = lfo.parameter == .tempo ? Int(lfo.depth.rounded())       : Int(midiToUI(lfo.depth))
         var result = Text("\(t)·\(lfo.parameter.shortName)·\(lfo.wave.shortName)")
         if lfo.inverted { result = result + Text(Image(systemName: "arrow.up.arrow.down")) }
-        result = result + Text("·s\(lfo.rateIndex)·\(dCenter)±\(dDepth)·")
+        result = result + Text("·\(lfo.rateLabel)·\(dCenter)±\(dDepth)·")
         result = result + Text(Image(systemName: lfo.loop ? "repeat" : "arrow.right.to.line"))
         return result
     }

@@ -2,19 +2,50 @@ import Foundation
 
 let PPQN = 24
 
-// Rate spinbox value (1-8) → ticks per LFO cycle
+// Rate spinbox value (1-8) → ticks per LFO cycle.
+// Index 1 = 8× (fastest), index 8 = 16b (slowest), matching the displayed labels 8→1.
 let RATE_TICKS: [Int: Int] = [
-    1: 16 * PPQN,
-    2: 8  * PPQN,
-    3: 4  * PPQN,
-    4: 2  * PPQN,
-    5: PPQN,
-    6: PPQN / 2,
-    7: PPQN / 4,
-    8: PPQN / 8,
+    1: PPQN / 8,    // 8×
+    2: PPQN / 4,    // 4×
+    3: PPQN / 2,    // 2×
+    4: PPQN,        // 1b
+    5: 2  * PPQN,   // 2b
+    6: 4  * PPQN,   // 4b
+    7: 8  * PPQN,   // 8b
+    8: 16 * PPQN,   // 16b
 ]
 
-let RATE_LABELS = ["16b", "8b", "4b", "2b", "1b", "2×", "4×", "8×"]
+let RATE_LABELS = ["8×", "4×", "2×", "1b", "2b", "4b", "8b", "16b"]
+
+// Free rates (f1–f17): fixed-time, tempo-independent. Rate indices 9–25.
+// Period in seconds, log-spaced from FREE_RATE_MIN_S to FREE_RATE_MAX_S.
+let FREE_RATE_MIN_S = 0.02
+let FREE_RATE_MAX_S = 15.0
+let FREE_RATE_SECONDS: [Int: Double] = {
+    var d: [Int: Double] = [:]
+    let n = 17
+    let logMin = log(FREE_RATE_MIN_S), logMax = log(FREE_RATE_MAX_S)
+    for i in 0..<n {
+        // Exponent < 1 gives larger steps near the fast end (f1-f3) and
+        // smaller steps near the slow end (f15-f17) vs pure log spacing.
+        let u = i == 0 ? 0.0 : pow(Double(i) / Double(n - 1), 0.75)
+        d[9 + i] = exp(logMin + u * (logMax - logMin))
+    }
+    return d
+}()
+
+// Label shown in the rate scrub widget (e.g. "8", "f1", "f17").
+// Tempo-relative indices 1–8 display as 8→1 (fast to slow); free rates display as f1→f17.
+func rateScrubLabel(for index: Int) -> String {
+    index <= 8 ? String(9 - index) : "f\(index - 8)"
+}
+
+// Label shown on LFO chips (e.g. "s8", "s1", "f1", "f17").
+func rateChipLabel(for index: Int) -> String {
+    if index >= 1 && index <= 8 { return "s\(9 - index)" }
+    guard index >= 9 && index <= 25 else { return "?" }
+    return "f\(index - 8)"
+}
 
 // MARK: - LfoWave
 
@@ -117,6 +148,7 @@ struct LfoClip: Identifiable, Codable {
     let parameter: Parameter
     let wave: LfoWave
     let rateTicks: Int
+    var freeRatePeriod: Double? = nil  // non-nil → free rate (fixed seconds, not tempo-dependent)
     let depth: Double        // MIDI units (0-127), or BPM for tempo
     let centerValue: Double  // MIDI units (0-127), or BPM for tempo
     let inverted: Bool
@@ -124,12 +156,14 @@ struct LfoClip: Identifiable, Codable {
     var isEnabled: Bool = true   // false = paused; chip stays in list but sends no MIDI
     let originalValue: Double    // MIDI value of parameter captured at clip creation (for restore-on-disable)
 
-    var rateLabel: String {
-        let idx = RATE_TICKS.first(where: { $0.value == rateTicks })?.key ?? 3
-        return RATE_LABELS[idx - 1]
+    var rateIndex: Int {
+        if let secs = freeRatePeriod {
+            return FREE_RATE_SECONDS.min(by: { abs($0.value - secs) < abs($1.value - secs) })?.key ?? 9
+        }
+        return RATE_TICKS.first(where: { $0.value == rateTicks })?.key ?? 3
     }
 
-    var rateIndex: Int { RATE_TICKS.first(where: { $0.value == rateTicks })?.key ?? 3 }
+    var rateLabel: String { rateChipLabel(for: rateIndex) }
 }
 
 // MARK: - Conversion helpers

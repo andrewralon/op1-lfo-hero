@@ -94,6 +94,7 @@ struct MultiWaveformView: View {
     let rateTicks: Int
     let depth: Double
     var tracks: [(Color, Bool)] = [(C.green, false)]
+    var bpm: Double = 120.0  // used to display free-rate clip waveforms
 
     var body: some View {
         if lfos.isEmpty {
@@ -118,7 +119,13 @@ struct MultiWaveformView: View {
     }
 
     private func buildPath(lfo: LfoClip, size: CGSize) -> Path {
-        let nCycles = Double(8 * PPQN) / Double(lfo.rateTicks)
+        let displayTicks: Int
+        if let secs = lfo.freeRatePeriod {
+            displayTicks = max(1, Int(secs * max(20, bpm) * Double(PPQN) / 60.0))
+        } else {
+            displayTicks = lfo.rateTicks
+        }
+        let nCycles = Double(8 * PPQN) / Double(displayTicks)
         let amplitude = size.height / 2 * 0.88
         let steps = Int(size.width * 1.5)
         var path = Path()

@@ -309,29 +309,43 @@ final class AppState: ObservableObject {
 
     // MARK: - LFO actions
 
+    // Effective tick count for waveform display (converts free-rate periods using current BPM).
+    var lfoDisplayRateTicks: Int {
+        if let secs = FREE_RATE_SECONDS[lfoRate] {
+            return max(1, Int(secs * max(20, bpm) * Double(PPQN) / 60.0))
+        }
+        return RATE_TICKS[lfoRate] ?? (4 * PPQN)
+    }
+
     func lfoStart(loop: Bool) {
-        let rt = RATE_TICKS[lfoRate] ?? (4 * PPQN)
+        let period = FREE_RATE_SECONDS[lfoRate]
+        let rt: Int
+        if let secs = period {
+            rt = max(1, Int(secs * max(20, bpm) * Double(PPQN) / 60.0))
+        } else {
+            rt = RATE_TICKS[lfoRate] ?? (4 * PPQN)
+        }
         let isTempo = lfoParam == .tempo
         let depthMidi  = isTempo ? lfoDepth  : Double(uiToMidi(lfoDepth))
         let centerMidi = isTempo ? lfoCenter : Double(uiToMidi(lfoCenter))
 
         if lfoParam.isMasterCapable && masterOn != 0 {
-            addLfo(track: 0, rateTicks: rt, depth: depthMidi, center: centerMidi,
+            addLfo(track: 0, rateTicks: rt, freeRatePeriod: period, depth: depthMidi, center: centerMidi,
                    inverted: masterOn == 2, loop: loop)
         } else {
             for (t, state) in trackOn.sorted(by: { $0.key < $1.key }) where state != 0 {
-                addLfo(track: t, rateTicks: rt, depth: depthMidi, center: centerMidi,
+                addLfo(track: t, rateTicks: rt, freeRatePeriod: period, depth: depthMidi, center: centerMidi,
                        inverted: state == 2, loop: loop)
             }
         }
     }
 
-    private func addLfo(track: Int, rateTicks: Int, depth: Double, center: Double,
+    private func addLfo(track: Int, rateTicks: Int, freeRatePeriod: Double?, depth: Double, center: Double,
                         inverted: Bool, loop: Bool) {
         // Dedup: only enabled clips count as "running" — disabled chips don't block a new start.
         if loop && activeLfos.contains(where: {
             $0.isEnabled && $0.loop && $0.track == track && $0.parameter == lfoParam &&
-            $0.wave == lfoWave && $0.rateTicks == rateTicks &&
+            $0.wave == lfoWave && $0.rateTicks == rateTicks && $0.freeRatePeriod == freeRatePeriod &&
             $0.depth == depth && $0.centerValue == center && $0.inverted == inverted
         }) { return }
 
@@ -349,7 +363,8 @@ final class AppState: ObservableObject {
         }
 
         let lfo = LfoClip(track: track, parameter: lfoParam, wave: lfoWave,
-                          rateTicks: rateTicks, depth: depth, centerValue: center,
+                          rateTicks: rateTicks, freeRatePeriod: freeRatePeriod,
+                          depth: depth, centerValue: center,
                           inverted: inverted, loop: loop, originalValue: originalValue)
         automation.add(lfo)
         activeLfos.append(lfo)
@@ -407,19 +422,27 @@ final class AppState: ObservableObject {
     }
 
     private func buildPreviewClips() -> [LfoClip] {
-        let rt = RATE_TICKS[lfoRate] ?? (4 * PPQN)
+        let period = FREE_RATE_SECONDS[lfoRate]
+        let rt: Int
+        if let secs = period {
+            rt = max(1, Int(secs * max(20, bpm) * Double(PPQN) / 60.0))
+        } else {
+            rt = RATE_TICKS[lfoRate] ?? (4 * PPQN)
+        }
         let isTempo = lfoParam == .tempo
         let depthMidi  = isTempo ? lfoDepth  : Double(uiToMidi(lfoDepth))
         let centerMidi = isTempo ? lfoCenter : Double(uiToMidi(lfoCenter))
         var clips: [LfoClip] = []
         if lfoParam.isMasterCapable && masterOn != 0 {
             clips.append(LfoClip(track: 0, parameter: lfoParam, wave: lfoWave,
-                                 rateTicks: rt, depth: depthMidi, centerValue: centerMidi,
+                                 rateTicks: rt, freeRatePeriod: period,
+                                 depth: depthMidi, centerValue: centerMidi,
                                  inverted: masterOn == 2, loop: true, originalValue: centerMidi))
         } else {
             for (t, state) in trackOn.sorted(by: { $0.key < $1.key }) where state != 0 {
                 clips.append(LfoClip(track: t, parameter: lfoParam, wave: lfoWave,
-                                     rateTicks: rt, depth: depthMidi, centerValue: centerMidi,
+                                     rateTicks: rt, freeRatePeriod: period,
+                                     depth: depthMidi, centerValue: centerMidi,
                                      inverted: state == 2, loop: true, originalValue: centerMidi))
             }
         }

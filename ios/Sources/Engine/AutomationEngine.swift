@@ -1,4 +1,5 @@
 import Foundation
+import QuartzCore
 
 final class AutomationEngine {
     weak var controller: Controller?
@@ -13,6 +14,7 @@ final class AutomationEngine {
 
     // Per-clip mutable state tracked by UUID (all accessed under lock)
     private var startTicks:      [UUID: Int]    = [:]
+    private var freeRateStart:   [UUID: Double] = [:]  // wall-clock start for free-rate clips
     private var lastSent:        [UUID: Double] = [:]
     private var randomStep:      [UUID: Int]    = [:]   // last step index (0-7)
     private var randomState:     [UUID: UInt64] = [:]   // xorshift64 PRNG state, seeded per clip
@@ -20,11 +22,12 @@ final class AutomationEngine {
     private var disabledClipIDs: Set<UUID>      = []
 
     // Preview LFOs — run continuously, never appear in activeLfos
-    private var previewLfos:     [LfoClip] = []
-    private var previewLastSent: [UUID: Double] = [:]
-    private var previewRandStep:  [UUID: Int]    = [:]
-    private var previewRandState: [UUID: UInt64] = [:]
-    private var previewRandValue: [UUID: Double] = [:]
+    private var previewLfos:        [LfoClip] = []
+    private var previewLastSent:    [UUID: Double] = [:]
+    private var freePreviewStart:   [UUID: Double] = [:]  // wall-clock for free-rate previews
+    private var previewRandStep:    [UUID: Int]    = [:]
+    private var previewRandState:   [UUID: UInt64] = [:]
+    private var previewRandValue:   [UUID: Double] = [:]
 
     func add(_ lfo: LfoClip) {
         lock.lock(); lfos.append(lfo); lock.unlock()
@@ -34,6 +37,7 @@ final class AutomationEngine {
         lock.lock()
         lfos.removeAll { $0.id == lfo.id }
         startTicks.removeValue(forKey: lfo.id)
+        freeRateStart.removeValue(forKey: lfo.id)
         lastSent.removeValue(forKey: lfo.id)
         randomStep.removeValue(forKey: lfo.id)
         randomState.removeValue(forKey: lfo.id)
@@ -45,7 +49,7 @@ final class AutomationEngine {
     func clearAll() {
         lock.lock()
         lfos.removeAll()
-        startTicks.removeAll(); lastSent.removeAll()
+        startTicks.removeAll(); freeRateStart.removeAll(); lastSent.removeAll()
         randomStep.removeAll(); randomState.removeAll(); randomValue.removeAll()
         disabledClipIDs.removeAll()
         lock.unlock()
@@ -65,17 +69,18 @@ final class AutomationEngine {
         lock.lock()
         previewLfos = clips
         let ids = Set(clips.map { $0.id })
-        previewLastSent   = previewLastSent.filter   { ids.contains($0.key) }
-        previewRandStep   = previewRandStep.filter   { ids.contains($0.key) }
-        previewRandState  = previewRandState.filter  { ids.contains($0.key) }
-        previewRandValue  = previewRandValue.filter  { ids.contains($0.key) }
+        previewLastSent  = previewLastSent.filter  { ids.contains($0.key) }
+        freePreviewStart  = freePreviewStart.filter  { ids.contains($0.key) }
+        previewRandStep  = previewRandStep.filter  { ids.contains($0.key) }
+        previewRandState = previewRandState.filter { ids.contains($0.key) }
+        previewRandValue = previewRandValue.filter { ids.contains($0.key) }
         lock.unlock()
     }
 
     func clearPreview() {
         lock.lock()
         previewLfos.removeAll()
-        previewLastSent.removeAll()
+        previewLastSent.removeAll(); freePreviewStart.removeAll()
         previewRandStep.removeAll(); previewRandState.removeAll(); previewRandValue.removeAll()
         lock.unlock()
     }
@@ -88,11 +93,15 @@ final class AutomationEngine {
     // MARK: - Tick evaluation (called on clock thread)
 
     func onTick(_ tickCount: Int) {
+        let now = CACurrentMediaTime()  // wall-clock for absolute-time clips
+
         lock.lock()
         let current = lfos  // snapshot while locked
-        // Record start tick for newly added clips
         for lfo in current where startTicks[lfo.id] == nil {
             startTicks[lfo.id] = tickCount
+        }
+        for lfo in current where lfo.freeRatePeriod != nil && freeRateStart[lfo.id] == nil {
+            freeRateStart[lfo.id] = now
         }
         lock.unlock()
 
@@ -101,23 +110,27 @@ final class AutomationEngine {
         for lfo in current {
             lock.lock()
             let isDisabled = disabledClipIDs.contains(lfo.id)
-            let start = startTicks[lfo.id] ?? tickCount
             lock.unlock()
 
             if isDisabled { continue }  // phase advances implicitly; re-enable picks up at correct phase
 
-            let elapsed = tickCount - start
-
-            // One-shot: auto-remove after 8 beats (one full cycle at slowest useful rate)
-            if !lfo.loop {
-                let oneCycle = lfo.rateTicks
-                if elapsed >= oneCycle {
-                    finished.append(lfo)
-                    continue
-                }
+            let phase: Double
+            if let period = lfo.freeRatePeriod {
+                lock.lock()
+                let start = freeRateStart[lfo.id] ?? now
+                lock.unlock()
+                let elapsed = now - start
+                if !lfo.loop && elapsed >= period { finished.append(lfo); continue }
+                phase = (elapsed / period).truncatingRemainder(dividingBy: 1.0)
+            } else {
+                lock.lock()
+                let start = startTicks[lfo.id] ?? tickCount
+                lock.unlock()
+                let elapsed = tickCount - start
+                if !lfo.loop && elapsed >= lfo.rateTicks { finished.append(lfo); continue }
+                phase = Double(tickCount % lfo.rateTicks) / Double(lfo.rateTicks)
             }
 
-            let phase = Double(tickCount % lfo.rateTicks) / Double(lfo.rateTicks)
             let value = evaluate(lfo, phase: phase)
 
             lock.lock()
@@ -135,14 +148,23 @@ final class AutomationEngine {
         }
 
         // Preview LFOs — continuous, never finish or appear in activeLfos.
-        // Phase uses the same global-clock formula as active looping chips (tickCount % period),
-        // so it's always non-negative and survives slaveTick resets without any phase glitch.
         lock.lock()
         let currentPreview = previewLfos
+        for lfo in currentPreview where lfo.freeRatePeriod != nil && freePreviewStart[lfo.id] == nil {
+            freePreviewStart[lfo.id] = now
+        }
         lock.unlock()
 
         for lfo in currentPreview {
-            let pPhase = Double(tickCount % lfo.rateTicks) / Double(lfo.rateTicks)
+            let pPhase: Double
+            if let period = lfo.freeRatePeriod {
+                lock.lock()
+                let start = freePreviewStart[lfo.id] ?? now
+                lock.unlock()
+                pPhase = ((now - start) / period).truncatingRemainder(dividingBy: 1.0)
+            } else {
+                pPhase = Double(tickCount % lfo.rateTicks) / Double(lfo.rateTicks)
+            }
             let pValue = evaluatePreview(lfo, phase: pPhase)
 
             lock.lock()
