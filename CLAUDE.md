@@ -113,6 +113,20 @@ Use XCUITest (not `cliclick` coordinate math) to drive the simulator — accessi
 **Known accessibility identifiers:**
 - `helpButton` — opens HelpView sheet
 - `settingsButton` — opens SettingsView sheet
+- `paramPicker` — parameter CompactPicker button
+- `wavePicker` — wave shape CompactPicker button
+- `track1Button` / `track2Button` / `track3Button` / `track4Button` — track toggle buttons
+- `masterButton` — master track toggle button
+- `previewButton` — preview (P) toggle button
+- `repeatButton` — looping LFO start button (↻)
+- `oneShotButton` — one-shot LFO start button (→|)
+- `trashButton` — delete all chips button
+
+**Reset app state in UITests** — pass `--uitest-reset` as a launch argument to clear UserDefaults before the test:
+```swift
+app.launchArguments = ["--uitest-reset"]
+app.launch()
+```
 
 **Run specific tests from the command line:**
 ```bash
@@ -143,6 +157,26 @@ xcrun simctl list devices available | grep Booted
 # or pick any available iPhone:
 xcrun simctl list devices available | grep iPhone
 ```
+
+### App Store Preview video recording
+
+Use `--codec h264` (not the default HEVC) and stop with SIGINT so the file is properly finalized:
+
+```bash
+# Terminal 1: start recording (manually rotate iPad simulator to landscape first)
+xcrun simctl io <udid> recordVideo --codec h264 /tmp/claude-ss/preview.mov
+
+# Terminal 2: run the demo test
+cd ios && xcodebuild test \
+  -project op1-lfo-hero.xcodeproj \
+  -scheme op1-lfo-hero \
+  -destination 'id=<udid>' \
+  -only-testing:op1-lfo-heroUITests/AppPreviewUITests/testAppPreviewDemo
+
+# Back in Terminal 1: press Ctrl+C (SIGINT) to finalize. Do NOT use kill/SIGTERM — it corrupts the file.
+```
+
+**Important:** Do NOT use `XCUIDevice.shared.orientation` inside the demo test — it causes the video to record in portrait dimensions with rotated content. Instead, rotate the simulator manually via the Hardware menu before starting the recording.
 
 ### Landscape screenshots
 
