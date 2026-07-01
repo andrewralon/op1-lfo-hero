@@ -40,9 +40,9 @@ func rateScrubLabel(for index: Int) -> String {
     index <= 8 ? String(9 - index) : "f\(index - 8)"
 }
 
-// Label shown on LFO chips (e.g. "s8", "s1", "f1", "f17").
+// Label shown on LFO chips (e.g. "8", "1", "f1", "f17").
 func rateChipLabel(for index: Int) -> String {
-    if index >= 1 && index <= 8 { return "s\(9 - index)" }
+    if index >= 1 && index <= 8 { return "\(9 - index)" }
     guard index >= 9 && index <= 25 else { return "?" }
     return "f\(index - 8)"
 }
@@ -59,15 +59,15 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
 
     var shortName: String {
         switch self {
-        case .sine:     return "sine"
+        case .sine:     return "sin"
         case .triangle: return "tri"
         case .saw:      return "saw"
         case .square:   return "squ"
         case .log:      return "log"
         case .exp:      return "exp"
-        case .sweepUp:  return "swup"
-        case .sweepDn:  return "swdn"
-        case .random:   return "rand"
+        case .sweepUp:  return "swu"
+        case .sweepDn:  return "swd"
+        case .random:   return "rnd"
         }
     }
 
@@ -125,8 +125,23 @@ enum Parameter: String, CaseIterable, Identifiable, Codable {
         case .volume: return "vol"
         case .pan:    return "pan"
         case .mute:   return "mut"
-        case .tempo:  return "tmpo"
-        default:      return rawValue.replacingOccurrences(of: " ", with: "")
+        case .tempo:  return "tmp"
+        case .par1:   return "p1"
+        case .par2:   return "p2"
+        case .par3:   return "p3"
+        case .par4:   return "p4"
+        case .envA:   return "eA"
+        case .envD:   return "eD"
+        case .envS:   return "eS"
+        case .envR:   return "eR"
+        case .fx1:    return "fx1"
+        case .fx2:    return "fx2"
+        case .fx3:    return "fx3"
+        case .fx4:    return "fx4"
+        case .lfo1:   return "l1"
+        case .lfo2:   return "l2"
+        case .lfo3:   return "l3"
+        case .lfo4:   return "l4"
         }
     }
 

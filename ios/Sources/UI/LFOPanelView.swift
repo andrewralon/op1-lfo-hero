@@ -596,16 +596,13 @@ private struct ActiveLfoChip: View {
     let onStop: () -> Void
     @Environment(\.metrics) private var m
 
-    // Tracks the start of each press; nil = no press active or long press already fired.
-    // The timer captures this value and only fires if it still matches (i.e. press not released).
-    @State private var pressedAt: Date? = nil
-
     private func chipLabel() -> Text {
-        let t = lfo.track == 0 ? "m" : "t\(lfo.track)"
+        let t = lfo.track == 0 ? "m" : "\(lfo.track)"
         let dCenter = lfo.parameter == .tempo ? Int(lfo.centerValue.rounded()) : Int(midiToUI(lfo.centerValue))
         let dDepth  = lfo.parameter == .tempo ? Int(lfo.depth.rounded())       : Int(midiToUI(lfo.depth))
-        var result = Text("\(t)·\(lfo.parameter.shortName)·\(lfo.wave.shortName)")
+        var result = Text(t)
         if lfo.inverted { result = result + Text(Image(systemName: "arrow.up.arrow.down")) }
+        result = result + Text("·\(lfo.parameter.shortName)·\(lfo.wave.shortName)")
         result = result + Text("·\(lfo.rateLabel)·\(dCenter)±\(dDepth)·")
         result = result + Text(Image(systemName: lfo.loop ? "repeat" : "arrow.right.to.line"))
         return result
@@ -630,30 +627,10 @@ private struct ActiveLfoChip: View {
         .background(C.bg3)
         .overlay(RoundedRectangle(cornerRadius: 3).stroke(selected ? C.green.opacity(0.7) : Color.clear, lineWidth: 1))
         .cornerRadius(3)
-        .onTapGesture { }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    // Cancel if the user is scrolling
-                    if abs(value.translation.height) > 8 || abs(value.translation.width) > 8 {
-                        pressedAt = nil
-                        return
-                    }
-                    guard pressedAt == nil else { return }
-                    let t = Date()
-                    pressedAt = t
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        guard pressedAt == t else { return } // released or scrolled — skip
-                        pressedAt = nil
-                        onSelect()
-                    }
-                }
-                .onEnded { value in
-                    guard pressedAt != nil else { return } // long press already fired — skip tap
-                    pressedAt = nil
-                    let moved = max(abs(value.translation.width), abs(value.translation.height))
-                    if moved < 10 { onToggleEnabled() }
-                }
+        .gesture(
+            LongPressGesture(minimumDuration: 0.4, maximumDistance: 10)
+                .onEnded { _ in onSelect() }
+                .exclusively(before: TapGesture().onEnded { onToggleEnabled() })
         )
     }
 }
