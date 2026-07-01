@@ -85,8 +85,10 @@ final class ClockEngine {
     }
 
     private func handleStart() {
-        lock.lock(); slaveTick = 0; lock.unlock()
         isPlaying = true
+        // slaveTick is intentionally NOT reset here. Resetting it causes the LFO phase formula
+        // (tickCount % rateTicks) to jump to ~0 on every loop boundary, snapping LFOs to
+        // their center value. slaveTick stays monotonic so phases continue smoothly.
     }
 
     private func handleStop() {
