@@ -82,6 +82,48 @@ Change one fraction in `LayoutMetrics` — it updates every device size at once.
 | Action column (repeat/1x/trash) too narrow | `actionColW` | adjust `1.4` (toggleBtnSize multiplier) |
 | repeat/1x/trash/help/settings icons too small | `actionIconSize` | adjust `0.06` (iPad) / `0.04` (iPhone) fraction |
 
+### Scaling UI elements using percentages instead of hardcoded values
+
+Never hardcode a pt value. Instead, express it as a fraction of `screen.width` (or a Tier 1 dimension like `lfoH`) so it scales correctly across every device and orientation automatically — no `isIpad` branch needed.
+
+#### What to scale (and what not to)
+
+Scale **spacing and layout dimensions** — gaps between elements, padding, element sizes. These values need to feel proportionally correct relative to the overall layout, and a value tuned on one device will feel cramped or oversized on another.
+
+Do **not** scale hairline borders or dividers. A `lineWidth: 1` border looks visually correct at 1pt on every device — scaling it to a percentage produces values like 3.5pt on iPad landscape, which is far too heavy. Keep 1pt strokes and dividers hardcoded.
+
+#### How to convert a hardcoded pt value to a percentage
+
+1. **Find the reference screen width** for the layout where the value looks correct:
+
+   | Layout | Reference `screen.width` |
+   |---|---|
+   | iPhone portrait | ~390pt |
+   | iPhone landscape | ~844pt |
+   | iPad portrait | ~1024pt |
+   | iPad landscape | ~1366pt |
+
+2. **Divide** the target pt value by the reference width:
+   ```
+   percentage = target_pts / reference_screen_width
+   ```
+   Example: an 8pt gap that looks right in iPhone landscape → `8 / 844 ≈ 0.0095` → use `screen.width * 0.0095`
+
+3. **Verify** on at least one other device size. Because the same percentage is used everywhere, an 8pt gap on iPhone landscape becomes ~10pt on iPad landscape — proportionally correct without any extra branches.
+
+#### Standard gap reference
+
+**6pt** is the validated visual distance between major UI elements or groups. Its derived percentages are:
+
+| Device | Layout | Formula | ~pts |
+|---|---|---|---|
+| iPhone | portrait | `screen.width * 0.015` | ~6pt |
+| iPhone | landscape | `screen.width * 0.007` | ~6pt |
+| iPad | portrait | `screen.width * 0.015` | ~15pt |
+| iPad | landscape | `screen.width * 0.007` | ~10pt |
+
+The reference implementation is `trackGapUnit` in `LayoutMetrics`. Reuse these constants for any new spacing between zones or element groups.
+
 ### Rules
 
 - The only allowed hardcoded point value is `max(..., 44)` to enforce Apple's minimum touch target. Everything else is a fraction.

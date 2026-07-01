@@ -369,18 +369,19 @@ struct HelpView: View {
     @State private var wavePhase: Double = 0
 
     private let sections: [(String, Text)] = [
-        ("mute buttons", Text("tap a track's colored number to mute/unmute it. bright colored background = unmuted; dark background = muted.")),
-        ("pan knobs", Text("drag up/down on a knob to pan right/left. release near the top to snap to center. [vertical scrubbing for a horizontal control like pan is weird. i'm open to better ideas...]")),
-        ("volume faders", Text("drag up/down on a fader to set that track's volume; the digits below update live while dragging.")),
-        ("transport buttons", Text("play/stop control op1 tape playback (play only works when the app is the clock master). left/right arrow buttons step the op1 tape position backward/forward.")),
-        ("metronome / tempo mode", Text("tap the metronome icon to switch the clock source. then change the op1 to match.\n\(Text("op1 (beat match)").foregroundColor(C.track(1))) — op1 is master\n· app's lfos follow op1's tempo.\n\(Text("app (midi sync)").foregroundColor(C.green)) — app is master\n· app controls op1 tape transport (play/stop/back/forward).\n\(Text("· note: ").bold())tempo control requires 'app (midi sync)' mode and usb-c; bluetooth does not send high-resolution tempo changes.")),
-        ("tempo / bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.\n\(Text("· note: ").bold())tempo control requires 'app (midi sync)' mode and usb-c; bluetooth does not send high-resolution tempo changes.")),
-        ("track / master buttons", Text("tap to cycle off → on → inverted. tracks apply the lfo to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
-        ("parameter / wave", Text("choose which parameter the lfo modulates, and which waveform shape it follows.")),
-        ("rate / depth / center", Text("drag up/down on a box to scrub its value. rate sets lfo speed, depth sets its range, center sets its midpoint.")),
-        ("waveform preview", Text("shows the shape of the lfo that will be sent, colored per active track/master.")),
-        ("repeat / 1x / trash", Text("start the lfo looping, start it once, or delete all currently active lfos.")),
-        ("active lfos", Text("tap an entry to preview it on the waveform; tap the x to stop just that one.")),
+        ("mute", Text("tap a track's colored number pad to mute/unmute it. bright colored background = unmuted; dark background = muted.")),
+        ("pan", Text("drag up/down on a knob to pan right/left. release near top dead center to snap to center. [vertical scrubbing for horizontal controls like pan are hard. i'm open to better ideas...]")),
+        ("volume", Text("drag up/down on a fader to set that track's volume. drag to the side for fine scrubbing.")),
+        ("transport", Text("play/stop control op1 tape playback (play only works when the app is the clock master). left/right arrow buttons step the op1 tape position backward/forward.")),
+        ("metronome & tempo mode", Text("tap the metronome icon to switch the clock source. then change the op1 to match.\n\(Text("op1 (beat match)").foregroundColor(C.track(1))) — op1 is master\n· app's lfos follow op1's tempo.\n\(Text("app (midi sync)").foregroundColor(C.green)) — app is master\n· app controls op1 tape transport (play/stop/back/forward).\n\(Text("· note: ").bold())tempo control requires 'app (midi sync)' mode and usb-c; bluetooth does not send high-resolution tempo changes.")),
+        ("tempo & bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.\n\(Text("· note: ").bold())tempo control requires 'app (midi sync)' mode and usb-c; bluetooth does not send high-resolution tempo changes.")),
+        ("track & master", Text("tap to cycle off → on → inverted. tracks apply the lfo to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
+        ("preview (p)", Text("enables live preview: the current editor settings are sent to the op-1 in real time as you adjust them, so you can hear the effect while dialing in speed, depth, center, and wave shape. no chip is created — press repeat or 1x to create an lfo.")),
+        ("parameter & curve", Text("choose which parameter the lfo modulates, and which waveform shape it follows. tap the icons to step to the next option without opening the picker.")),
+        ("speed & center & depth", Text("drag up/down on a box to scrub its value. tap the speed (timer) icon to step to the next speed value one at a time. speed sets lfo speed, depth sets its range, center sets its midpoint.")),
+        ("waveform preview", Text("when no lfo chips are running, shows the current editor settings as a preview. when chips are active, shows all running lfo curves overlaid, colored per track.")),
+        ("repeat & one-shot & delete", Text("start the lfo looping, start it once, or delete all currently active lfos.")),
+        ("active lfos", Text("lfos are shown as 'chips' showing 'track/master·parameter·wave·speed·center±depth·repeat/loop'.\n\(Text("tap").bold()) — toggle the lfo on/off without stopping it.\n\(Text("long-press").bold()) — enter edit mode; adjust controls to update the chip live, then long-press again to commit.\n\(Text("×").bold()) — stop and remove that lfo.\n\(Text("tap empty space").bold()) — cancel the current edit.")),
         ("status bar", Text("shows the current midi connection and clock source; tap it to choose a ble midi device."))
     ]
 

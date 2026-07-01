@@ -18,6 +18,7 @@ struct WaveformView: View {
             let steps   = Int(w * 1.5)
             // Target ~60 pt per color segment; steps are ~1.5 per pt so multiply directly.
             let segLen  = max(1, Int(waveformSegmentPt * Double(steps) / Double(w)))
+            let waveStroke = StrokeStyle(lineWidth: size.height * 0.012, lineCap: .round, lineJoin: .round)
 
             var center = Path()
             center.move(to: CGPoint(x: 0, y: midY))
@@ -61,7 +62,7 @@ struct WaveformView: View {
                     for (i, pt) in pts.enumerated() {
                         if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
                     }
-                    ctx.stroke(path, with: .color(group[0].color), style: solidStroke)
+                    ctx.stroke(path, with: .color(group[0].color), style: waveStroke)
                 } else {
                     // Multiple tracks — solid alternating color segments, no gaps.
                     // Each segment starts at the last point of the previous one so
@@ -75,7 +76,7 @@ struct WaveformView: View {
                             else          { path.addLine(to: pts[i]) }
                         }
                         ctx.stroke(path, with: .color(group[ci % group.count].color),
-                                   style: solidStroke)
+                                   style: waveStroke)
                         ci    += 1
                         start  = end   // overlap by 1 pt — prevents pixel-level gaps
                     }
@@ -102,6 +103,7 @@ struct MultiWaveformView: View {
         } else {
             Canvas { ctx, size in
                 let midY = size.height / 2
+                let waveStroke = StrokeStyle(lineWidth: size.height * 0.012, lineCap: .round, lineJoin: .round)
                 var center = Path()
                 center.move(to: CGPoint(x: 0, y: midY))
                 center.addLine(to: CGPoint(x: size.width, y: midY))
@@ -110,7 +112,7 @@ struct MultiWaveformView: View {
                 for lfo in lfos {
                     let c = lfo.track == 0 ? C.green : C.track(lfo.track)
                     ctx.stroke(buildPath(lfo: lfo, size: size), with: .color(c),
-                               style: solidStroke)
+                               style: waveStroke)
                 }
             }
             .background(C.bg2)
@@ -156,5 +158,4 @@ struct MultiWaveformView: View {
     }
 }
 
-private let solidStroke = StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
 private let waveformSegmentPt: Double = 50  // pt per color segment when multiple same-state tracks are shown

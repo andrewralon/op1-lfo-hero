@@ -27,13 +27,13 @@ struct PanKnobView: View {
                     .fill(Color(hex: "#1c1c1e"))
 
                 Circle()
-                    .stroke(Color(hex: "#aaaaaa"), lineWidth: 1)
+                    .stroke(Color(hex: "#aaaaaa"), lineWidth: sz * 0.015)
 
                 // L/R limit ticks at ±130° from 12 o'clock
                 limitTick(cx: cx, cy: cy, r: r, deg: -90 - 130)
-                    .stroke(Color(hex: "#aaaaaa"), lineWidth: 1.5)
+                    .stroke(Color(hex: "#aaaaaa"), lineWidth: sz * 0.023)
                 limitTick(cx: cx, cy: cy, r: r, deg: -90 + 130)
-                    .stroke(Color(hex: "#aaaaaa"), lineWidth: 1.5)
+                    .stroke(Color(hex: "#aaaaaa"), lineWidth: sz * 0.023)
 
                 // Indicator — green at center (matches desktop), white off-center
                 Path { p in
@@ -41,7 +41,7 @@ struct PanKnobView: View {
                     p.addLine(to: CGPoint(x: tipX, y: tipY))
                 }
                 .stroke(liveVal == 0 ? C.green : C.text,
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        style: StrokeStyle(lineWidth: sz * 0.046, lineCap: .round))
             }
             .frame(width: sz, height: sz)
             .contentShape(Circle())
