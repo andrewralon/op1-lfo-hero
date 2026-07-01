@@ -208,7 +208,7 @@ struct LFOPanelView: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 5).padding(.leading, 5)
+            .padding(.vertical, m.lfoScrollPad).padding(.leading, m.lfoScrollPad)
         }
         .contentShape(Rectangle())
         .onTapGesture { cancelChipEdit() }
@@ -310,7 +310,7 @@ struct LFOPanelView: View {
                     .background(C.bg2)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
-                    .padding(8)
+                    .padding(m.lfoPanelPad)
 
                     HStack(spacing: 0) {
                         VStack(spacing: 0) {
@@ -336,8 +336,8 @@ struct LFOPanelView: View {
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
-                    .padding(.trailing, 8)
-                    .padding(.vertical, 8)
+                    .padding(.trailing, m.lfoPanelPad)
+                    .padding(.vertical, m.lfoPanelPad)
                 }
                 .frame(maxHeight: .infinity)
             } else {

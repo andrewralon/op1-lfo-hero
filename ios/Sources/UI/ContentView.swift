@@ -93,6 +93,10 @@ struct LayoutMetrics {
     // Active LFO chip text — bigger on iPad landscape for readability.
     var lfoChipFont: CGFloat     { isIpad && isLandscape ? max(lfoH * 0.038, 18) : (isIpad ? max(lfoH * 0.022, 14) : 12) }
     var lfoChipIconSize: CGFloat { isIpad && isLandscape ? max(lfoH * 0.028, 14) : (isIpad ? max(lfoH * 0.016, 11) : 11) }
+    /// Outer padding around bordered waveform/chip panel boxes in the LFO section.
+    var lfoPanelPad: CGFloat { isLandscape && !isIpad ? screen.width * 0.007 : 8 }
+    /// Inner content padding of the chip scroll area.
+    var lfoScrollPad: CGFloat { isLandscape && !isIpad ? screen.width * 0.004 : 5 }
 
     // Status bar (connection + tempo row at the very bottom of the screen).
     var statusBarFont: CGFloat { isIpad ? 12 : 9 }
