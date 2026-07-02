@@ -74,7 +74,6 @@ platform :ios do
         -UI functionality - does it do what you expect? slide, change, ...
         -does it look good? too big or small, skewed or morphed? non-round circle, ...
         -is anything weird? does anything *not* do what you expect?
-        -NEW: lfos can be toggled on/off; lower energy usage
 
         commits:
         #{commits}
