@@ -55,6 +55,14 @@ Print commits since a beta build number: fastlane changelog since:7
 
 Build and upload to TestFlight
 
+### ios previews
+
+```sh
+[bundle exec] fastlane ios previews
+```
+
+Upload app preview videos from fastlane/app_previews/ to App Store Connect
+
 ### ios release
 
 ```sh

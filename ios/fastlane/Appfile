@@ -1,3 +1,4 @@
 app_identifier("com.andrewralon.op1-lfo-hero")
 apple_id(ENV["APPLE_ID"])
 team_id(ENV["APPLE_TEAM_ID"])
+itc_team_id("129049587")

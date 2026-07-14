@@ -13,15 +13,19 @@ final class AppPreviewUITests: XCTestCase {
 
     // MARK: - App Store Preview demo
     //
-    // Scene 1: App launches. Dark UI: 4 track strips, waveform view, LFO controls.
+    // Records one continuous video that can be split into two previews at the
+    // 5-second hold after Scene 2 (chip 1 running).
     //
-    // Scene 2: Build chip 1 — track 1 · volume · square · speed 4 · center 90 · depth 10.
-    //          Tap repeat (↻) — chip appears: t1·vol·squ·s4·90±10·↻
+    // Preview 1 (~22s): launch → configure chip 1 → chip running (5s hold)
+    //   Scene 1: App launches. Dark UI: 4 track strips, waveform view, LFO controls. (5s hold)
+    //   Scene 2: Build chip 1 — track 1 · volume · square · speed 4 · center 90 · depth 10.
+    //            Tap repeat (↻) — chip appears, volume LFO runs. (5s hold) ← CUT HERE
     //
-    // Scene 3: Turn track 1 off. Enable track 2 (normal) and track 4 (inverted).
-    //          Switch to pan · sine · speed 2 · center 50 · depth 30.
-    //          Tap repeat (↻) — two chips appear (t2 normal, t4 inverted pan/sine),
-    //          pans sweep in opposite directions. Hold a few seconds to show the motion.
+    // Preview 2 (~20s): configure multi-track pan LFOs → chips running (5s hold)
+    //   Scene 3: Turn track 1 off. Enable track 2 (normal) and track 4 (inverted).
+    //            Switch to pan · sine · speed 2 · center 50 · depth 30.
+    //            Tap repeat (↻) — two chips appear (t2 normal, t4 inverted pan/sine),
+    //            pans sweep in opposite directions. (5s hold)
 
     @MainActor func testAppPreviewDemo() throws {
         let app = XCUIApplication()
@@ -32,8 +36,9 @@ final class AppPreviewUITests: XCTestCase {
         XCTAssertTrue(helpButton.waitForExistence(timeout: 10))
         sleep(2)
 
-        // Scene 1: Initial state
+        // Scene 1: Initial state — 5s hold so this can be the start of preview 1.
         try snapshot("01_launch", app: app)
+        sleep(5)
 
         // Scene 2: Chip 1 — track 1, volume, square, speed 4, center 80, depth 10
         // After --uitest-reset, trackOn defaults to [1:1, ...] so track 1 is already ON (state 1 = normal).
@@ -45,7 +50,7 @@ final class AppPreviewUITests: XCTestCase {
         try snapshot("02_chip1_configured", app: app)
 
         app.buttons["repeatButton"].tap()
-        sleep(2)
+        sleep(5)                                    // ← cut here to split preview 1 / preview 2
         try snapshot("03_chip1_created", app: app)
 
         // Scene 3: Track 1 off, track 2 normal, track 4 inverted, pan, sine, speed 2, center 50, depth 30
@@ -71,7 +76,7 @@ final class AppPreviewUITests: XCTestCase {
         try snapshot("04_chip2_configured", app: app)
 
         app.buttons["repeatButton"].tap()
-        sleep(6)
+        sleep(5)                                    // ← end of preview 2
         try snapshot("05_chip2_created", app: app)
     }
 
