@@ -3,6 +3,7 @@ project("op1-lfo-hero.xcodeproj")
 
 devices([
   "iPhone 13 Pro Max Screenshots",  # 6.7" — 1284×2778, accepted by App Store Connect
+  "iPad Pro 13-inch Screenshots",   # 13"  — 2064×2752, required by App Store Connect
 ])
 
 languages(["en-US"])

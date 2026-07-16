@@ -55,6 +55,14 @@ Print commits since a beta build number: fastlane changelog since:7
 
 Build and upload to TestFlight
 
+### ios upload_screenshots
+
+```sh
+[bundle exec] fastlane ios upload_screenshots
+```
+
+Upload screenshots from fastlane/screenshots/ to App Store Connect (no capture)
+
 ### ios previews
 
 ```sh

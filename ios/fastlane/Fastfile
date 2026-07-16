@@ -85,6 +85,19 @@ platform :ios do
     push_git_tags
   end
 
+  desc "Upload screenshots from fastlane/screenshots/ to App Store Connect (no capture)"
+  lane :upload_screenshots do
+    ENV["FASTLANE_ENABLE_BETA_DELIVER_SYNC_SCREENSHOTS"] = "1"
+    deliver(
+      skip_metadata: true,
+      skip_binary_upload: true,
+      sync_screenshots: true,
+      overwrite_screenshots: true,
+      force: true,
+      precheck_include_in_app_purchases: false
+    )
+  end
+
   desc "Upload app preview videos from fastlane/app_previews/ to App Store Connect"
   lane :previews do
     deliver(
