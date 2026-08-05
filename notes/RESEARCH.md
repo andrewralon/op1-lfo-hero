@@ -622,9 +622,27 @@ nothing". Possibilities not ruled out:
 - it has no front-panel indicator at all
 - it is inert on this firmware, like `CC 18 = 64` turned out to be
 
-**Consequence:** marked `lfoTargetable: false`. Independent of whether it works, modulating a
-mode-enable toggle at LFO rates is not musically meaningful, and exposing a control whose effect
-nobody can confirm — on hardware that cannot report back — is worse than not exposing it.
+### The whole cue subsystem appears inert over MIDI
+
+`CC 16` was tested in **all three receiving modes** (`off`, `cue`, `sync`) — no observable effect
+in any of them.
+
+Incoming **notes** were then tested as well, since the reference says notes create cue markers.
+Three notes (C, E, G) were sent in `sync` mode and again in `cue` mode with the cue submenu
+selected. **No cue markers appeared.**
+
+This negative is trustworthy because the tester first created a cue marker by hand and deleted
+it, to confirm what one looks like on the display before judging the MIDI attempts. Without that
+control the result would only mean "nothing recognisable happened".
+
+So neither documented half of the cue subsystem — `CC 16` cue rec mode, nor note-triggered cue
+markers — produces any effect on this firmware. Something else is required that is not
+documented, or the feature is not implemented over MIDI.
+
+**Consequence:** `tp7.cueRec` is marked `lfoTargetable: false`. Independent of whether it works,
+modulating a mode-enable at LFO rates is not musically meaningful, and exposing a control whose
+effect nobody can confirm — on hardware that cannot report back — is worse than not exposing it.
+Notes are not exposed by the app at all, so no change was needed there.
 
 ## Open questions — answer on hardware
 
@@ -632,7 +650,5 @@ nobody can confirm — on hardware that cannot report back — is worse than not
 - [ ] Does the TX-6 *follow* incoming MIDI clock, even though it does not send it?
 - [ ] How badly does TX-6 CC 46 desync when the transport is started from the device panel?
 - [ ] Is TX-6 program change on ch 7 usable for scene slots?
-- [ ] Everything above, for the TP-7 — plus whether it emits or follows clock.
-- [ ] TP-7 CC 120 polarity.
 - [ ] Exact BLE peripheral names for TX-6 and TP-7 — or whether they do BLE MIDI at all.
 - [ ] A TP-7 CC 18 ff/rewind step size that feels right (currently ±8).
