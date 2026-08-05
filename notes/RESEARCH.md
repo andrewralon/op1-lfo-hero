@@ -607,6 +607,23 @@ onto 0/1/2, so most of the sweep would be discarded and the rest would drop loop
 arbitrary moments — noise rather than modulation. This is the same class of modelling error as
 CC 18: a state machine dressed as a plain value.
 
+### TP-7 cue rec mode (CC 16) — no observable effect
+
+Sent `127` four times and `0` twice, with the tape playing. **No change was visible on the
+display or audible at any point.**
+
+This is recorded as *unverified*, not as *working* — and not as *broken* either. On a device
+that never reports its state, there is no way to distinguish "silently succeeding" from "doing
+nothing". Possibilities not ruled out:
+
+- it needs a precondition we did not set up (armed, recording, or a particular menu state)
+- it has no front-panel indicator at all
+- it is inert on this firmware, like `CC 18 = 64` turned out to be
+
+**Consequence:** marked `lfoTargetable: false`. Independent of whether it works, modulating a
+mode-enable toggle at LFO rates is not musically meaningful, and exposing a control whose effect
+nobody can confirm — on hardware that cannot report back — is worse than not exposing it.
+
 ## Open questions — answer on hardware
 
 - [ ] Do the pinned FX-bus channels (ch 8/9) actually land?

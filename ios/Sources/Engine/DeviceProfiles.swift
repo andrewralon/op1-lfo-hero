@@ -279,7 +279,13 @@ extension DeviceProfile {
         masterOnly("tp7.in2Gain", "in2 gain", "g2", cc: 9, channel: 1),
         masterOnly("tp7.in3Gain", "in3 gain", "g3", cc: 9, channel: 2),
         masterOnly("tp7.rec",    "record",  "rec", cc: 14, channel: 0, encoding: teSwitch),
-        masterOnly("tp7.cueRec", "cue rec", "cue", cc: 16, channel: 0, encoding: teSwitch),
+        // No observable effect on hardware — sent 127 x4 and 0 x2 with the tape playing, and
+        // nothing changed on the display or in the audio. Recorded as unverified rather than
+        // broken: the TP-7 never reports its state, so "silently working" and "doing nothing"
+        // are indistinguishable. Not LFO-targetable — toggling a mode-enable at LFO rates is
+        // not musical, and an unverifiable control is worse than an absent one.
+        masterOnly("tp7.cueRec", "cue rec", "cue", cc: 16, channel: 0, encoding: teSwitch,
+                   lfoTargetable: false),
         // off / in / out — but a STATE MACHINE, not three independent values: `in` must be set
         // before `out`, and once a loop is active only `off` releases it. Verified on hardware:
         // sending `out` with no prior `in` is silently discarded.

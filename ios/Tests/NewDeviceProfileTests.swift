@@ -570,3 +570,34 @@ final class TP7LoopStateMachineTests: XCTestCase {
         }
     }
 }
+
+/// Controls that exist in the TP-7's MIDI table but are not offered as LFO targets, each for a
+/// different reason. See notes/RESEARCH.md.
+final class TP7NonModulatableControlsTests: XCTestCase {
+
+    /// loop: a state machine — `out` without `in` is discarded, so a sweep produces noise.
+    func testLoopIsNotTargetable() {
+        XCTAssertFalse(DeviceProfile.tp7.param("tp7.loop")!.lfoTargetable)
+    }
+
+    /// cue rec: no observable effect on hardware, and no way to verify on a device that never
+    /// reports its state.
+    func testCueRecIsNotTargetable() {
+        XCTAssertFalse(DeviceProfile.tp7.param("tp7.cueRec")!.lfoTargetable)
+    }
+
+    /// Neither reaches the parameter picker.
+    func testNeitherAppearsInThePicker() {
+        let ids = DeviceProfile.tp7.pickerParams.map(\.id)
+        XCTAssertFalse(ids.contains("tp7.loop"))
+        XCTAssertFalse(ids.contains("tp7.cueRec"))
+    }
+
+    /// But the mixer controls that were verified on hardware are still offered.
+    func testVerifiedControlsRemainTargetable() {
+        let ids = DeviceProfile.tp7.pickerParams.map(\.id)
+        XCTAssertTrue(ids.contains("tp7.vol"), "mix volume — verified audibly")
+        XCTAssertTrue(ids.contains("tp7.mute"), "mix mute — verified audibly")
+        XCTAssertTrue(ids.contains("tp7.in1Gain"), "input gain — verified audibly")
+    }
+}
