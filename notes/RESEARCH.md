@@ -488,6 +488,36 @@ a "rewind while stopped". Untested candidates: Song Position Pointer `0xF2 00 00
 the variable `ClockEngine.transportSpeed`, direction from the op — and `stop` must send
 `CC 18 = 64` followed by `0xFC`. Both are implemented.
 
+### TP-7 `ctrl` mode — verified transmit behaviour
+
+`ctrl` is a true controller mode, confirmed on hardware in both directions:
+
+- **Full incoming lockout.** CC is ignored (volume sweep did nothing) *and* real-time transport
+  is ignored (0xFA/0xFC did nothing). It is not merely "CC off" — nothing gets in.
+- **Transmits its whole control surface** on channel 1, buttons as value 127.
+- Entering `ctrl` stops tape playback and the display shows only "CTRL".
+
+Ten distinct controls were observed transmitting: `CC 20, 21, 22, 23, 24, 25, 26, 28, 30` and
+pitch bend.
+
+**`memo` is CC 28, not CC 27.** Verified in isolation: a 2-minute capture with only the memo
+button pressed produced exactly one CC — `ch1 cc28 = 127`. `CC 27` never appeared in any
+capture. The published TP-7 reference lists memo as CC 27; that is wrong.
+
+**The wheel (CC 30) is a true relative encoder whose value is rotation speed.** Hand-scrubbing
+produced values across the full 1-127 range; the motorised reel turning on its own during
+playback produced a steady 1-2 at roughly 57 messages/second. So value = how fast, not merely
+that it moved. That makes it usable as a real control input, and also means a playing TP-7 in
+`ctrl` mode is a constant ~57 msg/s source of MIDI traffic.
+
+**At rest the TP-7 is completely silent** — 20 s of idle with the tape stopped produced nothing,
+no active sensing, no chatter.
+
+**Caution on the other button labels.** The published table's names (up/down/left/right) do not
+map cleanly onto the physical controls (a rocker, `-`/`+` buttons, separate user buttons), so
+only `memo`, `rec`, `play`, `stop`, the wheel and the rocker are confidently identified here.
+The remaining CC numbers are confirmed to exist but their button labels are not.
+
 ## Open questions — answer on hardware
 
 - [ ] Do the pinned FX-bus channels (ch 8/9) actually land?

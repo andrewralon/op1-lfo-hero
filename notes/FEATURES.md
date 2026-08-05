@@ -12,7 +12,7 @@
 - [ ] MED - tx-6/tp-7: BLE peripheral names unverified (the tx-6 may not expose BLE MIDI at all). manual device override in settings is the escape hatch
 - [ ] LOW - tp-7: pitch bend = playback speed as an lfo target (ParamBinding.pitchBend exists but is unused)
 - [ ] LOW - tp-7: input gain only exists on channels 1-3 — grey it out on 4-6 rather than just hiding the binding
-- [ ] LOW - tp-7: listen to its controller-mode outgoing CCs (up 20 … memo 27, wheel 30) as app input
+- [ ] LOW - tp-7: listen to its controller-mode outgoing CCs as app input (cc 20-26, memo cc 28, wheel cc 30, rocker pitch bend). NOTE: ctrl mode blocks ALL incoming midi, so the app could receive but not send while in it
 - [ ] LOW - tx-6: use CC 47 (relative tempo) to drive the app's BPM when the device nudges it
 - [ ] LOW - device auto-detect matches on endpoint name only; CoreMIDI also exposes manufacturer ("teenage engineering") and model — use as a fallback for hubs with generic port names
 - [ ] MED - hit stop twice quickly to return to tape start CC 84, >= 64
