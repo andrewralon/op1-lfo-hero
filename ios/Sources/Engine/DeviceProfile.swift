@@ -78,6 +78,11 @@ enum ParamBinding: Hashable {
     case pitchBend(channel: ChannelRule)
     /// App-internal BPM — no MIDI CC. The OP-1's "tempo" parameter drives ClockEngine directly.
     case virtualTempo
+    /// A two-state control that fires transport op lists rather than a CC — for parameters
+    /// whose effect is a real-time message (play/stop) or a multi-step sequence (record).
+    /// Above `threshold` runs `onOps`, below runs `offOps`. Edge-triggered by the caller so a
+    /// held state does not re-fire every tick.
+    case transport(onOps: [TransportOp], offOps: [TransportOp], threshold: Int = 64)
 }
 
 /// What the app semantically knows about a parameter, beyond "it's a CC". Only these four
@@ -181,6 +186,10 @@ struct DeviceCapabilities: Hashable {
     var hasTempoParam = true
     /// Label on the tempo-source toggle when the device, not the app, is the clock.
     var clockLabel = "op1"
+
+    /// Pressing play while already playing reverses the tape instead of re-sending play —
+    /// the TP-7's own play button behaves this way.
+    var playReversesWhenPlaying = false
 
     /// Whether what the device *transmits* uses the same CC map it *receives* on.
     ///

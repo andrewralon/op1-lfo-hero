@@ -222,6 +222,7 @@ final class AppState: ObservableObject {
         controller.setProfile(newProfile)
         automation.setProfile(newProfile)
         clock.transport = newProfile.transport
+        clock.playTogglesDirection = newProfile.caps.playReversesWhenPlaying
 
         let tracks = newProfile.trackIndices
         volumes = Dictionary(uniqueKeysWithValues: tracks.map { ($0, st.volumes[$0] ?? newProfile.defaultVolume) })
@@ -382,6 +383,8 @@ final class AppState: ObservableObject {
     init() {
         controller = Controller(router: router)
         automation.controller = controller
+        // `.transport` parameters need ClockEngine, which owns play state and song position.
+        controller.transportRunner = { [weak clock] ops in clock?.runOps(ops) }
         clock.router = router
 
         wireCallbacks()
@@ -529,6 +532,12 @@ final class AppState: ObservableObject {
 
     func tapePrev() { clock.tapePrev() }
     func tapeNext() { clock.tapeNext() }
+
+    /// Press-and-hold scrubbing. On devices whose seek is a persistent speed state, the reel
+    /// moves only while held and accelerates the longer it is held.
+    func beginScrub(forward: Bool) { clock.beginScrub(forward: forward) }
+    func endScrub()                { clock.endScrub() }
+    var hasMomentaryScrub: Bool    { clock.hasMomentaryScrub }
 
     func enableClock() {
         isClockMaster = true

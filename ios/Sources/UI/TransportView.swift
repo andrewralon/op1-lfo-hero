@@ -16,8 +16,8 @@ struct TransportBarView: View {
 
             Sep()
 
-            TransBtn(symbol: app.profile.transport.prevSymbol, active: false) { app.tapePrev() }
-            TransBtn(symbol: app.profile.transport.nextSymbol, active: false) { app.tapeNext() }
+            ScrubBtn(symbol: app.profile.transport.prevSymbol, forward: false)
+            ScrubBtn(symbol: app.profile.transport.nextSymbol, forward: true)
 
             Sep()
 
@@ -236,9 +236,9 @@ struct TransportColumnView: View {
 
             // Row 2: tape ← / →
             HStack(spacing: 0) {
-                TransColBtn(symbol: app.profile.transport.prevSymbol, active: false) { app.tapePrev() }
+                ScrubColBtn(symbol: app.profile.transport.prevSymbol, forward: false)
                 Rectangle().fill(C.bg3).frame(width: 1)
-                TransColBtn(symbol: app.profile.transport.nextSymbol, active: false) { app.tapeNext() }
+                ScrubColBtn(symbol: app.profile.transport.nextSymbol, forward: true)
             }
             .frame(maxHeight: .infinity)
 
@@ -293,6 +293,72 @@ private struct TransColBtn: View {
         }
         .buttonStyle(ImmediateButtonStyle())
         .disabled(disabled)
+    }
+}
+
+/// A scrub button that acts while held rather than on tap. Used where the device's seek is a
+/// persistent speed state (the TP-7's CC 18): the reel moves only while the finger is down and
+/// accelerates the longer it is held. Falls back to a plain tap on nudge-style devices.
+/// Landscape-column counterpart of `ScrubBtn`.
+private struct ScrubColBtn: View {
+    let symbol: String
+    let forward: Bool
+    @EnvironmentObject private var app: AppState
+    @Environment(\.metrics) private var m
+    @State private var held = false
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: m.transportColBtnSize))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(held ? C.green.opacity(0.18) : Color.clear)
+            .foregroundColor(held ? C.green : C.text)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !held else { return }
+                        held = true
+                        app.beginScrub(forward: forward)
+                    }
+                    .onEnded { _ in
+                        held = false
+                        app.endScrub()
+                    }
+            )
+            .accessibilityIdentifier(forward ? "scrubForwardButton" : "scrubBackButton")
+    }
+}
+
+private struct ScrubBtn: View {
+    let symbol: String
+    let forward: Bool
+    @EnvironmentObject private var app: AppState
+    @State private var held = false
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: isPad ? 32 : 20))
+            .frame(width: isPad ? 68 : 44)
+            .frame(maxHeight: .infinity)
+            .background(held ? C.green.opacity(0.18) : Color.clear)
+            .foregroundColor(held ? C.green : C.text)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !held else { return }   // onChanged repeats; only start once
+                        held = true
+                        app.beginScrub(forward: forward)
+                    }
+                    .onEnded { _ in
+                        held = false
+                        app.endScrub()
+                    }
+            )
+            .accessibilityIdentifier(forward ? "scrubForwardButton" : "scrubBackButton")
     }
 }
 

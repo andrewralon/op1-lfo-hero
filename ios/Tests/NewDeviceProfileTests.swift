@@ -261,8 +261,10 @@ final class TP7ProfileTests: XCTestCase {
                       "the TP-7 does send MIDI clock in sync mode — verified on hardware")
     }
 
+    /// hasTempoParam is true even though the TP-7 has no tempo CC: it *follows* MIDI clock in
+    /// `sync` mode, so retuning the app's clock retunes the device.
     func testCapabilities() {
-        XCTAssertFalse(profile.caps.hasTempoParam)
+        XCTAssertTrue(profile.caps.hasTempoParam)
         // TE's docs: "TP-7 never reports its state via MIDI" — nothing to mirror.
         XCTAssertFalse(profile.caps.mirrorsIncomingCC)
     }
@@ -625,5 +627,253 @@ final class TP7NonModulatableControlsTests: XCTestCase {
         XCTAssertTrue(ids.contains("tp7.vol"), "mix volume — verified audibly")
         XCTAssertTrue(ids.contains("tp7.mute"), "mix mute — verified audibly")
         XCTAssertTrue(ids.contains("tp7.in1Gain"), "input gain — verified audibly")
+    }
+}
+
+/// The requested TP-7 playback parameters: speed, direction and tempo.
+final class TP7PlaybackParamsTests: XCTestCase {
+
+    private var destination: RecordingDestination!
+    private var ctrl: Controller!
+
+    override func setUp() {
+        super.setUp()
+        destination = RecordingDestination()
+        ctrl = Controller(router: destination)
+        ctrl.setProfile(.tp7)
+    }
+
+    private func send(_ id: String, _ value: Double) -> [[UInt8]] {
+        destination.reset()
+        ctrl.send(spec: DeviceProfile.tp7.param(id)!, track: 0, value: value)
+        return destination.packets
+    }
+
+    // MARK: - Speed (pitch bend)
+
+    /// Pitch bend is 14-bit, but parameters are always 0-127, so the value must be mapped
+    /// across the full range — otherwise an LFO would only ever reach the slowest speeds.
+    func testSpeedMapsAcrossTheFullPitchBendRange() {
+        XCTAssertEqual(send("tp7.speed", 0),   [[0xE0, 0, 0]], "slowest = x0.25")
+        XCTAssertEqual(send("tp7.speed", 127), [[0xE0, 127, 127]], "fastest = x2.0")
+    }
+
+    /// Mid-scale must land at pitch-bend centre, which the device treats as normal speed.
+    func testSpeedMidScaleIsAboutCentre() {
+        let p = send("tp7.speed", 64)[0]
+        let value = Int(p[1]) | Int(p[2]) << 7
+        XCTAssertEqual(p[0], 0xE0)
+        XCTAssertEqual(Double(value), 8192, accuracy: 100, "64 should sit at x1.0 (8192)")
+    }
+
+    func testSpeedIsMasterOnlyAndTargetable() {
+        let spec = DeviceProfile.tp7.param("tp7.speed")!
+        XCTAssertTrue(spec.isMasterOnly)
+        XCTAssertTrue(spec.lfoTargetable, "speed is exactly the kind of thing to modulate")
+    }
+
+    // MARK: - Direction
+
+    /// Behaves like mute: a two-state control, forward above the threshold, reverse below.
+    /// 68 and 60 are 1x in each direction — both verified by ear on hardware.
+    func testDirectionSnapsForwardOrReverse() {
+        XCTAssertEqual(send("tp7.direction", 127), [[0xB0, 18, 68]], "forward at 1x")
+        XCTAssertEqual(send("tp7.direction", 64),  [[0xB0, 18, 68]], "threshold is forward")
+        XCTAssertEqual(send("tp7.direction", 63),  [[0xB0, 18, 60]], "below threshold reverses")
+        XCTAssertEqual(send("tp7.direction", 0),   [[0xB0, 18, 60]], "reverse at 1x")
+    }
+
+    /// A square-wave LFO on direction should alternate cleanly between the two, never landing
+    /// on an intermediate speed.
+    func testDirectionNeverEmitsAnIntermediateValue() {
+        for v in stride(from: 0.0, through: 127.0, by: 1.0) {
+            let byte = send("tp7.direction", v)[0][2]
+            XCTAssertTrue(byte == 68 || byte == 60, "value \(v) produced \(byte)")
+        }
+    }
+
+    // MARK: - Tempo
+
+    /// The TP-7 has no tempo CC, but it follows MIDI clock — so tempo retunes the app's clock,
+    /// which the device tracks. Sends no MIDI of its own, exactly like the OP-1's tempo.
+    func testTempoSendsNothingButIsAvailable() {
+        let spec = DeviceProfile.tp7.param("tp7.tempo")!
+        XCTAssertEqual(spec.role, .tempo)
+        XCTAssertTrue(spec.isMasterOnly)
+        XCTAssertEqual(send("tp7.tempo", 120), [], "virtual tempo emits no MIDI")
+    }
+
+    /// Tempo is master-only, so selecting it must force the master target on — the same
+    /// behaviour the OP-1 relies on.
+    func testTempoIsMasterOnlyLikeTheOP1() {
+        XCTAssertTrue(DeviceProfile.tp7.param("tp7.tempo")!.isMasterOnly)
+        XCTAssertTrue(DeviceProfile.op1Field.param("tempo")!.isMasterOnly)
+    }
+
+    func testAllThreeAppearInThePicker() {
+        let ids = DeviceProfile.tp7.pickerParams.map(\.id)
+        XCTAssertTrue(ids.contains("tp7.speed"))
+        XCTAssertTrue(ids.contains("tp7.direction"))
+        XCTAssertTrue(ids.contains("tp7.tempo"))
+    }
+}
+
+/// Play/stop and record exposed as parameters, via the `.transport` binding.
+final class TP7TransportParamsTests: XCTestCase {
+
+    private var destination: RecordingDestination!
+    private var ctrl: Controller!
+    private var clock: ClockEngine!
+
+    override func setUp() {
+        super.setUp()
+        destination = RecordingDestination()
+        clock = ClockEngine()
+        clock.router = destination
+        clock.transport = DeviceProfile.tp7.transport
+        ctrl = Controller(router: destination)
+        ctrl.setProfile(.tp7)
+        ctrl.transportRunner = { [weak clock] ops in clock?.runOps(ops) }
+    }
+
+    private func send(_ id: String, _ value: Double) -> [[UInt8]] {
+        destination.reset()
+        ctrl.send(spec: DeviceProfile.tp7.param(id)!, track: 0, value: value)
+        return destination.packets
+    }
+
+    /// Above the threshold plays, below stops.
+    func testPlayParamGatesTransport() {
+        XCTAssertEqual(send("tp7.play", 127), [[0xFB]], "plays")
+        XCTAssertEqual(send("tp7.play", 0), [[0xFC]], "stops")
+    }
+
+    /// Edge-triggered: a sustained value must not re-fire every tick. An LFO sends a value on
+    /// every clock tick (~40 Hz), so without this, holding "on" would spam transport messages.
+    func testTransportParamsAreEdgeTriggered() {
+        _ = send("tp7.play", 127)
+        XCTAssertEqual(send("tp7.play", 127), [], "same state must not re-fire")
+        XCTAssertEqual(send("tp7.play", 120), [], "still above threshold, still no re-fire")
+        XCTAssertEqual(send("tp7.play", 0), [[0xFC]], "crossing the threshold fires once")
+        XCTAssertEqual(send("tp7.play", 10), [], "and does not repeat")
+    }
+
+    /// The record sequence mirrors the physical one: stop if playing, arm, then roll.
+    func testRecordSequenceArmsThenPlays() {
+        clock.play()                       // transport running
+        let packets = send("tp7.recSeq", 127)
+        XCTAssertEqual(packets, [[0xB0, 18, 64],   // release CC 18 (only fires while playing)
+                                 [0xFC],           // stop
+                                 [0xB0, 14, 127],  // arm
+                                 [0xFB]])          // roll — recording begins
+    }
+
+    /// Turning it off stops and disarms, so it cannot be left recording.
+    func testRecordSequenceOffStopsAndDisarms() {
+        clock.play()
+        _ = send("tp7.recSeq", 127)
+        XCTAssertEqual(send("tp7.recSeq", 0), [[0xFC], [0xB0, 14, 0]])
+    }
+
+    /// Record is destructive, so it stays out of the LFO picker even though it is edge-triggered.
+    func testRecordSequenceIsNotLfoTargetable() {
+        XCTAssertFalse(DeviceProfile.tp7.param("tp7.recSeq")!.lfoTargetable)
+        XCTAssertFalse(DeviceProfile.tp7.pickerParams.contains { $0.id == "tp7.recSeq" })
+    }
+
+    /// Play/stop is safe to modulate, so it does appear.
+    func testPlayIsLfoTargetable() {
+        XCTAssertTrue(DeviceProfile.tp7.pickerParams.contains { $0.id == "tp7.play" })
+    }
+}
+
+/// Play-reverses-when-playing, and momentary scrubbing with a speed ramp.
+final class TP7ScrubAndReverseTests: XCTestCase {
+
+    private var destination: RecordingDestination!
+    private var clock: ClockEngine!
+
+    override func setUp() {
+        super.setUp()
+        destination = RecordingDestination()
+        clock = ClockEngine()
+        clock.router = destination
+        clock.transport = DeviceProfile.tp7.transport
+        clock.playTogglesDirection = DeviceProfile.tp7.caps.playReversesWhenPlaying
+    }
+
+    // MARK: - Play reverses
+
+    /// First play rolls the tape; a second press while rolling reverses, matching the
+    /// TP-7's own play button rather than re-sending play.
+    func testSecondPlayReversesInsteadOfReplaying() {
+        destination.reset()
+        clock.play()
+        XCTAssertEqual(destination.packets, [[0xFB]], "first press plays")
+
+        destination.reset()
+        clock.play()
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 60]], "second press reverses")
+        XCTAssertEqual(clock.transportDirection, -1)
+
+        destination.reset()
+        clock.play()
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 68]], "and back to forward")
+    }
+
+    /// The OP-1 has no such behaviour — play must keep meaning play.
+    func testOP1PlayDoesNotReverse() {
+        let c = ClockEngine()
+        c.router = destination
+        c.transport = DeviceProfile.op1Field.transport
+        c.playTogglesDirection = DeviceProfile.op1Field.caps.playReversesWhenPlaying
+        c.play()
+        destination.reset()
+        c.play()
+        XCTAssertEqual(destination.packets, [[0xFB]], "OP-1 play always plays")
+    }
+
+    // MARK: - Momentary scrub
+
+    /// The TP-7 seeks via a persistent speed state, so scrubbing is press-and-hold.
+    func testTP7HasMomentaryScrubButOP1DoesNot() {
+        XCTAssertTrue(clock.hasMomentaryScrub)
+        let c = ClockEngine()
+        c.transport = DeviceProfile.op1Field.transport
+        XCTAssertFalse(c.hasMomentaryScrub, "the OP-1 seeks by SPP nudge, not a held speed")
+    }
+
+    /// Holding starts the reel at about 1x rather than jumping straight to the configured speed.
+    func testScrubStartsAtNormalSpeed() {
+        destination.reset()
+        clock.beginScrub(forward: true)
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 68]], "64 + 4 = forward at 1x")
+        clock.endScrub()
+    }
+
+    /// Releasing must return CC 18 to centre, or the tape keeps rolling after the finger lifts.
+    func testReleasingScrubStopsTheReel() {
+        clock.beginScrub(forward: true)
+        destination.reset()
+        clock.endScrub()
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 64]], "centre = stopped")
+    }
+
+    /// And the user's configured seek speed survives a scrub.
+    func testScrubRestoresTheConfiguredSpeed() {
+        clock.transportSpeed = 4.0
+        clock.beginScrub(forward: false)
+        clock.endScrub()
+        XCTAssertEqual(clock.transportSpeed, 4.0, accuracy: 0.001)
+    }
+
+    /// On a nudge-style device, "begin scrub" just fires the nudge once — there is no held state.
+    func testScrubFallsBackToASingleNudgeOnOP1() {
+        let c = ClockEngine()
+        c.router = destination
+        c.transport = DeviceProfile.op1Field.transport
+        destination.reset()
+        c.beginScrub(forward: true)
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127], [0xF2, 16, 0]], "one tape seek")
     }
 }

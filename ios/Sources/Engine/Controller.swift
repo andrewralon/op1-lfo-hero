@@ -30,16 +30,37 @@ final class Controller {
     /// Send one parameter to one target. `track` 0 is master. `value` is in MIDI units (0-127),
     /// or BPM for a tempo parameter. Pass `profile` explicitly from the automation thread so a
     /// concurrent profile switch cannot split a clip's parameter from its device.
+    /// Fires transport ops for a `.transport` binding. Set by AppState so the Controller does
+    /// not need to know about ClockEngine's play state or song position.
+    var transportRunner: (([TransportOp]) -> Void)?
+
+    /// Last on/off state sent per parameter id, so `.transport` bindings only fire on a change.
+    /// Without this an LFO would re-trigger play or record on every clock tick.
+    private var lastSwitchState: [String: Bool] = [:]
+
     func send(spec: ParamSpec, track: Int, value: Double, profile p: DeviceProfile? = nil) {
         let prof = p ?? profile
         guard let binding = prof.binding(spec, track: track) else { return }
         switch binding {
+        case .transport(let onOps, let offOps, let threshold):
+            let on = Int(value.rounded()) >= threshold
+            lock.lock()
+            let changed = lastSwitchState[spec.id] != on
+            lastSwitchState[spec.id] = on
+            lock.unlock()
+            // Edge-triggered: a sustained value must not re-fire transport every tick.
+            guard changed else { return }
+            transportRunner?(on ? onOps : offOps)
         case .virtualTempo:
             // No MIDI — the app's own clock is the target. AppState reacts via updateCallback.
             return
         case .pitchBend(let rule):
+            // Parameters are always in MIDI units (0-127); pitch bend is 14-bit (0-16383).
+            // Map across the full range so an LFO sweeping 0-127 sweeps the whole bend range,
+            // with 64 landing near centre (8192 = no change).
             let ch = prof.channel(rule, track: track)
-            let v = max(0, min(16383, Int(value.rounded())))
+            let clamped = max(0, min(127, value))
+            let v = Int((clamped * 16383.0 / 127.0).rounded())
             router?.send([UInt8(0xE0 | (ch & 0x0F)), UInt8(v & 0x7F), UInt8((v >> 7) & 0x7F)])
         case .cc(let cc, let rule, let encoding):
             sendCC(ch: prof.channel(rule, track: track), cc: cc, val: encoding.wireValue(from: value))

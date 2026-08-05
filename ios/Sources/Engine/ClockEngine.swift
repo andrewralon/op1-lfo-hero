@@ -63,6 +63,15 @@ final class ClockEngine {
         didSet { wireRouter() }
     }
 
+    deinit {
+        // A resumed DispatchSourceTimer traps in libdispatch if it is released while active,
+        // and a suspended one traps if cancelled without resuming first. Both timers have to
+        // be shut down explicitly.
+        scrubTimer?.cancel()
+        if masterTimerSuspended { masterTimer?.resume() }
+        masterTimer?.cancel()
+    }
+
     private func wireRouter() {
         router?.onClock = { [weak self] in self?.handleSlaveTick() }
         router?.onStart = { [weak self] in self?.handleStart() }
@@ -220,11 +229,38 @@ final class ClockEngine {
     /// other devices use their own CCs. Set from the active profile by AppState.
     var transport: TransportMap = DeviceProfile.op1Field.transport
 
+    /// When true, pressing play while already playing reverses direction instead of
+    /// re-sending play — matching the TP-7's own play button. Set from the device profile.
+    var playTogglesDirection = false
+
     func play() {
+        // Matches the hardware: on a device whose play button reverses, a second press while
+        // rolling flips direction rather than restarting playback.
+        if playTogglesDirection && isPlaying {
+            reverseDirection()
+            return
+        }
         // Ops run before `isPlaying` flips, so a `.toggleCC(whenPlaying:)` op sees the state
         // the button was pressed in.
         run(transport.play)
         isPlaying = true
+    }
+
+    /// Flip the tape direction using whichever `.directionalTransport` op the profile defines.
+    /// No-op on devices that have no directional transport.
+    ///
+    /// Always at 1x: this is a *playback* direction change, not a seek, so it should sound like
+    /// playing backwards rather than rewinding. The user's seek speed is left untouched.
+    func reverseDirection() {
+        let newDirection = transportDirection >= 0 ? -1 : 1
+        let ops = (newDirection > 0 ? transport.next : transport.prev).filter {
+            if case .directionalTransport = $0 { return true } else { return false }
+        }
+        guard !ops.isEmpty else { return }
+        let saved = transportSpeed
+        transportSpeed = 1.0
+        run(ops)
+        transportSpeed = saved
     }
 
     func stop() {
@@ -240,6 +276,68 @@ final class ClockEngine {
 
     func tapePrev() { run(transport.prev) }
     func tapeNext() { run(transport.next) }
+
+    // MARK: - Momentary scrubbing
+    //
+    // On devices whose seek is a persistent speed state (the TP-7's CC 18), holding a scrub
+    // button should move the reel only while held, and move faster the longer it is held —
+    // rather than latching a speed the user then has to cancel.
+
+    private var scrubTimer: DispatchSourceTimer?
+    private var scrubHeldSeconds = 0.0
+    private var speedBeforeScrub: Double?
+
+    /// True when the active profile seeks via a persistent speed state rather than a nudge.
+    var hasMomentaryScrub: Bool {
+        (transport.prev + transport.next).contains {
+            if case .directionalTransport = $0 { return true } else { return false }
+        }
+    }
+
+    /// Begin scrubbing. Speed starts near 1x and ramps toward 8x over a few seconds of holding.
+    func beginScrub(forward: Bool) {
+        guard hasMomentaryScrub else {
+            // Nudge-style devices have nothing to hold; fire once.
+            forward ? tapeNext() : tapePrev()
+            return
+        }
+        endScrub(resend: false)
+        speedBeforeScrub = transportSpeed
+        scrubHeldSeconds = 0
+        transportSpeed = 1.0
+        run(forward ? transport.next : transport.prev)
+
+        let t = DispatchSource.makeTimerSource(queue: masterQueue)
+        t.schedule(deadline: .now() + 0.15, repeating: .milliseconds(150))
+        t.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.scrubHeldSeconds += 0.15
+            // Ramp 1x -> 8x over ~3s held, then hold at the top.
+            let ramped = min(8.0, 1.0 + self.scrubHeldSeconds * 2.3)
+            guard abs(ramped - self.transportSpeed) > 0.05 else { return }
+            self.transportSpeed = ramped
+            self.run(forward ? self.transport.next : self.transport.prev)
+        }
+        t.resume()
+        scrubTimer = t
+    }
+
+    /// Release: stop the reel and restore the speed the user had configured.
+    func endScrub(resend: Bool = true) {
+        scrubTimer?.cancel()
+        scrubTimer = nil
+        scrubHeldSeconds = 0
+        if resend, hasMomentaryScrub, transportDirection != 0 {
+            // Return CC 18 to centre so the tape stops when the finger lifts.
+            run(transport.stop.filter {
+                if case .directionalTransport = $0 { return true } else { return false }
+            })
+        }
+        if let s = speedBeforeScrub { transportSpeed = s; speedBeforeScrub = nil }
+    }
+
+    /// Run an arbitrary op list — used by `.transport` parameters as well as the buttons.
+    func runOps(_ ops: [TransportOp]) { run(ops) }
 
     private func run(_ ops: [TransportOp]) {
         for op in ops {

@@ -120,6 +120,35 @@ Found by hardware testing — **all five would have shipped**:
 - [ ] Verify the 6-track layout on iPad, both orientations. Only iPhone has been checked on
       hardware; iPad has simulator screenshots only
 
+### 🎛️ Requested TP-7 parameters and transport behaviour — implemented, needs hardware testing
+
+All seven are built and unit-tested. **None have been tried on the device yet.**
+
+- [x] **1. Speed parameter** (`tp7.speed`) — pitch bend, 0-127 mapped across the full 14-bit
+      range so an LFO sweeps x0.25 to x2.0, with 64 at centre
+- [x] **2. Direction parameter** (`tp7.direction`) — two-state on `CC 18` like mute: above the
+      threshold 68 (forward 1x), below 60 (reverse 1x). Never emits an intermediate value
+- [x] **3. Tempo parameter** (`tp7.tempo`) — `.virtualTempo`, retunes the app's clock, which the
+      TP-7 follows in `sync` mode. `hasTempoParam` flipped to true
+- [x] **4. Play/stop parameter** (`tp7.play`) — new `ParamBinding.transport` case for real-time
+      messages. **Edge-triggered**, so a sustained LFO value does not re-fire every clock tick
+- [x] **5. Record sequence** (`tp7.recSeq`) — stop (only if playing), arm, play. Off stops and
+      disarms. ⚠️ Destructive, so kept out of the LFO picker
+- [x] **6. Play reverses when already playing** — `caps.playReversesWhenPlaying`, TP-7 only.
+      Reverses at 1x, since it is a playback change rather than a seek
+- [x] **7. Momentary scrub** — `ScrubBtn` / `ScrubColBtn` act while held, starting at 1x and
+      ramping to 8x over ~3s, returning `CC 18` to centre on release and restoring the user's
+      configured speed. Falls back to a single nudge on the OP-1
+
+Still to verify on hardware:
+- [ ] Does the speed parameter actually sweep playback rate, and does an LFO on it sound musical?
+- [ ] Does direction switch cleanly, or does it click/glitch at the crossover?
+- [ ] Does tempo modulation actually move the TP-7 (needs `sync` mode)?
+- [ ] Does play/stop as an LFO target gate playback usefully, or is it too abrupt?
+- [ ] Does the record sequence reliably start a recording?
+- [ ] Does play-reverses feel right, or should it reverse at the current speed rather than 1x?
+- [ ] Does the scrub ramp feel right — 1x to 8x over 3s, or too slow/fast?
+
 ### 🟡 Low — features and polish
 
 - [ ] **Wire up double-stop to rewind.** `ClockEngine.rewindToStart()` exists and is tested but

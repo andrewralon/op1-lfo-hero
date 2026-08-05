@@ -114,6 +114,13 @@ private func masterOnly(_ id: String, _ name: String, _ short: String,
               lfoTargetable: lfoTargetable)
 }
 
+/// A master-level pitch-bend control (the TP-7's playback speed).
+private func masterPitchBend(_ id: String, _ name: String, _ short: String,
+                             channel: Int) -> ParamSpec {
+    ParamSpec(id: id, name: name, short: short,
+              track: nil, master: .pitchBend(channel: .pinned(channel)))
+}
+
 /// TE's documented on/off convention for the 6-channel devices: 0-63 off, 64-127 on.
 private let teSwitch = ValueEncoding.switching(SwitchEncoding(onValue: 127, offValue: 0, threshold: 64))
 
@@ -255,10 +262,12 @@ extension DeviceProfile {
             // reference documents no clock output — this was only found by listening.
             canBeClockMaster: true,
             followsClock: true,     // UNVERIFIED — see notes/RESEARCH.md
-            hasTempoParam: false,
+            hasTempoParam: true,
             clockLabel: "tp7",
             // TE's own docs: "TP-7 never reports its state via MIDI." There is nothing to
             // mirror, and in `ctrl` mode what it does send is its own button map.
+            // The TP-7's own play button reverses the tape when pressed while already playing.
+            playReversesWhenPlaying: true,
             mirrorsIncomingCC: false
         ),
         setupSteps: [
@@ -288,6 +297,50 @@ extension DeviceProfile {
         // audio in testing, but "could not" is not "cannot".
         masterOnly("tp7.rec",    "record",  "rec", cc: 14, channel: 0, encoding: teSwitch,
                    lfoTargetable: false),
+
+        // Playback speed. Pitch bend is an independent multiplier (x0.25 at 0, x1.0 at centre,
+        // x2.0 at full) verified on hardware — it does NOT set direction, only rate.
+        // NOTE: it persists across stop/play with no on-screen feedback, so a stray value
+        // silently pitch-shifts everything until returned to centre.
+        masterPitchBend("tp7.speed", "speed", "spd", channel: 0),
+
+        // Direction, behaving like mute: a two-state control on CC 18. Above the threshold
+        // plays forward, below plays reverse — offset 4 from centre is 1x in each direction,
+        // both verified on hardware. CC 18 takes over the transport as soon as it is sent.
+        ParamSpec(id: "tp7.direction", name: "direction", short: "dir",
+                  track: nil,
+                  master: .cc(cc: 18, channel: .pinned(0),
+                              encoding: .switching(SwitchEncoding(onValue: 68, offValue: 60,
+                                                                  threshold: 64)))),
+
+        // Transport as a parameter: above the threshold plays, below stops. Edge-triggered in
+        // Controller, so a sustained LFO value does not re-fire transport every clock tick.
+        // A square wave on this gates playback in rhythm.
+        ParamSpec(id: "tp7.play", name: "play/stop", short: "ply",
+                  track: nil,
+                  master: .transport(onOps: [.midiStartOrContinue], offOps: [.midiStop])),
+
+        // Record, as the full physical sequence: stop (only if already playing), arm, then
+        // play — which is what actually starts a recording.
+        //
+        // DESTRUCTIVE. This can capture over a take. Kept out of the LFO picker: the sequence
+        // is edge-triggered so it will not fire continuously, but an LFO crossing the threshold
+        // would still start recordings unattended.
+        ParamSpec(id: "tp7.recSeq", name: "rec seq", short: "rsq",
+                  track: nil,
+                  master: .transport(
+                      onOps: [.toggleCC(ch: 0, cc: 18, value: 64, whenPlaying: true),
+                              .midiStop,
+                              .cc(ch: 0, cc: 14, value: 127),
+                              .midiStartOrContinue],
+                      offOps: [.midiStop, .cc(ch: 0, cc: 14, value: 0)]),
+                  lfoTargetable: false),
+
+        // Tempo. The TP-7 has no tempo control of its own, but it follows MIDI clock in `sync`
+        // mode — so retuning the app's clock retunes the device too, as well as the LFO rate.
+        // Same mechanism the OP-1 uses; sends no CC of its own.
+        ParamSpec(id: "tp7.tempo", name: "tempo", short: "tmp",
+                  track: nil, master: .virtualTempo, role: .tempo),
         // No observable effect on hardware — sent 127 x4 and 0 x2 with the tape playing, and
         // nothing changed on the display or in the audio. Recorded as unverified rather than
         // broken: the TP-7 never reports its state, so "silently working" and "doing nothing"
