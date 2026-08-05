@@ -644,6 +644,35 @@ modulating a mode-enable at LFO rates is not musically meaningful, and exposing 
 effect nobody can confirm — on hardware that cannot report back — is worse than not exposing it.
 Notes are not exposed by the app at all, so no change was needed there.
 
+### TP-7 record (CC 14) — arms, does not record
+
+`CC 14 = 127` puts the TP-7 into **record-armed**: red light blinking, display showing 0
+seconds, no audio. It does **not** start recording. The published reference calls this simply
+"record", which implies it rolls.
+
+| action | effect |
+|---|---|
+| `CC 14 = 127` | arms record |
+| waiting | arm **persists** — still blinking after 30 s, no timeout |
+| `CC 14 = 0` | disarms |
+| **`0xFC` (stop)** | **also cancels the arm** |
+| `CC 16` while armed | nothing — tested in isolation with nothing else sent |
+
+Two differences from the physical button, both undocumented:
+
+- The **hardware record button stops the reel** as part of arming. `CC 14` does not — arming
+  while a tape is rolling leaves it rolling. So the button is a compound action the CC does not
+  reproduce.
+- Arming while transport is running and then sending `0xFC` cancels the arm rather than leaving
+  it armed and stopped.
+
+**Safety conclusion: `CC 14` alone cannot overwrite audio.** It only arms, and every route we
+found to roll the transport cancels the arm. Recording would require rolling while armed, which
+was not achieved over MIDI.
+
+**Untested deliberately:** sending play (`0xFB`) while armed. That is the one combination that
+could capture audio over a take, so it was not attempted.
+
 ## Open questions — answer on hardware
 
 - [ ] Do the pinned FX-bus channels (ch 8/9) actually land?
