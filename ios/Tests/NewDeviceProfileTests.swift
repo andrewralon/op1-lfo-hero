@@ -813,12 +813,16 @@ final class TP7ScrubAndReverseTests: XCTestCase {
 
         destination.reset()
         clock.play()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 60]], "second press reverses")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, UInt8(64 - clock.reverseUnitOffset)]],
+                       "second press reverses via CC 18")
         XCTAssertEqual(clock.transportDirection, -1)
 
+        // Forward hands control back to the device's own transport rather than driving CC 18,
+        // so playback is at exactly the normal rate instead of an approximation of it.
         destination.reset()
         clock.play()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 68]], "and back to forward")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 64], [0xFB]],
+                       "forward releases CC 18 and lets the device play")
     }
 
     /// The OP-1 has no such behaviour — play must keep meaning play.

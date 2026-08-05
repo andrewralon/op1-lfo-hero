@@ -140,6 +140,15 @@ All seven are built and unit-tested. **None have been tried on the device yet.**
       ramping to 8x over ~3s, returning `CC 18` to centre on release and restoring the user's
       configured speed. Falls back to a single nudge on the OP-1
 
+Known wrong, needs a measurement:
+- [ ] **`ClockEngine.reverseUnitOffset`** — the CC 18 offset that plays backwards at normal
+      speed. The third-party spec says 4 ("rewind x1"), but on hardware that sounds *very* slow,
+      so the scale is not symmetric around centre. Currently guessed at 8. To measure: play
+      56/57/58/59/60/61 for a few seconds each and pick the one that sounds like normal speed
+      backwards. Requires the TP-7 on the Mac
+- Forward no longer needs measuring: it releases CC 18 and sends Continue, so the device plays
+  at its own normal rate rather than an approximation of it
+
 Still to verify on hardware:
 - [ ] Does the speed parameter actually sweep playback rate, and does an LFO on it sound musical?
 - [ ] Does direction switch cleanly, or does it click/glitch at the crossover?

@@ -246,21 +246,42 @@ final class ClockEngine {
         isPlaying = true
     }
 
-    /// Flip the tape direction using whichever `.directionalTransport` op the profile defines.
-    /// No-op on devices that have no directional transport.
+    /// CC 18 offset below centre that plays backwards at about normal speed.
     ///
-    /// Always at 1x: this is a *playback* direction change, not a seek, so it should sound like
-    /// playing backwards rather than rewinding. The user's seek speed is left untouched.
+    /// Forward does not need an equivalent: releasing CC 18 and sending Continue gives the
+    /// device's own playback rate exactly, which is better than approximating it.
+    ///
+    /// TODO: measured value pending. 4 (the third-party spec's "1x") sounds far too slow on
+    /// hardware, so the scale is not symmetric around centre. See notes/FIELD_DEVICE_SUPPORT.md.
+    var reverseUnitOffset = 8
+
+    /// Flip the tape direction. No-op on devices without a directional transport.
+    ///
+    /// Forward hands control back to the device's own transport rather than driving CC 18, so
+    /// it plays at exactly the normal rate. Reverse uses CC 18, since there is no other way to
+    /// play backwards.
     func reverseDirection() {
-        let newDirection = transportDirection >= 0 ? -1 : 1
-        let ops = (newDirection > 0 ? transport.next : transport.prev).filter {
-            if case .directionalTransport = $0 { return true } else { return false }
+        guard hasMomentaryScrub else { return }   // no directional transport on this device
+
+        if transportDirection < 0 {
+            // Currently reversing -> go forward. Release CC 18 and let the device play.
+            run(transport.stop.filter {
+                if case .directionalTransport = $0 { return true } else { return false }
+            })
+            router?.send([0xFB])
+            isPlaying = true
+        } else {
+            // Currently forward or stopped -> reverse via CC 18.
+            let ops = transport.prev.filter {
+                if case .directionalTransport = $0 { return true } else { return false }
+            }
+            guard !ops.isEmpty else { return }
+            let saved = transportSpeed
+            // reverseUnitOffset is expressed in raw CC steps, so convert through unitSpeed.
+            transportSpeed = Double(reverseUnitOffset) / 4.0
+            run(ops)
+            transportSpeed = saved
         }
-        guard !ops.isEmpty else { return }
-        let saved = transportSpeed
-        transportSpeed = 1.0
-        run(ops)
-        transportSpeed = saved
     }
 
     func stop() {
