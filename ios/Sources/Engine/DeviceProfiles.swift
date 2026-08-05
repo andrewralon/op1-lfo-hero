@@ -278,7 +278,16 @@ extension DeviceProfile {
         masterOnly("tp7.in1Gain", "in1 gain", "g1", cc: 9, channel: 0),
         masterOnly("tp7.in2Gain", "in2 gain", "g2", cc: 9, channel: 1),
         masterOnly("tp7.in3Gain", "in3 gain", "g3", cc: 9, channel: 2),
-        masterOnly("tp7.rec",    "record",  "rec", cc: 14, channel: 0, encoding: teSwitch),
+        // Verified on hardware: CC 14 ARMS record (blinking light, 0s, no audio) rather than
+        // starting it, and it is absolute — sending 127 twice leaves it armed, it does not
+        // toggle. The arm persists indefinitely; 0xFC cancels it.
+        //
+        // Not LFO-targetable. Arming/disarming at LFO rates has no musical use, and record is
+        // the one parameter where automation can destroy a take rather than merely sound wrong.
+        // Excluded on the precautionary principle: CC 14 alone could not be made to capture
+        // audio in testing, but "could not" is not "cannot".
+        masterOnly("tp7.rec",    "record",  "rec", cc: 14, channel: 0, encoding: teSwitch,
+                   lfoTargetable: false),
         // No observable effect on hardware — sent 127 x4 and 0 x2 with the tape playing, and
         // nothing changed on the display or in the audio. Recorded as unverified rather than
         // broken: the TP-7 never reports its state, so "silently working" and "doing nothing"

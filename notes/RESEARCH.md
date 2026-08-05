@@ -666,12 +666,26 @@ Two differences from the physical button, both undocumented:
 - Arming while transport is running and then sending `0xFC` cancels the arm rather than leaving
   it armed and stopped.
 
-**Safety conclusion: `CC 14` alone cannot overwrite audio.** It only arms, and every route we
-found to roll the transport cancels the arm. Recording would require rolling while armed, which
-was not achieved over MIDI.
+**`CC 14` alone cannot record — it only arms.** But arm followed by play *does* record, mirroring
+the physical sequence exactly (press record once to arm, press play to start):
 
-**Untested deliberately:** sending play (`0xFB`) while armed. That is the one combination that
-could capture audio over a take, so it was not attempted.
+```
+CC 14 = 127   ->  armed   (blinking, 0s)
+0xFB          ->  RECORDING BEGINS
+0xFC          ->  stops
+```
+
+Verified on hardware: this produced a 4-second recording from a live input.
+
+**It created a NEW track rather than overwriting the one that was loaded** — non-destructive in
+the configuration tested. Whether that is fixed behaviour or depends on a record-menu setting is
+**unconfirmed**: the TP-7 guide has `#recording` and `#record_menu` sections, but that page
+serves its content as images and the text could not be retrieved. Check the device's own record
+menu before relying on this.
+
+**Do not assume MIDI recording is safe.** One observation in one configuration is not a
+guarantee, and a setting that made record overwrite the current take would turn this into a
+destructive operation with no warning.
 
 ## Open questions — answer on hardware
 

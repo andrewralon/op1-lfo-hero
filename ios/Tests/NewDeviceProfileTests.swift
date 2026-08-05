@@ -575,6 +575,17 @@ final class TP7LoopStateMachineTests: XCTestCase {
 /// different reason. See notes/RESEARCH.md.
 final class TP7NonModulatableControlsTests: XCTestCase {
 
+    // Stored, not local: Controller.router is weak, so a local would be released mid-test.
+    private var destination: RecordingDestination!
+    private var ctrl: Controller!
+
+    override func setUp() {
+        super.setUp()
+        destination = RecordingDestination()
+        ctrl = Controller(router: destination)
+        ctrl.setProfile(.tp7)
+    }
+
     /// loop: a state machine — `out` without `in` is discarded, so a sweep produces noise.
     func testLoopIsNotTargetable() {
         XCTAssertFalse(DeviceProfile.tp7.param("tp7.loop")!.lfoTargetable)
@@ -586,11 +597,26 @@ final class TP7NonModulatableControlsTests: XCTestCase {
         XCTAssertFalse(DeviceProfile.tp7.param("tp7.cueRec")!.lfoTargetable)
     }
 
-    /// Neither reaches the parameter picker.
-    func testNeitherAppearsInThePicker() {
+    /// record: arms rather than records, and automating it risks a take. Precautionary.
+    func testRecordIsNotTargetable() {
+        XCTAssertFalse(DeviceProfile.tp7.param("tp7.rec")!.lfoTargetable)
+    }
+
+    /// None of the three reaches the parameter picker.
+    func testNoneAppearInThePicker() {
         let ids = DeviceProfile.tp7.pickerParams.map(\.id)
         XCTAssertFalse(ids.contains("tp7.loop"))
         XCTAssertFalse(ids.contains("tp7.cueRec"))
+        XCTAssertFalse(ids.contains("tp7.rec"))
+    }
+
+    /// CC 14 is absolute, not a toggle — verified on hardware by sending 127 twice and watching
+    /// the arm persist. So the same value twice must produce the same bytes twice.
+    func testRecordIsAbsoluteNotAToggle() {
+        let rec = DeviceProfile.tp7.param("tp7.rec")!
+        ctrl.send(spec: rec, track: 0, value: 127)
+        ctrl.send(spec: rec, track: 0, value: 127)
+        XCTAssertEqual(destination.packets, [[0xB0, 14, 127], [0xB0, 14, 127]])
     }
 
     /// But the mixer controls that were verified on hardware are still offered.
