@@ -530,3 +530,43 @@ final class TP7TransportTests: XCTestCase {
         clock.stop();     XCTAssertEqual(clock.transportDirection, 0)
     }
 }
+
+/// TP-7 loop (CC 17) is a state machine, verified on hardware: `out` (2) sent with no prior
+/// `in` (1) is silently discarded, and once a loop is active only `off` (0) releases it.
+final class TP7LoopStateMachineTests: XCTestCase {
+
+    /// Because of that, loop must not be an LFO target — a sweep would map cyclically onto
+    /// 0/1/2, discarding most values and dropping loop points at arbitrary moments.
+    func testLoopIsNotLfoTargetable() {
+        let loop = DeviceProfile.tp7.param("tp7.loop")
+        XCTAssertNotNil(loop)
+        XCTAssertFalse(loop!.lfoTargetable, "loop is a state machine, not a modulatable value")
+    }
+
+    /// And therefore must not appear in the parameter picker.
+    func testLoopIsAbsentFromThePicker() {
+        XCTAssertFalse(DeviceProfile.tp7.pickerParams.contains { $0.id == "tp7.loop" })
+    }
+
+    // Held as stored properties, not locals: Controller.router is a weak var, so a local
+    // RecordingDestination can be released out from under it mid-test.
+    private var destination: RecordingDestination!
+    private var ctrl: Controller!
+
+    override func setUp() {
+        super.setUp()
+        destination = RecordingDestination()
+        ctrl = Controller(router: destination)
+        ctrl.setProfile(.tp7)
+    }
+
+    /// It still encodes correctly if something does send it deliberately.
+    func testLoopStillEncodesItsThreeStates() {
+        let loop = DeviceProfile.tp7.param("tp7.loop")!
+        for (input, expected) in [(0.0, 0), (64.0, 1), (127.0, 2)] {
+            destination.reset()
+            ctrl.send(spec: loop, track: 0, value: input)
+            XCTAssertEqual(destination.packets, [[0xB0, 17, UInt8(expected)]])
+        }
+    }
+}

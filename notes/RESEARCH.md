@@ -593,6 +593,20 @@ as a track parameter on tracks 1-3 implies gain 1 belongs to track 1. It does no
 to jack 1, whose signal reaches whichever mix channels it is routed to. Modelled as three
 master-level controls instead.
 
+### TP-7 loop (CC 17) is a state machine — verified
+
+Setting `in` (1) then `out` (2) three seconds apart created a working 3-second loop: markers
+appeared, the audio repeated, and `off` (0) released it cleanly with playback continuing.
+
+**But `out` sent with no prior `in` is silently discarded** — tested twice, no display change, no
+audio change. So the values are not independent; the order is mandatory, exactly as
+[lucidyan/tp7-midi](https://github.com/lucidyan/tp7-midi) reports.
+
+**Consequence:** loop is marked `lfoTargetable: false`. An LFO sweeping 0-127 maps cyclically
+onto 0/1/2, so most of the sweep would be discarded and the rest would drop loop points at
+arbitrary moments — noise rather than modulation. This is the same class of modelling error as
+CC 18: a state machine dressed as a plain value.
+
 ## Open questions — answer on hardware
 
 - [ ] Do the pinned FX-bus channels (ch 8/9) actually land?

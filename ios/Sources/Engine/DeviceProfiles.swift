@@ -106,10 +106,12 @@ private func perTrack(_ id: String, _ name: String, _ short: String, cc: Int,
 /// target, which is why they carry a `master` binding and no `track` binding.
 private func masterOnly(_ id: String, _ name: String, _ short: String,
                         cc: Int, channel: Int,
-                        encoding: ValueEncoding = .continuous) -> ParamSpec {
+                        encoding: ValueEncoding = .continuous,
+                        lfoTargetable: Bool = true) -> ParamSpec {
     ParamSpec(id: id, name: name, short: short,
               track: nil,
-              master: .cc(cc: cc, channel: .pinned(channel), encoding: encoding))
+              master: .cc(cc: cc, channel: .pinned(channel), encoding: encoding),
+              lfoTargetable: lfoTargetable)
 }
 
 /// TE's documented on/off convention for the 6-channel devices: 0-63 off, 64-127 on.
@@ -278,7 +280,14 @@ extension DeviceProfile {
         masterOnly("tp7.in3Gain", "in3 gain", "g3", cc: 9, channel: 2),
         masterOnly("tp7.rec",    "record",  "rec", cc: 14, channel: 0, encoding: teSwitch),
         masterOnly("tp7.cueRec", "cue rec", "cue", cc: 16, channel: 0, encoding: teSwitch),
-        // off / in / out
-        masterOnly("tp7.loop",   "loop",    "lp",  cc: 17, channel: 0, encoding: .enumerated(count: 3)),
+        // off / in / out — but a STATE MACHINE, not three independent values: `in` must be set
+        // before `out`, and once a loop is active only `off` releases it. Verified on hardware:
+        // sending `out` with no prior `in` is silently discarded.
+        //
+        // Not LFO-targetable as a result. An LFO sweeping 0-127 would map cyclically onto
+        // 0/1/2, so most of the sweep would be discarded and the rest would drop loop points at
+        // arbitrary moments — noise, not modulation.
+        masterOnly("tp7.loop", "loop", "lp", cc: 17, channel: 0,
+                   encoding: .enumerated(count: 3), lfoTargetable: false),
     ]
 }
