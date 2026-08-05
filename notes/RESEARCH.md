@@ -524,6 +524,30 @@ map cleanly onto the physical controls (a rocker, `-`/`+` buttons, separate user
 only `memo`, `rec`, `play`, `stop`, the wheel and the rocker are confidently identified here.
 The remaining CC numbers are confirmed to exist but their button labels are not.
 
+### TP-7 input gain (CC 9) — measured curve
+
+Stepped through nine values, holding each so the on-screen dB could be read:
+
+| midi | 0 | 16 | 32 | 48 | 64 | 80 | 96 | 112 | 127 |
+|---|---|---|---|---|---|---|---|---|---|
+| dB | 0 | +5 | +10 | +15 | +21 | +26 | +31 | +37 | +42 |
+
+**Linear in dB**: `dB = midi x 42/127`, about 0.33 dB per MIDI step, range 0 to +42 dB. Every
+measured point is within 1 dB of that line.
+
+Worth knowing for automation: because the scale is linear in dB — which is already logarithmic
+in amplitude, and roughly matches how loudness is perceived — a sine LFO on gain rises and
+falls evenly. A control that was linear in amplitude would make the same LFO sound lopsided.
+
+**Gain is inaudible on tape playback.** It is an input-stage control, so sweeping it while
+playing a recorded file changes the on-screen dB but not the sound. Anyone testing this
+feature against a recording will think it is broken.
+
+**Untested:** whether gain exists on channels 4-6. The reference says inputs 1-3 only, and the
+profile encodes that as `availableTracks: 1...3`, which *hides* the control on tracks 4-6. If
+the reference is wrong there, the app is hiding a control that exists. The TP-7 has three
+physical inputs, so "3 stereo inputs feeding 6 mono mix channels" is a plausible reading.
+
 ## Open questions — answer on hardware
 
 - [ ] Do the pinned FX-bus channels (ch 8/9) actually land?
