@@ -1,6 +1,7 @@
 # Features (iOS)
 
 ## To fix
+- [ ] HIGH - nothing has been tested over BLE. all hardware testing so far was usb-c. ble peripheral names for tx-6/tp-7 are still guesses, so auto-detect may silently fail and require the manual device override
 - [ ] MED - tp-7: confirm whether recording creates a new take or can overwrite the current one. observed as non-destructive (new track) in one test, but the guide's record menu section is images-only and could not be read. if there is an overwrite setting, the app must warn before arming record
 - [ ] MED - tp-7: reverse playback is reachable and verified (CC 18 < 64, engage first). the prev/next buttons now do it, but there is no explicit direction/speed UI — worth exposing
 - [ ] LOW - tp-7: expose ClockEngine.transportSpeed in the ui (how fast prev/next move the tape). currently fixed at 8, which is a fast chipmunk-speed seek

@@ -158,6 +158,31 @@ Never use `List` inside a `NavigationStack` inside a `.sheet` (or `.fullScreenCo
 
 **Fix:** replace `List { ... }` with `ScrollView { VStack { ... } }`. Style section headers manually with `Text(...).font(.subheadline)` and `Divider()`. See `HelpView`, `DevicePickerView`, and `SettingsView` in `ContentView.swift` for examples.
 
+## MIDI cannot be tested in the simulator
+
+The iOS Simulator has **no MIDI at all**. Verified by probing CoreMIDI from a test running in
+the simulator with a TP-7 attached to the host Mac and visible to it:
+
+```
+MIDIGetNumberOfDestinations() = 0
+MIDIGetNumberOfSources()      = 0
+```
+
+It does not bridge the host's USB MIDI devices, and it has no Bluetooth radio. So the simulator
+can verify layout, navigation and anything that reads a `DeviceProfile` — but never that bytes
+reach a device.
+
+Anything involving real MIDI has to run on physical hardware:
+
+| | |
+|---|---|
+| `iPad Pro Dawg` (iPad8,9) | **USB-C** — connects the OP-1 / TX-6 / TP-7 directly |
+| `iPhone Dawg` (iPhone12,3) | Lightning — needs an adapter for USB MIDI, or use BLE |
+
+For byte-level verification without hardware, use `RecordingDestination` in the unit tests: it
+implements `MidiDestination` and records the exact wire bytes. That is how the OP-1 golden byte
+table works.
+
 ## Screenshots and simulator testing
 
 All testing/Xcode/simulator screenshots go in `/tmp/claude-ss/`. Create the directory if it doesn't exist (`mkdir -p /tmp/claude-ss`) before writing. Use this path in `xcrun simctl io` commands, UITest screenshot saves, and any other screenshot output.
