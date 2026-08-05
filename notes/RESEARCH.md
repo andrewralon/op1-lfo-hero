@@ -543,10 +543,26 @@ falls evenly. A control that was linear in amplitude would make the same LFO sou
 playing a recorded file changes the on-screen dB but not the sound. Anyone testing this
 feature against a recording will think it is broken.
 
-**Untested:** whether gain exists on channels 4-6. The reference says inputs 1-3 only, and the
-profile encodes that as `availableTracks: 1...3`, which *hides* the control on tracks 4-6. If
-the reference is wrong there, the app is hiding a control that exists. The TP-7 has three
-physical inputs, so "3 stereo inputs feeding 6 mono mix channels" is a plausible reading.
+**`CC 9` addresses the three physical input jacks, NOT tracks.** This is a different namespace
+from the six mix channels, and the two are not aligned. Established by elimination:
+
+| test | result |
+|---|---|
+| `CC 9` ch 5 | nothing at all — no display change, no audio. Gain really is 1-3 only. |
+| `CC 9` ch 3, audio on track 5 | display moved, **audio did not** |
+| `CC 9` ch 1, audio on track 1 | display moved, **audio did not** |
+| `CC 9` ch 1, audio patched into **input jack 1** | display moved **and the audio changed** |
+
+So gain channels 1-3 are the preamps for the three hardware input jacks. The stereo-pair theory
+(3 gains spanning 6 mix channels) is disproved — gain 3 does not reach mix channel 5.
+
+Note the display always moves regardless, because the *setting* is real even when nothing is
+patched into that jack. Watching the display alone would have produced the wrong conclusion
+three times over; only listening distinguished them.
+
+**Consequence for this app:** modelling gain as a per-track parameter restricted to tracks 1-3
+implies gain 1 belongs to track 1, which is false. It belongs to input jack 1, whose audio may
+be routed anywhere or nowhere.
 
 ## Open questions — answer on hardware
 
