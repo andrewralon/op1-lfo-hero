@@ -497,12 +497,18 @@ the variable `ClockEngine.transportSpeed`, direction from the op — and `stop` 
 - **Transmits its whole control surface** on channel 1, buttons as value 127.
 - Entering `ctrl` stops tape playback and the display shows only "CTRL".
 
-Ten distinct controls were observed transmitting: `CC 20, 21, 22, 23, 24, 25, 26, 28, 30` and
-pitch bend.
+Ten distinct controls were observed transmitting: `CC 20, 21, 22, 23, 24, 25, 26, 27, 28, 30`
+and pitch bend. Of these, `CC 28` (mode) is absent from the published reference.
 
-**`memo` is CC 28, not CC 27.** Verified in isolation: a 2-minute capture with only the memo
-button pressed produced exactly one CC — `ch1 cc28 = 127`. `CC 27` never appeared in any
-capture. The published TP-7 reference lists memo as CC 27; that is wrong.
+**`memo` is CC 27, as documented** — verified in isolation (a capture with only that button
+pressed produced exactly one message, `ch1 cc27 = 127`).
+
+**`CC 28` is the `mode` button** (bottom left, next to record) — **undocumented**. It does not
+appear anywhere in the published TP-7 MIDI reference, but it transmits `127` like the others.
+Isolated and confirmed separately from memo.
+
+(An earlier note here claimed memo was CC 28. That was wrong — it came from a capture where the
+bottom-left button was pressed by mistake. Corrected after re-testing each button in isolation.)
 
 **The wheel (CC 30) is a true relative encoder whose value is rotation speed.** Hand-scrubbing
 produced values across the full 1-127 range; the motorised reel turning on its own during
