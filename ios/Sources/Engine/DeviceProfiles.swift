@@ -268,8 +268,14 @@ extension DeviceProfile {
     private static let tp7Params: [ParamSpec] = [
         perTrack("tp7.vol",  "mix volume", "vol", cc: 7,   role: .volume),
         perTrack("tp7.mute", "mix mute",   "mut", cc: 120, role: .mute, encoding: teSwitch),
-        // Only the three physical inputs have gain; channels 4-6 are playback.
-        perTrack("tp7.gain", "input gain", "gn",  cc: 9,   tracks: 1...3),
+        // CC 9 is the preamp for the three physical INPUT JACKS, which sit upstream of the mix
+        // channels: jack -> gain -> mix. So it is addressed per jack, not per track, and
+        // changing it does nothing audible unless a signal is actually arriving on that jack.
+        // Verified on hardware. Modelled as master-level controls because a track number would
+        // wrongly imply gain 1 belongs to track 1. See notes/RESEARCH.md.
+        masterOnly("tp7.in1Gain", "in1 gain", "g1", cc: 9, channel: 0),
+        masterOnly("tp7.in2Gain", "in2 gain", "g2", cc: 9, channel: 1),
+        masterOnly("tp7.in3Gain", "in3 gain", "g3", cc: 9, channel: 2),
         masterOnly("tp7.rec",    "record",  "rec", cc: 14, channel: 0, encoding: teSwitch),
         masterOnly("tp7.cueRec", "cue rec", "cue", cc: 16, channel: 0, encoding: teSwitch),
         // off / in / out

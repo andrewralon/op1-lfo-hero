@@ -176,6 +176,25 @@ Beat Match with tape stopped:
 
 # Multi-device MIDI mapping (op-1 field / tx-6 / tp-7)
 
+## At a glance — where the published references are wrong
+
+Everything below was measured on real hardware. The pattern: the guides are accurate about
+*single CC -> single value*, and wrong or silent about *state, modes and timing*.
+
+| Device | The reference says | Actually |
+|---|---|---|
+| TP-7 | nothing about MIDI clock | **sends it** continuously in `sync` mode |
+| TP-7 | nothing about the four midi modes | they gate everything; `ctrl` blocks all input |
+| TP-7 | `CC 18` = "fast forward/rewind, -64..+63" | persistent bipolar speed state that must engage first |
+| TP-7 | nothing about real-time transport | 0xFA/0xFB/0xFC drive the tape |
+| TP-7 | `CC 9` = "input gain, channels 1-3" | the three **input jacks**, upstream of the mix channels |
+| TP-7 | button table omits one | there is a `mode` button on **CC 28** |
+| TX-6 | nothing about needing setup | ignores everything until `midi control = in` |
+| TX-6 | one CC table | transmit and receive are **different maps that collide** |
+
+Four bugs in this app came from trusting the references; all are fixed and covered by tests.
+
+
 Sources: OP-1 tables in `README.md`; [tp-7](https://teenage.engineering/guides/tp-7#midi-reference)
 and [tx-6](https://teenage.engineering/guides/tx-6#midi-reference) MIDI references.
 
@@ -543,8 +562,16 @@ falls evenly. A control that was linear in amplitude would make the same LFO sou
 playing a recorded file changes the on-screen dB but not the sound. Anyone testing this
 feature against a recording will think it is broken.
 
-**`CC 9` addresses the three physical input jacks, NOT tracks.** This is a different namespace
-from the six mix channels, and the two are not aligned. Established by elimination:
+**`CC 9` addresses the three physical input jacks, which feed the six mix channels.** It is a
+preamp at the *input stage*, so it sits upstream in the signal chain:
+
+```
+input jack 1-3  ->  [ CC 9 gain applied here ]  ->  mix channels 1-6
+```
+
+Gain therefore does affect what you hear — but only for audio actually arriving through that
+jack. If nothing is coming in on jack N, changing gain N does nothing audible, even though the
+setting itself moves. That is what made this confusing to pin down:
 
 | test | result |
 |---|---|
@@ -553,16 +580,18 @@ from the six mix channels, and the two are not aligned. Established by eliminati
 | `CC 9` ch 1, audio on track 1 | display moved, **audio did not** |
 | `CC 9` ch 1, audio patched into **input jack 1** | display moved **and the audio changed** |
 
-So gain channels 1-3 are the preamps for the three hardware input jacks. The stereo-pair theory
-(3 gains spanning 6 mix channels) is disproved — gain 3 does not reach mix channel 5.
+Every "no audio change" above is explained by there being no live signal on that jack at the
+time — not by the gain being disconnected from the mix. Once a source was patched into jack 1,
+gain 1 changed it immediately.
 
-Note the display always moves regardless, because the *setting* is real even when nothing is
-patched into that jack. Watching the display alone would have produced the wrong conclusion
-three times over; only listening distinguished them.
+The display always moves regardless, because the setting is real whether or not anything is
+plugged in. Watching the display alone would have given the wrong answer three times over; only
+listening distinguished them.
 
-**Consequence for this app:** modelling gain as a per-track parameter restricted to tracks 1-3
-implies gain 1 belongs to track 1, which is false. It belongs to input jack 1, whose audio may
-be routed anywhere or nowhere.
+**Consequence for this app:** gain is addressed per *input jack*, not per track, so modelling it
+as a track parameter on tracks 1-3 implies gain 1 belongs to track 1. It does not — it belongs
+to jack 1, whose signal reaches whichever mix channels it is routed to. Modelled as three
+master-level controls instead.
 
 ## Open questions — answer on hardware
 

@@ -202,15 +202,27 @@ final class TP7ProfileTests: XCTestCase {
         XCTAssertEqual(bytes("tp7.mute", track: 2, value: 0),   [0xB1, 120, 0])
     }
 
-    /// Input gain exists only on the three physical inputs — channels 4-6 are playback.
-    func testInputGainOnlyOnFirstThreeChannels() {
-        let gain = profile.param("tp7.gain")!
-        for track in 1...3 {
-            XCTAssertTrue(gain.isAvailable(onTrack: track), "gain should exist on \(track)")
-            XCTAssertEqual(bytes("tp7.gain", track: track), [UInt8(0xB0 | (track - 1)), 9, 100])
+    /// CC 9 is the preamp for the three physical input jacks, which feed the mix channels:
+    /// jack -> gain -> mix. Addressed per jack rather than per track, so it is master-level.
+    /// Verified on hardware — gain only changed audio once a source was patched into that jack.
+    func testInputGainsAreMasterLevelOnePerJack() {
+        for (n, ch) in [(1, 0), (2, 1), (3, 2)] {
+            let spec = profile.param("tp7.in\(n)Gain")
+            XCTAssertNotNil(spec, "input \(n) gain should exist")
+            XCTAssertTrue(spec!.isMasterOnly, "input gain is not a track parameter")
+            XCTAssertEqual(bytes("tp7.in\(n)Gain", track: 0), [UInt8(0xB0 | ch), 9, 100],
+                           "input \(n) gain on channel \(ch + 1)")
         }
-        for track in 4...6 {
-            XCTAssertFalse(gain.isAvailable(onTrack: track), "gain should not exist on \(track)")
+    }
+
+    /// There is no fourth input, and no gain on the mix channels.
+    func testThereIsNoGainBeyondThreeInputs() {
+        XCTAssertNil(profile.param("tp7.in4Gain"))
+        XCTAssertNil(profile.param("tp7.gain"), "the old per-track gain must be gone")
+        for track in 1...6 {
+            XCTAssertNil(profile.params.first { $0.role == .generic && $0.name.contains("gain") }?
+                            .track.flatMap { _ in Optional(track) },
+                         "no gain parameter should be track-addressable")
         }
     }
 
