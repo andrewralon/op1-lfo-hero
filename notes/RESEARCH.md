@@ -609,8 +609,10 @@ CC 18: a state machine dressed as a plain value.
 
 ### TP-7 cue rec mode (CC 16) — no observable effect
 
-Sent `127` four times and `0` twice, with the tape playing. **No change was visible on the
-display or audible at any point.**
+Sent `127` four times and `0` twice in midi mode `off`, with the tape playing, then `127` again
+in midi mode **`cue`** — on the theory that a mode of that name might be what makes a
+"cue rec mode" CC meaningful. **No change was visible on the display or audible at any point,
+in either mode.**
 
 This is recorded as *unverified*, not as *working* — and not as *broken* either. On a device
 that never reports its state, there is no way to distinguish "silently succeeding" from "doing
