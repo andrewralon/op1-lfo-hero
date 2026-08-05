@@ -171,3 +171,330 @@ Beat Match with tape stopped:
 ```
 
 156 clock ticks received with tape fully stopped, and again with tape playing — identical counts and jitter in both cases. The OP-1 sends MIDI clock continuously in Beat Match mode regardless of tape state. The earlier zero-result was from a cold/unresponsive device, not from the tape being stopped. By extension, PO Sync and 1/16 (which showed the same tick counts in all tests) are expected to behave the same way.
+
+---
+
+# Multi-device MIDI mapping (op-1 field / tx-6 / tp-7)
+
+Sources: OP-1 tables in `README.md`; [tp-7](https://teenage.engineering/guides/tp-7#midi-reference)
+and [tx-6](https://teenage.engineering/guides/tx-6#midi-reference) MIDI references.
+
+These tables are the spec that `ios/Sources/Engine/DeviceProfiles.swift` encodes, and they are
+independently re-asserted in `ios/Tests/` (`OP1ProfileMatchesSpecTests`, `TX6ProfileTests`,
+`TP7ProfileTests`) so a typo in the profile can't hide behind a test that reads the same table.
+
+## Display scale is app-wide, not per device
+
+Every device shows **0-99** in the UI while MIDI carries **0-127**. This is the OP-1's on-screen
+scale and it is deliberately applied to all devices for consistency:
+
+```
+midiToUI(v) = floor(v * 99 / 127)
+uiToMidi(u) = (u * 127 + 98) / 99      // ceiling inverse — every UI value round-trips exactly
+```
+
+`DeviceProfile` intentionally has **no** per-device scale field, so the two can never diverge.
+
+## Channel model
+
+| Device | tracks | track channels (0-based) | master | other |
+|---|---|---|---|---|
+| op-1 field | 4 | 0-3 | ch 0 (separate CC bank) | — |
+| tx-6 | 6 | 0-5 | ch 6 | fx I = ch 7, fx II = ch 8 |
+| tp-7 | 6 | 0-5 | ch 0 | — |
+
+The TX-6's FX buses have no track of their own, so they are exposed as **master-only**
+parameters under the (m) target — hence `ParamSpec` carrying separate `track` and `master`
+bindings, and `ChannelRule.pinned` for an absolute channel.
+
+## op-1 field
+
+Per track (ch = track − 1): volume `7`, mute `9` (127/0), pan `10`, par 1-4 `46-49`,
+env A/D/S/R `50-53`, fx 1-4 `54-57`, lfo 1-4 `58-61`.
+Master (always ch 0): master fx 1-4 `70-73`, master compressor 1-4 `74-77`
+(the master "lfo" parameter is intentionally overloaded onto the compressor).
+Transport: `0xFA`/`0xFB` start/continue, `0xFC` stop, tape prev/next `82`/`83` + SPP `0xF2`.
+
+## tx-6
+
+Per channel (ch 0-5): volume `7`, pan `8`, gain `9`, seq pattern `14`, filter `74`,
+eq high `85`, eq mid `86`, eq low `87`, comp `93`, syn wave `3`, syn freq `89`, syn len `90`,
+syn detune `95`, fx1 send `91`, aux send `92`, aux2 send `94`, mute/solo `120`.
+Master (ch 6): main vol `7`, aux vol `14`, cue vol `15`, local control `122`,
+start/stop toggle `46`, tempo relative `47`.
+FX I (ch 7) / FX II (ch 8): enable `82`, engine `15`, param 1-3 `12`/`13`/`14`,
+fx I return `7` (ch 7), fx II track select `9` (ch 8).
+On/off encoding: 0-63 = off, 64-127 = on.
+
+**CC 47 is deliberately not an automatable parameter.** It is a relative encoder, so an LFO on
+it would drift the tempo in one direction forever instead of oscillating. It is reachable only
+from the −/+ transport buttons.
+
+**CC 120 is standard MIDI "all sound off".** TE reuses it per channel for mute. Sending it will
+also silence unrelated gear sharing a hub.
+
+## tp-7
+
+Per channel (ch 0-5): mix volume `7`, mix mute `120`, input gain `9` (**channels 1-3 only** —
+4-6 are playback, not inputs).
+Global (ch 0): record `14`, cue rec `16`, loop `17` (0=off, 1=in, 2=out), ff/rewind `18` (relative).
+Notes = cue markers; pitch bend = playback speed (not yet used by the app).
+Outgoing in controller mode (ch 0): up `20`, down `21`, rec `22`, play `23`, stop `24`,
+left `25`, right `26`, memo `27`, wheel `30` (relative), rocker = pitch bend.
+
+## Device detection
+
+CoreMIDI endpoint names, read off a Mac's MIDI database with all three devices paired:
+
+| Device | `kMIDIPropertyName` / model | manufacturer |
+|---|---|---|
+| OP-1 Field | `OP-1` | `teenage engineering` |
+| TP-7 | `TP-7` | `teenage engineering` |
+| TX-6 | `TX-6` | `teenage engineering` |
+
+Matching is a lowercase substring test against the endpoint display name
+(`op-1`/`op1`, `tx-6`/`tx6`, `tp-7`/`tp7`). Manufacturer and model are also exposed by CoreMIDI
+and would be a sturdier signal for hubs that rename ports — not used yet.
+
+Each device appears **twice** in the device list (one USB entry, one BLE entry).
+
+## Hardware findings — TX-6 over USB MIDI
+
+Measured by passively monitoring a real TX-6's CoreMIDI source (~12 minutes total across three
+sessions, including one 10-minute session of heavy hands-on use). Nothing was transmitted to
+the device.
+
+### The transmit map and the receive map are different namespaces that collide
+
+This is the important one. In controller mode the TX-6 sends its **own** map, all on MIDI
+channel 1, which is *not* the map it listens on. Five CCs mean different things in each
+direction:
+
+| CC | transmitted (controller mode) | received (mixer control) |
+|---|---|---|
+| 3 | fader 3 | syn wave |
+| **7** | **upper knob 1** | **volume** |
+| **8** | **upper knob 2** | **pan** |
+| **9** | **upper knob 3** | **gain** |
+| 14 | middle knob 2 | seq pattern |
+
+So feeding the TX-6's output back through the receive table makes turning upper knob 1 look
+like "track 1 volume changed". Confirmed: upper knob 1 was observed transmitting CC 7 on ch 1.
+Meanwhile the faders transmit CC 1-6, which the receive table does not use at all — so the one
+thing you would actually want to mirror is invisible, and the things you would not want to
+mirror are misread.
+
+Handled by `DeviceCapabilities.mirrorsIncomingCC` (false for the TX-6): incoming CC is ignored
+for UI mirroring rather than misinterpreted. The OP-1 echoes its mixer on the CCs it accepts,
+so it keeps mirroring enabled.
+
+### Confirmed transmitting
+
+`cc1` fader 1 (range 0-127) · `cc18` middle knob 6 · `cc24` lower knob 6 ·
+`cc25-30` all six track buttons · `cc31` encoder turn · `cc32` encoder button ·
+`cc33` fx I · `cc34` fx II · `cc35` shift — every one matching the documented outgoing table.
+Faders **do** transmit; an earlier session that saw none simply had no fader movement.
+
+### MIDI clock
+
+**Zero `0xF8` ticks in ~12 minutes**, including 10 minutes of continuous hands-on use, and zero
+active sensing. MIDI clock transmits continuously when enabled, independent of which control is
+touched, so this is strong evidence the TX-6 does not send clock in its default configuration —
+supporting `canBeClockMaster: false` (the app is always the tempo source).
+
+Remaining caveat: some devices only emit clock while their sequencer runs, and it was not
+confirmed that the TX-6's sequencer was started during these captures. The TX-6's outgoing
+table lists no transport control at all, so pressing play may simply transmit nothing.
+
+### Two device settings are required before any of this works
+
+A TX-6 straight out of its default state ignores the app completely. Both of these are on the
+device, not in the app, and a user who does not know about them will conclude the app is broken:
+
+| TX-6 setting | Set to | Without it |
+|---|---|---|
+| `midi control` | **in** | the device ignores every CC the app sends |
+| `clock SRC` | **usb** | the device will not follow the app's tempo |
+
+#### `midi control` modes — full behaviour, tested on hardware
+
+The setting is a three-way switch and only one of its positions works with this app. Each was
+tested with the same 21-second volume sweep on `CC 7` ch 1:
+
+| Mode | Receives CC from the app? | Transmits its own controls? |
+|---|---|---|
+| **in** | **yes** — channel 1 swept audibly | no — silent across 95 s of capture |
+| **out** | no — no change at all | yes (documented; its control-surface map) |
+| **X** | no — no change at all | no |
+
+So the modes are mutually exclusive, not additive: the TX-6 is either a controller *or* a
+controlled device, never both. This is why the transmit/receive CC collision documented above
+cannot occur while the app is actually driving the device — in `in` mode there is nothing
+coming back to misread.
+
+#### Moving a physical fader while the app is sending
+
+Tested in `in` mode: moving fader 1 during an incoming `CC 7` sweep made the channel audibly
+**fight** — the fader's own value and the app's values alternated. Both write the same target
+and the last writer wins, so there is no handover or takeover behaviour to rely on.
+
+Practical consequence: an LFO on a channel's volume sends a value roughly 40 times a second, so
+grabbing that fader mid-performance produces stuttering rather than control. Pause the chip for
+that channel first. Worth surfacing in help.
+
+It also means **the app can never mirror the TX-6's physical fader positions**. Doing so would
+require `out` mode, which simultaneously stops the device accepting anything the app sends.
+Worth stating plainly rather than leaving as a "why doesn't the UI follow my hardware?" mystery.
+
+### Verified by sending to the device
+
+- **`midi control` must be set to `in` on the TX-6.** Until that is set the device ignores
+  everything — a full volume sweep produced no response at all. This is a setup step a user
+  will otherwise experience as "the app is broken"; it belongs in the help text.
+- **It acts on incoming CC.** With `in` set, `CC 7` on ch 1 swept channel 1's volume audibly.
+  Channel mapping (ch 1 = track 1) and CC number both confirmed correct.
+- **`CC 120` is absolute, not a toggle, and 127 = muted.** Sending 127 muted channel 1 and 0
+  unmuted it. The profile's `SwitchEncoding` default (on 127 / off 0 / threshold 64) is right,
+  and `inverted` is correctly left false. This mattered: had it been a toggle, an LFO on mute
+  would flip state on every clock tick (~40 Hz) and stutter the channel rather than gate it.
+- **It follows incoming MIDI clock** (requires `clock SRC = USB` on the device). Sending `0xFA`
+  plus 24 PPQN measured at 101.7 BPM moved the TX-6 from 68 BPM to a settled **101 BPM** — a
+  match within 1%. It slewed rather than jumping, and the 100-106 wobble during the run was the
+  test script's sleep-based timing, not the device.
+  So `followsClock: true` is verified, and the pairing is: the app is always clock master
+  (the TX-6 never sends clock) and the TX-6 locks to it.
+- **The pinned FX-bus channels work.** `CC 82 = 127` on ch 8 switched FX I on, and 0 switched it
+  off. Channel 8 is outside the 1-6 track range and is reachable only via `ChannelRule.pinned`,
+  so this validates that mechanism end to end.
+- **FX I enable is global, not per channel.** Confirmed on hardware: enabling the bus affects the
+  whole FX unit, while how much each channel feeds it is the separate per-channel send (`CC 91`,
+  ch 1-6). This is exactly the split the profile encodes — `tx6.fx1.en` is master-only and
+  `tx6.fx1Send` is per-track — so folding the FX buses into the master (m) slot is correct.
+- **Transmit and receive are mutually exclusive modes.** In `in` mode the TX-6 sent nothing at
+  all across two captures totalling 95 s, despite flooding earlier captures with control-surface
+  CCs in its default mode. So the transmit/receive collision documented above cannot occur while
+  the app is actually driving the device — `mirrorsIncomingCC: false` remains correct as a guard
+  for the case where a user leaves it in controller mode.
+
+## Hardware findings — TP-7 over USB MIDI
+
+Endpoint name `TP-7`, manufacturer `teenage engineering`; exposes both a source and a destination.
+
+### The four `midi` modes
+
+Unlike the TX-6, the TP-7 accepts CC in most modes — there is no "you must enable input" step.
+Measured with the same 21-second `CC 7` ch 1 volume sweep:
+
+All four modes tested with the same 21-second `CC 7` ch 1 volume sweep, monitoring
+simultaneously:
+
+| Mode | Receives CC from the app? | Transmits | Tape playback |
+|---|---|---|---|
+| `off` | **yes** | nothing | plays |
+| `sync` | **yes** | **MIDI clock**, continuously (~110 BPM measured) | plays |
+| `ctrl` | **no** | its own button map (CC 20-27, wheel 30) | **stops** |
+| `cue` | **yes** | nothing observed | plays |
+
+Three of the four modes accept CC. Only `ctrl` — controller mode — does not. So unlike the
+TX-6, the TP-7 needs **no setup at all** for the app to control it; the only thing a user must
+avoid is `ctrl`.
+
+The modes gate what the TP-7 *does*, not a blanket MIDI enable:
+`sync` adds clock output, `ctrl` swaps it into being a controller for other gear, `cue` relates
+to cue markers, `off` is plain. CC reception rides along in everything except `ctrl`.
+
+`ctrl` is *controller mode*: the TP-7 becomes a MIDI controller for other gear. It stops tape
+playback, shows only "CTRL" on the display, and stops accepting incoming MIDI. TE's docs
+confirm the exclusivity: *"TP-7 only sends button events (CC 20-27) in Controller Mode, which is
+mutually exclusive with receiving MIDI commands."*
+
+So the app should be used in `off` or `sync`, never `ctrl`.
+
+### It sends MIDI clock — contradicting the published reference
+
+**1769 clock ticks in 40 s (~110 BPM), streaming continuously**, while in `sync` mode. The
+published TP-7 MIDI reference documents no clock output at all; this was found only by
+listening. `canBeClockMaster` is therefore **true** for the TP-7 — the app can slave to it, the
+same "beat match" relationship the OP-1 has. (Contrast the TX-6, which genuinely never sends
+clock across ~12 minutes of monitoring.)
+
+### It never reports its state
+
+Per TE's docs: *"TP-7 never reports its state via MIDI. You cannot query transport, loop, or
+cue states."* So `mirrorsIncomingCC` is false — there is nothing to mirror, and in `ctrl` mode
+what it does send is a different map entirely.
+
+### TP-7 playback direction and speed — CC 18, verified on hardware
+
+`CC 18` is not "fast forward/rewind" as the official reference calls it, and not a relative
+nudge. It is a **persistent bipolar speed control that must first take over the transport**.
+The following was established by probing a real TP-7 in `sync` mode with a file playing.
+
+**The engage/release behaviour is the key, and is undocumented anywhere:**
+
+1. While the tape is rolling under its own transport, `CC 18 = 64` does **nothing** — CC 18 has
+   not taken control yet. (Verified: sent three times, no effect.)
+2. Sending any value **other than 64** takes control of the transport.
+3. Once engaged, `64` means **zero speed** and the tape stops moving.
+4. `0xFC` (MIDI stop) does **not** release that control — a tape seeking under CC 18 keeps
+   going. (Verified.)
+
+So stopping a CC 18-driven tape needs **`CC 18 = 64` *and* `0xFC`**: the CC zeroes the speed,
+the real-time message stops the transport.
+
+**Stopping holds position — it does not rewind.** Verified: after `CC 18 = 64` the tape stayed
+where it was. That is the desired behaviour for a first stop press, and it means returning to
+zero has to be an explicit separate action (the double-stop gesture), not a side effect of stop.
+
+**Measured speed scale**, all while engaged:
+
+| value | observed |
+|---|---|
+| 56 | reverse, fast |
+| 60 | reverse, ≈normal speed |
+| 61 | reverse, slower than normal |
+| 62 | reverse, crawling |
+| **64** | **stopped** (once engaged) |
+| 72 | forward, clearly faster than normal ("chipmunks") |
+
+Distance from 64 is speed; side of 64 is direction. Reverse playback is reachable only this way.
+
+**Correction to [lucidyan/tp7-midi](https://github.com/lucidyan/tp7-midi):** that source states
+the stop point "shifts between 60-61" during playback, with a workaround of `CC 18 = 60` plus
+pitch bend `+708`. On this firmware that is wrong — 60 and 61 are simply slow *reverse* speeds,
+and the "workaround" plays backwards at roughly 1x (the `+708` being a x1.09 multiplier). The
+stop point stays at 64; the confusion is explained by CC 18 needing to engage first.
+
+**Pitch bend is a separate, independent, persistent speed multiplier** (x0.25-x2.0) that does
+not set direction. Verified: a stray `+708` (x1.09) left over from an earlier test kept every
+subsequent playback slightly fast, surviving stop, rewind and play, until it was explicitly
+returned to centre (8192). It is invisible on the device's display — the guide's own note that
+pitch bend and the on-screen `SPD` are separate controls means the user gets no feedback that
+it is off-centre.
+
+**Anything in the app that drives pitch bend must return it to 8192 when it stops**, or the
+user is left with a silently pitch-shifted machine and no obvious cause.
+
+**Transport play resets the CC 18 speed.** After a stop, `0xFB` plays at normal speed rather
+than resuming the previous shuttle speed — so the app does *not* need to remember and restore
+CC 18. (The apparent counter-example was the stray pitch bend above.)
+
+**Still unknown:** how to jump the TP-7 to position zero on demand. `0xFA` (Start) does restart
+playback from the beginning — verified — but that also *starts* the tape, so it cannot serve as
+a "rewind while stopped". Untested candidates: Song Position Pointer `0xF2 00 00`, or driving
+`CC 18` to a fast-rewind value until the head reaches zero.
+
+**Consequence for this app:** `.directionalTransport` models this correctly — magnitude from
+the variable `ClockEngine.transportSpeed`, direction from the op — and `stop` must send
+`CC 18 = 64` followed by `0xFC`. Both are implemented.
+
+## Open questions — answer on hardware
+
+- [ ] Do the pinned FX-bus channels (ch 8/9) actually land?
+- [ ] Does the TX-6 *follow* incoming MIDI clock, even though it does not send it?
+- [ ] How badly does TX-6 CC 46 desync when the transport is started from the device panel?
+- [ ] Is TX-6 program change on ch 7 usable for scene slots?
+- [ ] Everything above, for the TP-7 — plus whether it emits or follows clock.
+- [ ] TP-7 CC 120 polarity.
+- [ ] Exact BLE peripheral names for TX-6 and TP-7 — or whether they do BLE MIDI at all.
+- [ ] A TP-7 CC 18 ff/rewind step size that feels right (currently ±8).
