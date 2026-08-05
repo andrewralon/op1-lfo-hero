@@ -454,25 +454,27 @@ final class TP7TransportTests: XCTestCase {
     }
 
     /// CC 18 is a persistent bipolar speed control: below 64 reverse, 64 stop, above forward.
+    /// Default speed is 2x, so the offset is deadZone 4 + unitSpeed 4 * 2 = 12.
     func testSeekIsBipolarAroundSixtyFour() {
         destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "forward = 64 + speed")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 76]], "forward = 64 + offset")
         destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 56]], "reverse = 64 - speed")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 52]], "reverse = 64 - offset")
     }
 
-    /// Speed is a multiple of normal playback, not a raw CC offset. unitSpeed 4 = 1x on the
-    /// TP-7, verified by ear: 60 (=64-4) played reverse at about normal speed.
+    /// Speed is a multiple of normal playback, not a raw CC offset, and the mapping is affine:
+    /// `offset = deadZone + unitSpeed * multiplier`. Measured against the sync-mode clock —
+    /// offset 4 is inside the dead zone (x0.06), and 1x lands at ~7.5, so 8 is the nearest step.
     func testSpeedIsAMultipleOfNormalPlayback() {
         clock.transportSpeed = 1.0            // 1x
         destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 68]], "64 + 4 = forward at 1x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "64 + 8 = forward at 1x")
         destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 60]], "64 - 4 = reverse at 1x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 56]], "64 - 8 = reverse at 1x")
     }
 
     /// The default is 2x — a fast-forward, matching the "chipmunks" heard at CC 18 = 72.
@@ -480,14 +482,14 @@ final class TP7TransportTests: XCTestCase {
         XCTAssertEqual(clock.transportSpeed, 2.0)
         destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "64 + 8 = forward at 2x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 76]], "64 + 4 + 8 = forward at 2x")
     }
 
     func testHalfSpeed() {
         clock.transportSpeed = 0.5
         destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 66]], "64 + 2 = forward at 0.5x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 70]], "64 + 4 + 2 = forward at 0.5x")
     }
 
     /// Speed must never push CC 18 out of range, and never round down to zero — an offset of 0
@@ -503,7 +505,7 @@ final class TP7TransportTests: XCTestCase {
         XCTAssertEqual(clock.transportSpeed, 0.25, "clamped to 0.25x")
         destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 63]], "0.25x = offset 1, the slowest crawl")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 59]], "0.25x = deadZone 4 + 1, the slowest crawl")
     }
 
     /// But stopping a tape that IS seeking under CC 18 must recentre it — 0xFC alone will not
@@ -675,12 +677,13 @@ final class TP7PlaybackParamsTests: XCTestCase {
     // MARK: - Direction
 
     /// Behaves like mute: a two-state control, forward above the threshold, reverse below.
-    /// 68 and 60 are 1x in each direction — both verified by ear on hardware.
+    /// 72 and 56 are offset 8, the nearest step to 1x — measured against the sync-mode clock.
+    /// The old values (68/60, offset 4) sit inside the dead zone and barely move the tape.
     func testDirectionSnapsForwardOrReverse() {
-        XCTAssertEqual(send("tp7.direction", 127), [[0xB0, 18, 68]], "forward at 1x")
-        XCTAssertEqual(send("tp7.direction", 64),  [[0xB0, 18, 68]], "threshold is forward")
-        XCTAssertEqual(send("tp7.direction", 63),  [[0xB0, 18, 60]], "below threshold reverses")
-        XCTAssertEqual(send("tp7.direction", 0),   [[0xB0, 18, 60]], "reverse at 1x")
+        XCTAssertEqual(send("tp7.direction", 127), [[0xB0, 18, 72]], "forward at 1x")
+        XCTAssertEqual(send("tp7.direction", 64),  [[0xB0, 18, 72]], "threshold is forward")
+        XCTAssertEqual(send("tp7.direction", 63),  [[0xB0, 18, 56]], "below threshold reverses")
+        XCTAssertEqual(send("tp7.direction", 0),   [[0xB0, 18, 56]], "reverse at 1x")
     }
 
     /// A square-wave LFO on direction should alternate cleanly between the two, never landing
@@ -688,7 +691,7 @@ final class TP7PlaybackParamsTests: XCTestCase {
     func testDirectionNeverEmitsAnIntermediateValue() {
         for v in stride(from: 0.0, through: 127.0, by: 1.0) {
             let byte = send("tp7.direction", v)[0][2]
-            XCTAssertTrue(byte == 68 || byte == 60, "value \(v) produced \(byte)")
+            XCTAssertTrue(byte == 72 || byte == 56, "value \(v) produced \(byte)")
         }
     }
 
@@ -811,18 +814,24 @@ final class TP7ScrubAndReverseTests: XCTestCase {
         clock.play()
         XCTAssertEqual(destination.packets, [[0xFB]], "first press plays")
 
+        // Reverse is CC 18 at the measured 1x offset (dead zone 4 + unitSpeed 4), then a pitch
+        // bend trim, because CC 18 alone cannot express 1x — it falls between offsets 7 and 8.
         destination.reset()
         clock.play()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, UInt8(64 - clock.reverseUnitOffset)]],
-                       "second press reverses via CC 18")
+        let trim = clock.reverseTrimBend
+        XCTAssertEqual(destination.packets,
+                       [[0xB0, 18, 56],
+                        [0xE0, UInt8(trim & 0x7F), UInt8((trim >> 7) & 0x7F)]],
+                       "second press reverses via CC 18 plus the bend trim")
         XCTAssertEqual(clock.transportDirection, -1)
 
         // Forward hands control back to the device's own transport rather than driving CC 18,
-        // so playback is at exactly the normal rate instead of an approximation of it.
+        // so playback is at exactly the normal rate instead of an approximation of it. The trim
+        // must be released first, or it would pitch-shift forward playback.
         destination.reset()
         clock.play()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 64], [0xFB]],
-                       "forward releases CC 18 and lets the device play")
+        XCTAssertEqual(destination.packets, [[0xE0, 0, 64], [0xB0, 18, 64], [0xFB]],
+                       "forward releases the bend trim and CC 18, then lets the device play")
     }
 
     /// The OP-1 has no such behaviour — play must keep meaning play.
@@ -851,7 +860,7 @@ final class TP7ScrubAndReverseTests: XCTestCase {
     func testScrubStartsAtNormalSpeed() {
         destination.reset()
         clock.beginScrub(forward: true)
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 68]], "64 + 4 = forward at 1x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "64 + 8 = forward at 1x")
         clock.endScrub()
     }
 

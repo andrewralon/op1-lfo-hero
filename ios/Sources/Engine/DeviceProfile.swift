@@ -153,13 +153,22 @@ enum TransportOp: Hashable {
     /// plays forwards, and distance from centre is speed. The TP-7's CC 18 works this way —
     /// it is a *setting*, not an event, so it keeps moving the tape until something changes it.
     ///
-    /// `unitSpeed` is the offset from `center` that equals **1x normal playback**, so speed can
-    /// be reasoned about as a multiplier instead of a raw CC offset. On the TP-7 that is 4:
-    /// `center - 4` = 60 = reverse at 1x, `center + 4` = 68 = forward at 1x — both verified by
-    /// ear on hardware. The actual multiplier comes from `ClockEngine.transportSpeed`.
+    /// Speed is **affine, not proportional**: there is a dead zone near `center` where the tape
+    /// does not move at all, and speed rises linearly only beyond it. So
+    ///
+    ///     offset = deadZone + unitSpeed * multiplier
+    ///
+    /// where `deadZone` is the offset at which motion starts and `unitSpeed` is the additional
+    /// offset per 1x of playback. The multiplier comes from `ClockEngine.transportSpeed`.
+    ///
+    /// On the TP-7 both are 4, measured rather than guessed: driving CC 18 while counting the
+    /// sync-mode MIDI clock (whose tick rate is derived from tape speed) gives
+    /// `rate = 11.69 * offset - 44 ticks/s` across offsets 4-8, so motion begins at offset ~3.76
+    /// and 1x lands at ~7.5. Rounding to integers costs ~13%, which `ClockEngine.reverseTrimBend`
+    /// removes with pitch bend. See notes/RESEARCH.md.
     ///
     /// `direction` is -1 (reverse), 0 (release/stop) or +1 (forward).
-    case directionalTransport(ch: Int, cc: Int, center: Int, unitSpeed: Int, direction: Int)
+    case directionalTransport(ch: Int, cc: Int, center: Int, deadZone: Int, unitSpeed: Int, direction: Int)
     /// Send only when the app's play state matches `whenPlaying`. Used for the TX-6's single
     /// start/stop toggle (CC 46), which has no separate play and stop messages.
     case toggleCC(ch: Int, cc: Int, value: Int, whenPlaying: Bool)

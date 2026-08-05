@@ -140,12 +140,14 @@ All seven are built and unit-tested. **None have been tried on the device yet.**
       ramping to 8x over ~3s, returning `CC 18` to centre on release and restoring the user's
       configured speed. Falls back to a single nudge on the OP-1
 
-Known wrong, needs a measurement:
-- [ ] **`ClockEngine.reverseUnitOffset`** — the CC 18 offset that plays backwards at normal
-      speed. The third-party spec says 4 ("rewind x1"), but on hardware that sounds *very* slow,
-      so the scale is not symmetric around centre. Currently guessed at 8. To measure: play
-      56/57/58/59/60/61 for a few seconds each and pick the one that sounds like normal speed
-      backwards. Requires the TP-7 on the Mac
+- [x] **Reverse playback speed — measured and confirmed.** Was `reverseUnitOffset`, guessed by
+      ear across several deploys and never right. Resolved by measuring instead: in `sync` mode
+      the TP-7's MIDI clock is derived from tape speed, so ticks/s reads playback rate directly.
+      Findings: CC 18 is **affine** (dead zone below offset ~3.76, then linear), 1x falls at
+      offset **7.5** so no integer works, and pitch bend is a **signed velocity offset** rather
+      than the multiplier previously assumed. Reverse at 1x is now `CC 18 = 56` + bend `9700`
+      (43.95 vs a 44.0 target). Verified against the device's own reverse — 44.06 ticks/s over
+      30s, 0.25% away. Full write-up in notes/RESEARCH.md
 - Forward no longer needs measuring: it releases CC 18 and sends Continue, so the device plays
   at its own normal rate rather than an approximation of it
 

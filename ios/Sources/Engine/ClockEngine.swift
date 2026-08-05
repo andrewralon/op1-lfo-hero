@@ -251,9 +251,25 @@ final class ClockEngine {
     /// Forward does not need an equivalent: releasing CC 18 and sending Continue gives the
     /// device's own playback rate exactly, which is better than approximating it.
     ///
-    /// TODO: measured value pending. 4 (the third-party spec's "1x") sounds far too slow on
-    /// hardware, so the scale is not symmetric around centre. See notes/FIELD_DEVICE_SUPPORT.md.
-    var reverseUnitOffset = 8
+    /// Pitch-bend value that trims reverse playback to exactly 1x.
+    ///
+    /// CC 18 is too coarse to hit 1x on its own: 1x reverse falls at offset 7.5, and the nearest
+    /// integers are 14% slow (7) and 13% fast (8) — both audible, and both reported as such by
+    /// ear before being confirmed by measurement. Bend is the finer control, so reverse uses
+    /// offset 8 and pulls it back down with bend. Measured: offset 8 alone is 49.7 ticks/s,
+    /// bend 9700 brings it to 43.95 against a 44.0 target (0.1% error).
+    ///
+    /// Forward needs no equivalent — it releases CC 18 and sends Continue, so the device plays at
+    /// its own rate exactly.
+    var reverseTrimBend = 9700
+
+    /// Bend value meaning "no change", released when returning to forward.
+    private let centreBend = 8192
+
+    /// Whether `reverseTrimBend` is currently applied. Only release the bend if this engine set
+    /// it: bend is shared with the user-facing speed parameter, so recentring unconditionally
+    /// would silently undo a speed the user dialled in.
+    private var trimEngaged = false
 
     /// Flip the tape direction. No-op on devices without a directional transport.
     ///
@@ -264,27 +280,35 @@ final class ClockEngine {
         guard hasMomentaryScrub else { return }   // no directional transport on this device
 
         if transportDirection < 0 {
-            // Currently reversing -> go forward. Release CC 18 and let the device play.
+            // Currently reversing -> go forward. Release the reverse trim first, then CC 18, and
+            // let the device play at its own rate.
+            releaseTrim()
             run(transport.stop.filter {
                 if case .directionalTransport = $0 { return true } else { return false }
             })
             router?.send([0xFB])
             isPlaying = true
         } else {
-            // Currently forward or stopped -> reverse via CC 18.
+            // Currently forward or stopped -> reverse via CC 18 at 1x, then trim with bend.
             let ops = transport.prev.filter {
                 if case .directionalTransport = $0 { return true } else { return false }
             }
             guard !ops.isEmpty else { return }
             let saved = transportSpeed
-            // reverseUnitOffset is expressed in raw CC steps, so convert through unitSpeed.
-            transportSpeed = Double(reverseUnitOffset) / 4.0
+            transportSpeed = 1.0
             run(ops)
             transportSpeed = saved
+            // Only exact at 1x. A user-automated speed parameter writes the same bend channel
+            // and will overwrite this, which is the intended precedence.
+            sendBend(reverseTrimBend)
+            trimEngaged = true
         }
     }
 
     func stop() {
+        // Bend persists across stop/play with no on-screen feedback, so a trim left applied
+        // would silently pitch-shift the next playback.
+        releaseTrim()
         run(transport.stop)
         isPlaying = false
     }
@@ -382,20 +406,36 @@ final class ClockEngine {
                 sendCC(ch: ch, cc: cc, val: value)
             case .ccRelative(let ch, let cc, let delta):
                 sendCC(ch: ch, cc: cc, val: 64 + delta)
-            case .directionalTransport(let ch, let cc, let center, let unitSpeed, let direction):
+            case .directionalTransport(let ch, let cc, let center, let deadZone, let unitSpeed, let direction):
                 // direction 0 releases the grab. Only send it if this control actually HAS the
                 // transport: on a TP-7 a redundant stop is read as "stop while already stopped",
                 // which rewinds to zero — so sending it unconditionally would lose the user's
                 // position every time they pressed stop on a normally-playing tape.
                 if direction == 0 && transportDirection == 0 { break }
                 // Persistent state — the device keeps moving at this speed until told otherwise.
-                let offset = Int((Double(unitSpeed) * transportSpeed).rounded())
+                // Affine, not proportional: the dead zone has to be cleared before any speed
+                // registers, so a plain `unitSpeed * multiplier` lands far too slow (offset 4 is
+                // x0.06, not x1).
+                let offset = deadZone + Int((Double(unitSpeed) * transportSpeed).rounded())
                 sendCC(ch: ch, cc: cc, val: center + direction * max(1, offset))
                 transportDirection = direction
             case .toggleCC(let ch, let cc, let value, let whenPlaying):
                 if isPlaying == whenPlaying { sendCC(ch: ch, cc: cc, val: value) }
             }
         }
+    }
+
+    /// Return bend to centre, but only if this engine applied the reverse trim.
+    private func releaseTrim() {
+        guard trimEngaged else { return }
+        trimEngaged = false
+        sendBend(centreBend)
+    }
+
+    /// 14-bit pitch bend on channel 1, the TP-7's fine playback-speed control.
+    private func sendBend(_ v: Int) {
+        let b = max(0, min(16383, v))
+        router?.send([0xE0, UInt8(b & 0x7F), UInt8((b >> 7) & 0x7F)])
     }
 
     private func sendCC(ch: Int, cc: Int, val: Int) {

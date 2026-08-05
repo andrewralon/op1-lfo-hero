@@ -247,11 +247,12 @@ extension DeviceProfile {
             // than 64, and 0xFC alone will NOT release it (a seeking tape keeps rolling).
             // Stopping holds position; it does not rewind. See notes/RESEARCH.md.
             play: [.midiStartOrContinue],
-            stop: [.directionalTransport(ch: 0, cc: 18, center: 64, unitSpeed: 4, direction: 0), .midiStop],
+            stop: [.directionalTransport(ch: 0, cc: 18, center: 64, deadZone: 4, unitSpeed: 4, direction: 0), .midiStop],
             // CC 18 is a persistent bipolar speed control, not a nudge: below 64 plays
-            // backwards, above 64 forwards. Speed comes from ClockEngine.transportSpeed.
-            prev: [.directionalTransport(ch: 0, cc: 18, center: 64, unitSpeed: 4, direction: -1)],
-            next: [.directionalTransport(ch: 0, cc: 18, center: 64, unitSpeed: 4, direction: +1)],
+            // backwards, above 64 forwards. Speed comes from ClockEngine.transportSpeed, mapped
+            // through the measured dead zone — offset 4 is barely moving, 1x is offset ~7.5.
+            prev: [.directionalTransport(ch: 0, cc: 18, center: 64, deadZone: 4, unitSpeed: 4, direction: -1)],
+            next: [.directionalTransport(ch: 0, cc: 18, center: 64, deadZone: 4, unitSpeed: 4, direction: +1)],
             prevSymbol: "backward.fill",
             nextSymbol: "forward.fill"
         ),
@@ -298,19 +299,23 @@ extension DeviceProfile {
         masterOnly("tp7.rec",    "record",  "rec", cc: 14, channel: 0, encoding: teSwitch,
                    lfoTargetable: false),
 
-        // Playback speed. Pitch bend is an independent multiplier (x0.25 at 0, x1.0 at centre,
-        // x2.0 at full) verified on hardware — it does NOT set direction, only rate.
+        // Playback speed. Measured against the sync-mode clock: bend is a *signed velocity
+        // offset* of about -20..+40 ticks/s, added to whatever CC 18 and the transport are
+        // already doing — not a magnitude multiplier. Playing forward that reads as x0.54 at 0,
+        // x1.0 at centre and x2.14 at full; while reversing the sense flips (bend up slows the
+        // reverse), which is what proves it is signed rather than scaling.
         // NOTE: it persists across stop/play with no on-screen feedback, so a stray value
         // silently pitch-shifts everything until returned to centre.
         masterPitchBend("tp7.speed", "speed", "spd", channel: 0),
 
         // Direction, behaving like mute: a two-state control on CC 18. Above the threshold
-        // plays forward, below plays reverse — offset 4 from centre is 1x in each direction,
-        // both verified on hardware. CC 18 takes over the transport as soon as it is sent.
+        // plays forward, below plays reverse. CC 18 takes over the transport as soon as it is
+        // sent. The values are offset 8 either side of centre, not 4: measurement showed offset
+        // 4 is inside the dead zone and barely moves the tape (x0.06), while 8 is x1.13.
         ParamSpec(id: "tp7.direction", name: "direction", short: "dir",
                   track: nil,
                   master: .cc(cc: 18, channel: .pinned(0),
-                              encoding: .switching(SwitchEncoding(onValue: 68, offValue: 60,
+                              encoding: .switching(SwitchEncoding(onValue: 72, offValue: 56,
                                                                   threshold: 64)))),
 
         // Transport as a parameter: above the threshold plays, below stops. Edge-triggered in

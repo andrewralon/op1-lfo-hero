@@ -465,7 +465,7 @@ the real-time message stops the transport.
 where it was. That is the desired behaviour for a first stop press, and it means returning to
 zero has to be an explicit separate action (the double-stop gesture), not a side effect of stop.
 
-**Measured speed scale**, all while engaged:
+**First-pass speed scale, by ear**, all while engaged:
 
 | value | observed |
 |---|---|
@@ -478,14 +478,21 @@ zero has to be an explicit separate action (the double-stop gesture), not a side
 
 Distance from 64 is speed; side of 64 is direction. Reverse playback is reachable only this way.
 
+⚠️ **The "60 ≈ normal speed" row is wrong** — later measurement puts 60 at **x0.33**. Judging a
+reverse rate by ear without a simultaneous forward reference is unreliable, and this row sent the
+implementation down a wrong path for several iterations. See *TP-7 speed measured numerically*
+below, which supersedes this table.
+
 **Correction to [lucidyan/tp7-midi](https://github.com/lucidyan/tp7-midi):** that source states
 the stop point "shifts between 60-61" during playback, with a workaround of `CC 18 = 60` plus
 pitch bend `+708`. On this firmware that is wrong — 60 and 61 are simply slow *reverse* speeds,
 and the "workaround" plays backwards at roughly 1x (the `+708` being a x1.09 multiplier). The
 stop point stays at 64; the confusion is explained by CC 18 needing to engage first.
 
-**Pitch bend is a separate, independent, persistent speed multiplier** (x0.25-x2.0) that does
-not set direction. Verified: a stray `+708` (x1.09) left over from an earlier test kept every
+**Pitch bend is a separate, persistent speed control** — later measured to be a *signed velocity
+offset* rather than the magnitude multiplier described here, with a range of about x0.5-x2.1
+rather than x0.25-x2.0. See *TP-7 speed measured numerically* below. Verified: a stray `+708`
+(x1.09) left over from an earlier test kept every
 subsequent playback slightly fast, surviving stop, rewind and play, until it was explicitly
 returned to centre (8192). It is invisible on the device's display — the guide's own note that
 pitch bend and the on-screen `SPD` are separate controls means the user gets no feedback that
@@ -506,6 +513,87 @@ a "rewind while stopped". Untested candidates: Song Position Pointer `0xF2 00 00
 **Consequence for this app:** `.directionalTransport` models this correctly — magnitude from
 the variable `ClockEngine.transportSpeed`, direction from the op — and `stop` must send
 `CC 18 = 64` followed by `0xFC`. Both are implemented.
+
+### TP-7 speed measured numerically — the sync clock is a tape-speed readout
+
+Judging playback rate by ear failed repeatedly: offset 4 was called "≈normal speed" early on and
+is actually **x0.06**, and several rounds of guess-deploy-listen converged on nothing. The fix
+was to find an instrument.
+
+**In `sync` mode the TP-7 both accepts incoming CC and transmits MIDI clock, and that clock is
+derived from tape speed.** So counting `0xF8` ticks per second measures playback rate directly.
+`44.0 ticks/s = 110 BPM = 1x`, established from three independent forward baselines.
+
+This is self-diagnosing: if the clock were a fixed project tempo, the rate would not move when
+CC 18 changed. It moves proportionally, so it is tape-derived.
+
+**CC 18 is affine, not proportional.** Driving each offset and counting ticks:
+
+| offset (below 64) | ticks/s | multiplier |
+|---|---|---|
+| 4 | 2.80 | x0.06 |
+| 5 | 14.39 | x0.33 |
+| 6 | 26.17 | x0.59 |
+| 7 | 37.97 | x0.86 |
+| 8 | 49.55 | x1.13 |
+
+Successive differences are 11.59, 11.78, 11.80, 11.58 — a straight line:
+
+```
+rate = 11.69 * offset - 44 ticks/s        offset = 3.76 * (multiplier + 1)
+```
+
+**There is a dead zone**: the tape does not move until offset ~3.76, and speed rises linearly
+only beyond it. Consequences: `offset 4 = 1x` (both the third-party spec and the earlier by-ear
+note here) is wrong — offset 4 is the *stall point*. **1x is offset 7.5**, so it is not reachable
+at integer resolution: 7 is 14% slow and 8 is 13% fast, both audible and both independently
+reported by ear before being measured.
+
+The app therefore models this as `offset = deadZone + unitSpeed * multiplier`, with
+`deadZone = 4, unitSpeed = 4` on the TP-7.
+
+**Pitch bend is a signed velocity offset, not a magnitude multiplier.** Sweeping bend while
+playing forward and again while reversing:
+
+| bend | forward | reverse (cc18=56) |
+|---|---|---|
+| 0 (-8192) | x0.54 | x1.38 |
+| 8192 (centre) | x1.00 | x1.00 |
+| 16383 (+8192) | x2.14 | x0.22 |
+
+The sense **flips** in reverse — bend up *slows* a reversing tape. A magnitude multiplier could
+not do that. Expressed as a velocity contribution it is consistent across both runs: about
+**-20 ticks/s at full negative, +40 at full positive**, added to whatever the transport and CC 18
+are already doing.
+
+**Bend does nothing on its own.** With the transport stopped, holding bend at -8192 for 10s left
+the position completely unchanged (verified on the display: 2:16 before and after, no transport
+message sent at any point). Bend only scales an already-rolling transport.
+
+⚠️ **Correction to a widely-repeated claim** (an LLM answer citing TE, and the same idea in the
+third-party spec): that pitch bend maps directly to tape motor speed *and direction*, with
+`-8192` = "normal 1x playback in reverse" and `E0 00 00` as a one-message reverse command.
+Measured, `-8192` gives **x0.5**, not x1 — and with the transport stopped it does not move the
+tape at all. The claim's other two rows are correct (centre = 1x forward, +8192 = x2.14 forward),
+which is what makes it plausible. Direction cannot come from bend.
+
+**Reverse at exactly 1x = `CC 18 = 56` plus pitch bend `9700`.** Offset 8 alone is 49.7 ticks/s;
+the bend trim pulls it to 43.95 against a 44.0 target (0.1% error). Bend is the fine control
+because CC 18 has no resolution between offsets.
+
+**Confirmed against ground truth.** The device's own reverse (its play button, nothing sent from
+the Mac) measured **44.06 ticks/s over 30 s = x1.000** — so the TP-7's native reverse is the same
+rate as forward, and the calibrated app reverse sits **0.25% away** from it. Also confirmed by
+ear in a direct forward/reverse A/B.
+
+**Method notes for anyone repeating this:**
+- The clock rate is **unsigned** — it measures speed, never direction. Direction always needs ears.
+- The device emits **no clock while stopped**, so this instrument goes blind exactly when the
+  transport is parked. A "0 ticks/s" reading there means "stopped", not "the motor is not turning".
+- Never send `0xFC` twice. A stop while already stopped rewinds to zero; an early version of the
+  test tool did this and produced a spurious "31s -> 0s" jump that looked like a scrub.
+- Sample for at least ~10 s. One-second windows alternate between ~43.8 and ~44.8 as ticks land
+  on window boundaries; only the average is meaningful.
 
 ### TP-7 `ctrl` mode — verified transmit behaviour
 
