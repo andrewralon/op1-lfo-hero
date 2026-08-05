@@ -687,6 +687,25 @@ menu before relying on this.
 guarantee, and a setting that made record overwrite the current take would turn this into a
 destructive operation with no warning.
 
+### End-to-end validation — the app driving a TP-7 (iPhone, USB-C via adapter)
+
+First run of the actual app against real hardware. Everything below was verified on device:
+
+- **Auto-detection works.** Status bar showed `TP-7 (usb)` with a green dot on launch, with no
+  manual override — so endpoint-name matching, profile resolution and the status-bar wiring all
+  work together.
+- **6 track strips** with the tracks 5-6 colours.
+- **No pan knobs** (`caps.hasPan: false`), faders taking the full height.
+- **Transport shows the profile's symbols** (fast-forward / rewind rather than the OP-1 arrows).
+- **Parameter picker shows the TP-7's own vocabulary** ("mix volume", not "volume").
+- **Metronome dimmed**, since the app is forced clock master.
+- **Faders drive the device**: dragging a volume fader changes the matching value in the TP-7's
+  own mix submenu, exactly.
+- **An LFO on volume runs and sweeps the device.**
+
+**Control is one-way, app -> device.** The TP-7's mix values do not follow back into the app,
+which matches `mirrorsIncomingCC: false` and is the same behaviour as the OP-1.
+
 ## Open questions — answer on hardware
 
 - [ ] Do the pinned FX-bus channels (ch 8/9) actually land?

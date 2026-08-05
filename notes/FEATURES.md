@@ -41,6 +41,7 @@
 - [ ] LOW - fix left/right scrub mode if possible, like pressing them on the op1! tried and reverted, see commit history.
 
 ## Done
+- [x] HIGH - end-to-end: app auto-detects a tp-7 over usb and drives it, including a working volume lfo. verified on iphone
 - [x] HIGH - tp-7: play sent CC 14 — which is RECORD on that device, so pressing play would arm recording over a take. now real-time transport only
 - [x] HIGH - tp-7: prev/next modelled CC 18 as a momentary nudge when it is a persistent bipolar speed state, so they started the tape moving and never stopped it
 - [x] HIGH - play always sends Continue (0xFB) so the tape resumes; only an explicit rewind sends Start (0xFA). previously the first play of a session silently rewound the tape
