@@ -1,5 +1,9 @@
 # Features (iOS)
 
+> Multi-device support (op-1 field / tx-6 / tp-7) has its own status file:
+> [FIELD_DEVICE_SUPPORT.md](FIELD_DEVICE_SUPPORT.md) — what is done, what is untested, and what
+> is still only assumed. Protocol detail is in [RESEARCH.md](RESEARCH.md).
+
 ## To fix
 - [ ] HIGH - nothing has been tested over BLE. all hardware testing so far was usb-c. ble peripheral names for tx-6/tp-7 are still guesses, so auto-detect may silently fail and require the manual device override
 - [ ] MED - tp-7: confirm whether recording creates a new take or can overwrite the current one. observed as non-destructive (new track) in one test, but the guide's record menu section is images-only and could not be read. if there is an overwrite setting, the app must warn before arming record
