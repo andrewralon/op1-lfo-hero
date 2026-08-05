@@ -16,8 +16,8 @@ struct TransportBarView: View {
 
             Sep()
 
-            TransBtn(symbol: "arrow.left",  active: false) { app.tapePrev() }
-            TransBtn(symbol: "arrow.right", active: false) { app.tapeNext() }
+            TransBtn(symbol: app.profile.transport.prevSymbol, active: false) { app.tapePrev() }
+            TransBtn(symbol: app.profile.transport.nextSymbol, active: false) { app.tapeNext() }
 
             Sep()
 
@@ -29,7 +29,7 @@ struct TransportBarView: View {
                     Image(systemName: "metronome")
                         .font(.system(size: isPad ? 52 : 32, weight: .regular))
                         .scaleEffect(x: 0.50, y: 1.05, anchor: .center)
-                    Text(app.isClockMaster ? "app" : "op1")
+                    Text(app.isClockMaster ? "app" : app.profile.caps.clockLabel)
                         .font(.system(size: isPad ? 22 : 13, weight: .semibold, design: .monospaced))
                 }
                 .frame(width: isPad ? 72 : 42)
@@ -37,6 +37,9 @@ struct TransportBarView: View {
                 .foregroundColor(app.isClockMaster ? C.green : C.track(1))
             }
             .buttonStyle(.plain)
+            // Devices that never emit MIDI clock can't be the tempo source.
+            .disabled(!app.profile.caps.canBeClockMaster)
+            .opacity(app.profile.caps.canBeClockMaster ? 1 : 0.4)
             .padding(.leading, isPad ? 14 : 10)
 
             // BPM scrubber — compact fixed width with uniform 6pt margin
@@ -233,9 +236,9 @@ struct TransportColumnView: View {
 
             // Row 2: tape ← / →
             HStack(spacing: 0) {
-                TransColBtn(symbol: "arrow.left",  active: false) { app.tapePrev() }
+                TransColBtn(symbol: app.profile.transport.prevSymbol, active: false) { app.tapePrev() }
                 Rectangle().fill(C.bg3).frame(width: 1)
-                TransColBtn(symbol: "arrow.right", active: false) { app.tapeNext() }
+                TransColBtn(symbol: app.profile.transport.nextSymbol, active: false) { app.tapeNext() }
             }
             .frame(maxHeight: .infinity)
 
@@ -250,13 +253,16 @@ struct TransportColumnView: View {
                         Image(systemName: "metronome")
                             .font(.system(size: m.transportMetronomeSize, weight: .regular))
                             .scaleEffect(x: 0.50, y: 1.05, anchor: .center)
-                        Text(app.isClockMaster ? "app" : "op1")
+                        Text(app.isClockMaster ? "app" : app.profile.caps.clockLabel)
                             .font(.system(size: m.transportMetronomeLabel, weight: .semibold, design: .monospaced))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .foregroundColor(app.isClockMaster ? C.green : C.track(1))
                 }
                 .buttonStyle(.plain)
+                // Devices that never emit MIDI clock can't be the tempo source.
+                .disabled(!app.profile.caps.canBeClockMaster)
+                .opacity(app.profile.caps.canBeClockMaster ? 1 : 0.4)
 
                 Rectangle().fill(C.bg3).frame(width: 1)
 

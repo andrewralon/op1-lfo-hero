@@ -29,9 +29,29 @@ final class ClockEngine {
     // MARK: - Transport state
     // sppPos is in MIDI Song Position Pointer units (1/16 notes = 6 ticks at 24 PPQN)
     private var sppPos = 0
-    // hasStarted: true after first Start (0xFA) is sent; subsequent play() sends Continue (0xFB)
-    // Mirrors Python MidiClockGenerator._has_started — reset only on goto_start (double-stop)
-    private var hasStarted = false
+    // Play always sends Continue (0xFB) so the tape picks up where it left off — the same
+    // behaviour as the hardware's own play button. Only an explicit rewind makes the next play
+    // send Start (0xFA), which per the MIDI spec restarts from position zero.
+    //
+    // Verified on a TP-7: 0xFA rewound to 0, 0xFB resumed. Sending Start on the first play of a
+    // session (the old behaviour) therefore rewound the user's tape once, unasked.
+    //
+    // Set by rewindToStart(), which the double-stop feature should call — see notes/FEATURES.md.
+    private var rewindPending = false
+
+    /// Seek speed as a **multiple of normal playback**, used by `.directionalTransport`.
+    /// 1.0 = normal speed, 2.0 = double (the TP-7's "chipmunks"), 0.5 = half.
+    ///
+    /// Expressed as a multiplier rather than a raw CC offset because the device holds this as a
+    /// persistent playback speed, and because the offset that means "1x" is device-specific
+    /// (the op's `unitSpeed` carries it). Defaults to 2x so the seek buttons feel like a
+    /// fast-forward rather than plain playback.
+    var transportSpeed: Double = 2.0 {
+        didSet { transportSpeed = max(0.25, min(8.0, transportSpeed)) }
+    }
+
+    /// Last direction sent by a `.directionalTransport` op: -1 reverse, 0 stopped, +1 forward.
+    private(set) var transportDirection = 0
 
     // Controls how far each arrow press moves the tape.
     // .measure = 16 SPP units (1 bar in 4/4) | .scrub = 4 SPP units (1 quarter note)
@@ -39,7 +59,7 @@ final class ClockEngine {
     var tapeArrowMode: TapeArrowMode = .measure
     private var tapeArrowStep: Int { tapeArrowMode == .measure ? 16 : 4 }
 
-    weak var router: MidiRouter? {
+    weak var router: (any MidiSink)? {
         didSet { wireRouter() }
     }
 
@@ -196,37 +216,70 @@ final class ClockEngine {
 
     // MARK: - Transport commands
 
+    /// What the transport buttons send. The OP-1 uses MIDI start/stop plus tape SPP seeks;
+    /// other devices use their own CCs. Set from the active profile by AppState.
+    var transport: TransportMap = DeviceProfile.op1Field.transport
+
     func play() {
+        // Ops run before `isPlaying` flips, so a `.toggleCC(whenPlaying:)` op sees the state
+        // the button was pressed in.
+        run(transport.play)
         isPlaying = true
-        if hasStarted {
-            router?.send([0xFB])
-        } else {
-            sppPos = 0
-            router?.send([0xFA])
-            hasStarted = true
-        }
     }
 
     func stop() {
-        router?.send([0xFC])
+        run(transport.stop)
         isPlaying = false
     }
 
-    func tapePrev() {
-        sppPos = max(0, sppPos - tapeArrowStep)
-        sendTapeSeek(cc: 82)
+    /// Arm a rewind: the next play sends Start (0xFA) instead of Continue, so the device
+    /// restarts from zero. Intended for the double-stop gesture.
+    func rewindToStart() {
+        lock.lock(); rewindPending = true; sppPos = 0; lock.unlock()
     }
 
-    func tapeNext() {
-        sppPos += tapeArrowStep
-        sendTapeSeek(cc: 83)
+    func tapePrev() { run(transport.prev) }
+    func tapeNext() { run(transport.next) }
+
+    private func run(_ ops: [TransportOp]) {
+        for op in ops {
+            switch op {
+            case .midiStartOrContinue:
+                if rewindPending {
+                    sppPos = 0
+                    router?.send([0xFA])   // Start = play from zero
+                    rewindPending = false
+                } else {
+                    router?.send([0xFB])   // Continue = resume from current position
+                }
+            case .midiStop:
+                router?.send([0xFC])
+            case .tapeSeek(let cc, let steps):
+                sppPos = max(0, sppPos + steps * tapeArrowStep)
+                router?.send([0xB0, UInt8(cc), 127])
+                router?.send([0xF2, UInt8(sppPos & 0x7F), UInt8((sppPos >> 7) & 0x7F)])
+                if isPlaying { router?.send([0xFB]) }
+            case .cc(let ch, let cc, let value):
+                sendCC(ch: ch, cc: cc, val: value)
+            case .ccRelative(let ch, let cc, let delta):
+                sendCC(ch: ch, cc: cc, val: 64 + delta)
+            case .directionalTransport(let ch, let cc, let center, let unitSpeed, let direction):
+                // direction 0 releases the grab. Only send it if this control actually HAS the
+                // transport: on a TP-7 a redundant stop is read as "stop while already stopped",
+                // which rewinds to zero — so sending it unconditionally would lose the user's
+                // position every time they pressed stop on a normally-playing tape.
+                if direction == 0 && transportDirection == 0 { break }
+                // Persistent state — the device keeps moving at this speed until told otherwise.
+                let offset = Int((Double(unitSpeed) * transportSpeed).rounded())
+                sendCC(ch: ch, cc: cc, val: center + direction * max(1, offset))
+                transportDirection = direction
+            case .toggleCC(let ch, let cc, let value, let whenPlaying):
+                if isPlaying == whenPlaying { sendCC(ch: ch, cc: cc, val: value) }
+            }
+        }
     }
 
-    private func sendTapeSeek(cc: UInt8) {
-        let lo = UInt8(sppPos & 0x7F)
-        let hi = UInt8((sppPos >> 7) & 0x7F)
-        router?.send([0xB0, cc, 127])
-        router?.send([0xF2, lo, hi])
-        if isPlaying { router?.send([0xFB]) }
+    private func sendCC(ch: Int, cc: Int, val: Int) {
+        router?.send([UInt8(0xB0 | (ch & 0x0F)), UInt8(cc), UInt8(max(0, min(127, val)))])
     }
 }

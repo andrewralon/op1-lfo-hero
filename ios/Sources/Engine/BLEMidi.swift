@@ -29,6 +29,8 @@ final class BLEMidi: NSObject, ObservableObject {
 
     @Published var state: State = .scanning
     @Published var discovered: [CBPeripheral] = []
+    /// Profile id matched from the connected peripheral's name, nil when nothing matched.
+    @Published var matchedProfileId: String?
 
     // Callbacks — invoked on the BLE queue (background thread)
     var onClock:    (() -> Void)?
@@ -161,8 +163,10 @@ extension BLEMidi: CBCentralManagerDelegate {
         scanTimeout?.cancel()
         guard discoveredIds.insert(p.identifier).inserted else { return }
         DispatchQueue.main.async { self.discovered.append(p) }
-        // Auto-connect to first OP-1 found
-        if (p.name ?? "").lowercased().contains("op-1") {
+        // Auto-connect to the first known TE device found. Everything discovered is still
+        // listed in `discovered`, so an unrecognised peripheral can be picked by hand.
+        if let profile = DeviceRegistry.profile(forEndpointName: p.name ?? "") {
+            DispatchQueue.main.async { self.matchedProfileId = profile.id }
             connect(p)
         }
     }

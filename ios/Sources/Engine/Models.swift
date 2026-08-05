@@ -109,58 +109,21 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
     }
 }
 
-// MARK: - Parameter
-
-enum Parameter: String, CaseIterable, Identifiable, Codable {
-    case volume, pan, mute, tempo
-    case par1 = "par 1", par2 = "par 2", par3 = "par 3", par4 = "par 4"
-    case envA = "env A", envD = "env D", envS = "env S", envR = "env R"
-    case fx1 = "fx 1", fx2 = "fx 2", fx3 = "fx 3", fx4 = "fx 4"
-    case lfo1 = "lfo 1", lfo2 = "lfo 2", lfo3 = "lfo 3", lfo4 = "lfo 4"
-
-    var id: String { rawValue }
-
-    var shortName: String {
-        switch self {
-        case .volume: return "vol"
-        case .pan:    return "pan"
-        case .mute:   return "mut"
-        case .tempo:  return "tmp"
-        case .par1:   return "p1"
-        case .par2:   return "p2"
-        case .par3:   return "p3"
-        case .par4:   return "p4"
-        case .envA:   return "eA"
-        case .envD:   return "eD"
-        case .envS:   return "eS"
-        case .envR:   return "eR"
-        case .fx1:    return "fx1"
-        case .fx2:    return "fx2"
-        case .fx3:    return "fx3"
-        case .fx4:    return "fx4"
-        case .lfo1:   return "l1"
-        case .lfo2:   return "l2"
-        case .lfo3:   return "l3"
-        case .lfo4:   return "l4"
-        }
-    }
-
-    var isMasterOnly: Bool { self == .tempo }
-
-    var isMasterCapable: Bool {
-        switch self {
-        case .tempo, .fx1, .fx2, .fx3, .fx4, .lfo1, .lfo2, .lfo3, .lfo4: return true
-        default: return false
-        }
-    }
-}
-
 // MARK: - LfoClip
 
+/// One running LFO. `paramId` and `deviceId` reference a `ParamSpec` in a `DeviceProfile`
+/// rather than naming a parameter directly, so the same clip type serves every device.
+///
+/// This is persisted, so `init(from:)` below is hand-written: it defaults every missing key
+/// instead of throwing. Swift's synthesized `Decodable` ignores property default values, which
+/// means a synthesized decoder turns any added field into "all saved clips silently vanish".
 struct LfoClip: Identifiable, Codable, Equatable {
     var id = UUID()
-    var track: Int           // 0 = master, 1-4 = per track
-    var parameter: Parameter
+    /// Which device profile `paramId` belongs to — guards against dispatching a clip to the
+    /// wrong hardware across a profile switch.
+    var deviceId: String = "op1"
+    var track: Int           // 0 = master, 1...trackCount = per track
+    var paramId: String      // ParamSpec.id within `deviceId`'s profile
     var wave: LfoWave
     var rateTicks: Int
     var freeRatePeriod: Double? = nil  // non-nil → free rate (fixed seconds, not tempo-dependent)
@@ -170,6 +133,72 @@ struct LfoClip: Identifiable, Codable, Equatable {
     let loop: Bool           // set at creation; not editable
     var isEnabled: Bool = true   // false = paused; chip stays in list but sends no MIDI
     let originalValue: Double    // MIDI value of parameter captured at clip creation (for restore-on-disable)
+
+    init(id: UUID = UUID(), deviceId: String = "op1", track: Int, paramId: String,
+         wave: LfoWave, rateTicks: Int, freeRatePeriod: Double? = nil,
+         depth: Double, centerValue: Double, inverted: Bool, loop: Bool,
+         isEnabled: Bool = true, originalValue: Double) {
+        self.id = id
+        self.deviceId = deviceId
+        self.track = track
+        self.paramId = paramId
+        self.wave = wave
+        self.rateTicks = rateTicks
+        self.freeRatePeriod = freeRatePeriod
+        self.depth = depth
+        self.centerValue = centerValue
+        self.inverted = inverted
+        self.loop = loop
+        self.isEnabled = isEnabled
+        self.originalValue = originalValue
+    }
+
+    enum CodingKeys: String, CodingKey {
+        // "parameter" is the pre-multi-device key; still read so old saves survive.
+        case id, deviceId, track, paramId, parameter, wave, rateTicks, freeRatePeriod
+        case depth, centerValue, inverted, loop, isEnabled, originalValue
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id       = (try? c.decodeIfPresent(UUID.self,   forKey: .id))    .flatMap { $0 } ?? UUID()
+        deviceId = (try? c.decodeIfPresent(String.self, forKey: .deviceId)).flatMap { $0 } ?? "op1"
+        track    = (try? c.decodeIfPresent(Int.self,    forKey: .track)) .flatMap { $0 } ?? 1
+        // New key first, then the legacy `parameter` raw string. The OP-1 profile's parameter
+        // ids are deliberately those same raw values, so no translation table is needed.
+        paramId  = (try? c.decodeIfPresent(String.self, forKey: .paramId)).flatMap { $0 }
+                ?? (try? c.decodeIfPresent(String.self, forKey: .parameter)).flatMap { $0 }
+                ?? "volume"
+        wave     = (try? c.decodeIfPresent(LfoWave.self, forKey: .wave)).flatMap { $0 } ?? .sine
+        rateTicks      = (try? c.decodeIfPresent(Int.self,    forKey: .rateTicks)).flatMap { $0 } ?? PPQN
+        freeRatePeriod = (try? c.decodeIfPresent(Double.self, forKey: .freeRatePeriod)).flatMap { $0 }
+        depth          = (try? c.decodeIfPresent(Double.self, forKey: .depth)).flatMap { $0 } ?? 10
+        centerValue    = (try? c.decodeIfPresent(Double.self, forKey: .centerValue)).flatMap { $0 } ?? 64
+        inverted       = (try? c.decodeIfPresent(Bool.self,   forKey: .inverted)).flatMap { $0 } ?? false
+        loop           = (try? c.decodeIfPresent(Bool.self,   forKey: .loop)).flatMap { $0 } ?? true
+        isEnabled      = (try? c.decodeIfPresent(Bool.self,   forKey: .isEnabled)).flatMap { $0 } ?? true
+        originalValue  = (try? c.decodeIfPresent(Double.self, forKey: .originalValue)).flatMap { $0 }
+                      ?? centerValue
+    }
+
+    /// Hand-written because `CodingKeys` carries the legacy `parameter` key, which has no
+    /// property to synthesize from. Only the current keys are written.
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(deviceId, forKey: .deviceId)
+        try c.encode(track, forKey: .track)
+        try c.encode(paramId, forKey: .paramId)
+        try c.encode(wave, forKey: .wave)
+        try c.encode(rateTicks, forKey: .rateTicks)
+        try c.encodeIfPresent(freeRatePeriod, forKey: .freeRatePeriod)
+        try c.encode(depth, forKey: .depth)
+        try c.encode(centerValue, forKey: .centerValue)
+        try c.encode(inverted, forKey: .inverted)
+        try c.encode(loop, forKey: .loop)
+        try c.encode(isEnabled, forKey: .isEnabled)
+        try c.encode(originalValue, forKey: .originalValue)
+    }
 
     var rateIndex: Int {
         if let secs = freeRatePeriod {

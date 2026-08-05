@@ -5,12 +5,31 @@ final class AutomationEngine {
     weak var controller: Controller?
 
     // Called on clock thread with (track, parameter, midiValue)
-    var updateCallback:   ((Int, Parameter, Double) -> Void)?
+    var updateCallback:   ((Int, ParamSpec, Double) -> Void)?
     // Called on clock thread when a one-shot LFO completes
     var finishedCallback: ((LfoClip) -> Void)?
 
     private var lfos: [LfoClip] = []
     private let lock = NSLock()
+
+    // Active device profile. Kept under its own lock because `lock` is already held while
+    // evaluating clips, and the profile is read from inside those critical sections.
+    private var _profile: DeviceProfile = .op1Field
+    private let profileLock = NSLock()
+
+    var profile: DeviceProfile {
+        profileLock.lock(); defer { profileLock.unlock() }
+        return _profile
+    }
+
+    func setProfile(_ p: DeviceProfile) {
+        profileLock.lock(); _profile = p; profileLock.unlock()
+    }
+
+    /// True when this clip drives the app's own tempo rather than a MIDI CC.
+    private func isTempo(_ lfo: LfoClip, _ p: DeviceProfile) -> Bool {
+        p.param(lfo.paramId)?.role == .tempo
+    }
 
     // Per-clip mutable state tracked by UUID (all accessed under lock)
     private var startTicks:      [UUID: Int]    = [:]
@@ -205,7 +224,7 @@ final class AutomationEngine {
             y = lfo.wave.value(at: phase)
         }
         if lfo.inverted { y = -y }
-        if lfo.parameter == .tempo {
+        if isTempo(lfo, profile) {
             return max(20, min(300, lfo.centerValue + y * lfo.depth))
         }
         return max(0, min(127, (lfo.centerValue + y * lfo.depth).rounded()))
@@ -232,37 +251,19 @@ final class AutomationEngine {
 
         if lfo.inverted { y = -y }
 
-        if lfo.parameter == .tempo {
+        if isTempo(lfo, profile) {
             return max(20, min(300, lfo.centerValue + y * lfo.depth))
         }
         return max(0, min(127, (lfo.centerValue + y * lfo.depth).rounded()))
     }
 
     private func dispatch(lfo: LfoClip, value: Double) {
-        guard let ctrl = controller else { return }
-        let iv = Int(value)
-        switch lfo.parameter {
-        case .volume: ctrl.setVolume(track: lfo.track, value: iv)
-        case .pan:    ctrl.setPan(track: lfo.track, value: iv)
-        case .mute:   iv >= 64 ? ctrl.mute(track: lfo.track) : ctrl.unmute(track: lfo.track)
-        case .tempo:      break  // tempo modulation handled in AppState via updateCallback
-        case .par1:       ctrl.setPar(track: lfo.track, param: 1, value: iv)
-        case .par2:       ctrl.setPar(track: lfo.track, param: 2, value: iv)
-        case .par3:       ctrl.setPar(track: lfo.track, param: 3, value: iv)
-        case .par4:       ctrl.setPar(track: lfo.track, param: 4, value: iv)
-        case .envA: ctrl.setEnv(track: lfo.track, param: 1, value: iv)
-        case .envD: ctrl.setEnv(track: lfo.track, param: 2, value: iv)
-        case .envS: ctrl.setEnv(track: lfo.track, param: 3, value: iv)
-        case .envR: ctrl.setEnv(track: lfo.track, param: 4, value: iv)
-        case .fx1:        ctrl.setFx(track: lfo.track, param: 1, value: iv)
-        case .fx2:        ctrl.setFx(track: lfo.track, param: 2, value: iv)
-        case .fx3:        ctrl.setFx(track: lfo.track, param: 3, value: iv)
-        case .fx4:        ctrl.setFx(track: lfo.track, param: 4, value: iv)
-        case .lfo1:       ctrl.setPatchLfo(track: lfo.track, param: 1, value: iv)
-        case .lfo2:       ctrl.setPatchLfo(track: lfo.track, param: 2, value: iv)
-        case .lfo3:       ctrl.setPatchLfo(track: lfo.track, param: 3, value: iv)
-        case .lfo4:       ctrl.setPatchLfo(track: lfo.track, param: 4, value: iv)
-        }
-        updateCallback?(lfo.track, lfo.parameter, value)
+        let p = profile
+        // A clip saved for a different device must never reach this one's MIDI channels —
+        // possible for a moment while a profile switch is in flight.
+        guard lfo.deviceId == p.id, let spec = p.param(lfo.paramId) else { return }
+        // A `.virtualTempo` binding sends nothing; AppState retunes the clock via updateCallback.
+        controller?.send(spec: spec, track: lfo.track, value: value, profile: p)
+        updateCallback?(lfo.track, spec, value)
     }
 }

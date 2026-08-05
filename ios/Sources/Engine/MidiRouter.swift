@@ -1,9 +1,18 @@
 import Foundation
 
+/// Anything that can carry MIDI in both directions. `MidiRouter` is the real implementation;
+/// tests substitute a recorder so the outgoing wire format can be asserted without a transport.
+protocol MidiSink: AnyObject {
+    func send(_ bytes: [UInt8])
+    var onClock: (() -> Void)? { get set }
+    var onStart: (() -> Void)? { get set }
+    var onStop:  (() -> Void)? { get set }
+}
+
 /// Routes MIDI to USB when the OP-1 is connected via USB-C, BLE otherwise.
 /// Owns both transports and aggregates their incoming callbacks.
 /// BLE callbacks are silenced while USB is active to prevent double clock ticks.
-final class MidiRouter {
+final class MidiRouter: MidiSink {
     let ble = BLEMidi()
     let usb = USBMidi()
 
