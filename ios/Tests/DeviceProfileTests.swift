@@ -10,13 +10,13 @@ import XCTest
 final class OP1ProfileMatchesSpecTests: XCTestCase {
 
     private let profile = DeviceProfile.op1Field
-    private var sink: RecordingSink!
+    private var destination: RecordingDestination!
     private var ctrl: Controller!
 
     override func setUp() {
         super.setUp()
-        sink = RecordingSink()
-        ctrl = Controller(router: sink)
+        destination = RecordingDestination()
+        ctrl = Controller(router: destination)
         ctrl.setProfile(.op1Field)
     }
 
@@ -60,11 +60,11 @@ final class OP1ProfileMatchesSpecTests: XCTestCase {
                     continue
                 }
                 for v in Self.probeValues {
-                    sink.reset()
+                    destination.reset()
                     ctrl.send(spec: spec, track: track, value: Double(v))
                     // Mute is the one parameter that snaps rather than passing the value through.
                     let wantVal = spec.role == .mute ? (v >= 64 ? 127 : 0) : v
-                    XCTAssertEqual(sink.only(),
+                    XCTAssertEqual(destination.only(),
                                    [UInt8(0xB0 | want.ch), UInt8(want.cc), UInt8(wantVal)],
                                    "param '\(spec.id)' track \(track) value \(v)")
                     compared += 1

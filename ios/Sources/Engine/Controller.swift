@@ -7,12 +7,12 @@ import Foundation
 /// tracked: `AppState.mutes` is the single source of truth (a second copy here used to drift
 /// out of sync with incoming CC and with mute LFOs).
 final class Controller {
-    weak var router: (any MidiSink)?
+    weak var router: (any MidiDestination)?
 
     private var _profile: DeviceProfile = .op1Field
     private let lock = NSLock()
 
-    init(router: any MidiSink) {
+    init(router: any MidiDestination) {
         self.router = router
     }
 

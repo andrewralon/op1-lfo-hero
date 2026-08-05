@@ -1,8 +1,9 @@
 import XCTest
 @testable import op1_lfo_hero
 
-/// Captures a MidiSink's traffic so the exact wire bytes can be asserted.
-final class RecordingSink: MidiSink {
+/// A MidiDestination that records everything sent to it, so tests can assert the exact
+/// wire bytes without hardware.
+final class RecordingDestination: MidiDestination {
     private(set) var packets: [[UInt8]] = []
     var onClock: (() -> Void)?
     var onStart: (() -> Void)?
@@ -26,13 +27,13 @@ final class RecordingSink: MidiSink {
 /// ARE the spec. See notes/RESEARCH.md.
 final class GoldenMidiTests: XCTestCase {
 
-    private var sink: RecordingSink!
+    private var destination: RecordingDestination!
     private var ctrl: Controller!
 
     override func setUp() {
         super.setUp()
-        sink = RecordingSink()
-        ctrl = Controller(router: sink)
+        destination = RecordingDestination()
+        ctrl = Controller(router: destination)
         ctrl.setProfile(.op1Field)
     }
 
@@ -55,9 +56,9 @@ final class GoldenMidiTests: XCTestCase {
     func testVolumeBytes() {
         for track in 1...4 {
             for v in Self.probeValues {
-                sink.reset()
+                destination.reset()
                 send("volume", track: track, value: v)
-                XCTAssertEqual(sink.only(), [status(track - 1), 7, UInt8(v)],
+                XCTAssertEqual(destination.only(), [status(track - 1), 7, UInt8(v)],
                                "volume track \(track) value \(v)")
             }
         }
@@ -66,9 +67,9 @@ final class GoldenMidiTests: XCTestCase {
     func testPanBytes() {
         for track in 1...4 {
             for v in Self.probeValues {
-                sink.reset()
+                destination.reset()
                 send("pan", track: track, value: v)
-                XCTAssertEqual(sink.only(), [status(track - 1), 10, UInt8(v)],
+                XCTAssertEqual(destination.only(), [status(track - 1), 10, UInt8(v)],
                                "pan track \(track) value \(v)")
             }
         }
@@ -79,14 +80,14 @@ final class GoldenMidiTests: XCTestCase {
     func testParAndEnvBytes() {
         for track in 1...4 {
             for param in 1...4 {
-                sink.reset()
+                destination.reset()
                 send("par \(param)", track: track, value: 100)
-                XCTAssertEqual(sink.only(), [status(track - 1), UInt8(46 + param - 1), 100],
+                XCTAssertEqual(destination.only(), [status(track - 1), UInt8(46 + param - 1), 100],
                                "par \(param) track \(track)")
 
-                sink.reset()
+                destination.reset()
                 send("env \(["A","D","S","R"][param - 1])", track: track, value: 100)
-                XCTAssertEqual(sink.only(), [status(track - 1), UInt8(50 + param - 1), 100],
+                XCTAssertEqual(destination.only(), [status(track - 1), UInt8(50 + param - 1), 100],
                                "env \(param) track \(track)")
             }
         }
@@ -99,14 +100,14 @@ final class GoldenMidiTests: XCTestCase {
     func testFxBytesTrackAndMaster() {
         for param in 1...4 {
             for track in 1...4 {
-                sink.reset()
+                destination.reset()
                 send("fx \(param)", track: track, value: 77)
-                XCTAssertEqual(sink.only(), [status(track - 1), UInt8(54 + param - 1), 77],
+                XCTAssertEqual(destination.only(), [status(track - 1), UInt8(54 + param - 1), 77],
                                "fx \(param) track \(track)")
             }
-            sink.reset()
+            destination.reset()
             send("fx \(param)", track: 0, value: 77)
-            XCTAssertEqual(sink.only(), [0xB0, UInt8(70 + param - 1), 77],
+            XCTAssertEqual(destination.only(), [0xB0, UInt8(70 + param - 1), 77],
                            "master fx \(param)")
         }
     }
@@ -116,14 +117,14 @@ final class GoldenMidiTests: XCTestCase {
     func testPatchLfoBytesTrackAndMaster() {
         for param in 1...4 {
             for track in 1...4 {
-                sink.reset()
+                destination.reset()
                 send("lfo \(param)", track: track, value: 77)
-                XCTAssertEqual(sink.only(), [status(track - 1), UInt8(58 + param - 1), 77],
+                XCTAssertEqual(destination.only(), [status(track - 1), UInt8(58 + param - 1), 77],
                                "lfo \(param) track \(track)")
             }
-            sink.reset()
+            destination.reset()
             send("lfo \(param)", track: 0, value: 77)
-            XCTAssertEqual(sink.only(), [0xB0, UInt8(74 + param - 1), 77],
+            XCTAssertEqual(destination.only(), [0xB0, UInt8(74 + param - 1), 77],
                            "master comp \(param)")
         }
     }
@@ -133,31 +134,31 @@ final class GoldenMidiTests: XCTestCase {
     /// Mute is CC 9 with a hard 127/0 encoding (not a pass-through value).
     func testMuteBytes() {
         for track in 1...4 {
-            sink.reset()
+            destination.reset()
             ctrl.setMute(track: track, on: true)
-            XCTAssertEqual(sink.only(), [status(track - 1), 9, 127], "mute track \(track)")
+            XCTAssertEqual(destination.only(), [status(track - 1), 9, 127], "mute track \(track)")
 
-            sink.reset()
+            destination.reset()
             ctrl.setMute(track: track, on: false)
-            XCTAssertEqual(sink.only(), [status(track - 1), 9, 0], "unmute track \(track)")
+            XCTAssertEqual(destination.only(), [status(track - 1), 9, 0], "unmute track \(track)")
         }
     }
 
     /// `Controller` is stateless about mute — `AppState.mutes` is the only source of truth, so
     /// the same call twice must produce the same bytes twice rather than toggling.
     func testMuteIsStatelessInController() {
-        sink.reset()
+        destination.reset()
         ctrl.setMute(track: 2, on: true)
         ctrl.setMute(track: 2, on: true)
-        XCTAssertEqual(sink.packets, [[0xB1, 9, 127], [0xB1, 9, 127]])
+        XCTAssertEqual(destination.packets, [[0xB1, 9, 127], [0xB1, 9, 127]])
     }
 
     /// An LFO driving mute crosses the threshold rather than sending a continuous value.
     func testMuteLfoValuesSnapToOnOff() {
         for (input, expected) in [(0, 0), (63, 0), (64, 127), (127, 127)] {
-            sink.reset()
+            destination.reset()
             send("mute", track: 1, value: input)
-            XCTAssertEqual(sink.only(), [0xB0, 9, UInt8(expected)], "mute lfo value \(input)")
+            XCTAssertEqual(destination.only(), [0xB0, 9, UInt8(expected)], "mute lfo value \(input)")
         }
     }
 
@@ -166,13 +167,13 @@ final class GoldenMidiTests: XCTestCase {
     /// Out-of-range values are clamped to 0-127, never wrapped — a wrap would emit a byte
     /// with the high bit set and desync the receiver's running status.
     func testValuesAreClampedNotWrapped() {
-        sink.reset()
+        destination.reset()
         send("volume", track: 1, value: 300)
-        XCTAssertEqual(sink.only(), [0xB0, 7, 127])
+        XCTAssertEqual(destination.only(), [0xB0, 7, 127])
 
-        sink.reset()
+        destination.reset()
         send("volume", track: 1, value: -50)
-        XCTAssertEqual(sink.only(), [0xB0, 7, 0])
+        XCTAssertEqual(destination.only(), [0xB0, 7, 0])
     }
 
     /// Every emitted packet must be a well-formed 3-byte CC: status high bit set,
@@ -189,8 +190,8 @@ final class GoldenMidiTests: XCTestCase {
             send("fx \(param)", track: 0, value: 64)
             send("lfo \(param)", track: 0, value: 64)
         }
-        XCTAssertFalse(sink.packets.isEmpty)
-        for p in sink.packets {
+        XCTAssertFalse(destination.packets.isEmpty)
+        for p in destination.packets {
             XCTAssertEqual(p.count, 3, "not a 3-byte CC: \(p)")
             XCTAssertEqual(p[0] & 0xF0, 0xB0, "not a CC status byte: \(p)")
             XCTAssertEqual(p[1] & 0x80, 0, "cc number has high bit set: \(p)")
@@ -201,13 +202,13 @@ final class GoldenMidiTests: XCTestCase {
     // MARK: - Octave
 
     func testOctaveBytes() {
-        sink.reset()
+        destination.reset()
         ctrl.octaveUp()
-        XCTAssertEqual(sink.only(), [0xB0, 79, 127])
+        XCTAssertEqual(destination.only(), [0xB0, 79, 127])
 
-        sink.reset()
+        destination.reset()
         ctrl.octaveDown()
-        XCTAssertEqual(sink.only(), [0xB0, 79, 0])
+        XCTAssertEqual(destination.only(), [0xB0, 79, 0])
     }
 }
 
@@ -215,14 +216,14 @@ final class GoldenMidiTests: XCTestCase {
 /// Position Pointer. Transport became profile-driven in this work, so these pin the bytes.
 final class OP1TransportGoldenTests: XCTestCase {
 
-    private var sink: RecordingSink!
+    private var destination: RecordingDestination!
     private var clock: ClockEngine!
 
     override func setUp() {
         super.setUp()
-        sink = RecordingSink()
+        destination = RecordingDestination()
         clock = ClockEngine()
-        clock.router = sink
+        clock.router = destination
         clock.transport = DeviceProfile.op1Field.transport
     }
 
@@ -231,88 +232,88 @@ final class OP1TransportGoldenTests: XCTestCase {
     /// The previous behaviour sent Start on the first play of a session, silently rewinding the
     /// user's tape once.
     func testPlayAlwaysContinues() {
-        sink.reset()
+        destination.reset()
         clock.play()
-        XCTAssertEqual(sink.packets, [[0xFB]], "the first play must not rewind the tape")
+        XCTAssertEqual(destination.packets, [[0xFB]], "the first play must not rewind the tape")
 
         clock.stop()
-        sink.reset()
+        destination.reset()
         clock.play()
-        XCTAssertEqual(sink.packets, [[0xFB]])
+        XCTAssertEqual(destination.packets, [[0xFB]])
     }
 
     /// An explicit rewind arms Start (0xFA) for the next play only.
     func testRewindArmsStartForOnePlayOnly() {
         clock.rewindToStart()
-        sink.reset()
+        destination.reset()
         clock.play()
-        XCTAssertEqual(sink.packets, [[0xFA]], "after a rewind, play restarts from zero")
+        XCTAssertEqual(destination.packets, [[0xFA]], "after a rewind, play restarts from zero")
 
         clock.stop()
-        sink.reset()
+        destination.reset()
         clock.play()
-        XCTAssertEqual(sink.packets, [[0xFB]], "and reverts to resuming afterwards")
+        XCTAssertEqual(destination.packets, [[0xFB]], "and reverts to resuming afterwards")
     }
 
     /// A rewind also zeroes the song position, so a later tape seek counts from the start.
     func testRewindResetsSongPosition() {
         clock.tapeNext(); clock.tapeNext()      // move to bar 2
         clock.rewindToStart()
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(sink.packets, [[0xB0, 83, 127], [0xF2, 16, 0]], "should count from zero")
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127], [0xF2, 16, 0]], "should count from zero")
     }
 
     func testStopSendsStopByte() {
         clock.play()
-        sink.reset()
+        destination.reset()
         clock.stop()
-        XCTAssertEqual(sink.packets, [[0xFC]])
+        XCTAssertEqual(destination.packets, [[0xFC]])
     }
 
     /// Tape next: CC 83, then an SPP one bar (16 units) forward. Not playing → no resume.
     func testTapeNextSendsCCThenSongPosition() {
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(sink.packets, [[0xB0, 83, 127], [0xF2, 16, 0]])
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127], [0xF2, 16, 0]])
     }
 
     /// Tape prev is CC 82 and clamps the song position at zero rather than going negative.
     func testTapePrevClampsAtZero() {
-        sink.reset()
+        destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(sink.packets, [[0xB0, 82, 127], [0xF2, 0, 0]])
+        XCTAssertEqual(destination.packets, [[0xB0, 82, 127], [0xF2, 0, 0]])
     }
 
     func testTapeSeekAccumulatesSongPosition() {
         clock.tapeNext(); clock.tapeNext(); clock.tapeNext()
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(sink.packets, [[0xB0, 83, 127], [0xF2, 64, 0]], "4 bars = 64 SPP units")
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127], [0xF2, 64, 0]], "4 bars = 64 SPP units")
     }
 
     /// Seeking while playing must resume, or the device sits paused at the new position.
     func testTapeSeekResumesWhilePlaying() {
         clock.play()
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(sink.packets, [[0xB0, 83, 127], [0xF2, 16, 0], [0xFB]])
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127], [0xF2, 16, 0], [0xFB]])
     }
 
     /// Song position is 14-bit across two 7-bit bytes; past 127 units the high byte must carry.
     func testSongPositionSplitsAcrossTwoBytes() {
         for _ in 0..<9 { clock.tapeNext() }   // 9 bars = 144 units > 127
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(sink.packets, [[0xB0, 83, 127], [0xF2, 160 & 0x7F, 160 >> 7]])
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127], [0xF2, 160 & 0x7F, 160 >> 7]])
     }
 
     /// Scrub mode moves a quarter note (4 units) instead of a bar.
     func testScrubModeUsesSmallerStep() {
         clock.tapeArrowMode = .scrub
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(sink.packets, [[0xB0, 83, 127], [0xF2, 4, 0]])
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127], [0xF2, 4, 0]])
     }
 }
 

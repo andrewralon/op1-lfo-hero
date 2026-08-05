@@ -59,7 +59,7 @@ final class ClockEngine {
     var tapeArrowMode: TapeArrowMode = .measure
     private var tapeArrowStep: Int { tapeArrowMode == .measure ? 16 : 4 }
 
-    weak var router: (any MidiSink)? {
+    weak var router: (any MidiDestination)? {
         didSet { wireRouter() }
     }
 

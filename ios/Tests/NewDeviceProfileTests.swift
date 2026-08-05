@@ -9,13 +9,13 @@ import XCTest
 final class TX6ProfileTests: XCTestCase {
 
     private let profile = DeviceProfile.tx6
-    private var sink: RecordingSink!
+    private var destination: RecordingDestination!
     private var ctrl: Controller!
 
     override func setUp() {
         super.setUp()
-        sink = RecordingSink()
-        ctrl = Controller(router: sink)
+        destination = RecordingDestination()
+        ctrl = Controller(router: destination)
         ctrl.setProfile(.tx6)
     }
 
@@ -23,9 +23,9 @@ final class TX6ProfileTests: XCTestCase {
         guard let spec = profile.param(id) else {
             XCTFail("no such parameter '\(id)'"); return []
         }
-        sink.reset()
+        destination.reset()
         ctrl.send(spec: spec, track: track, value: value)
-        return sink.packets.first ?? []
+        return destination.packets.first ?? []
     }
 
     func testSixTracksOnChannelsZeroToFive() {
@@ -120,49 +120,49 @@ final class TX6ProfileTests: XCTestCase {
 /// TX-6 transport: a single stateless start/stop toggle plus a relative tempo encoder.
 final class TX6TransportTests: XCTestCase {
 
-    private var sink: RecordingSink!
+    private var destination: RecordingDestination!
     private var clock: ClockEngine!
 
     override func setUp() {
         super.setUp()
-        sink = RecordingSink()
+        destination = RecordingDestination()
         clock = ClockEngine()
-        clock.router = sink
+        clock.router = destination
         clock.transport = DeviceProfile.tx6.transport
     }
 
     /// CC 46 toggles, so play must only send it when the app believes it is stopped —
     /// otherwise pressing play twice would stop the device.
     func testPlaySendsToggleOnlyWhenStopped() {
-        sink.reset()
+        destination.reset()
         clock.play()
-        XCTAssertEqual(sink.packets, [[0xB6, 46, 127], [0xFB]])
+        XCTAssertEqual(destination.packets, [[0xB6, 46, 127], [0xFB]])
 
-        sink.reset()
+        destination.reset()
         clock.play()   // already playing
-        XCTAssertEqual(sink.packets, [[0xFB]], "the toggle must not fire again")
+        XCTAssertEqual(destination.packets, [[0xFB]], "the toggle must not fire again")
     }
 
     func testStopSendsToggleOnlyWhenPlaying() {
         clock.play()
-        sink.reset()
+        destination.reset()
         clock.stop()
-        XCTAssertEqual(sink.packets, [[0xB6, 46, 127], [0xFC]])
+        XCTAssertEqual(destination.packets, [[0xB6, 46, 127], [0xFC]])
 
-        sink.reset()
+        destination.reset()
         clock.stop()   // already stopped
-        XCTAssertEqual(sink.packets, [[0xFC]], "the toggle must not fire again")
+        XCTAssertEqual(destination.packets, [[0xFC]], "the toggle must not fire again")
     }
 
     /// −/+ nudge tempo via the relative encoder on CC 47, centred at 64.
     func testTempoNudgeUsesRelativeEncoder() {
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(sink.packets, [[0xB6, 47, 65]], "one step up")
+        XCTAssertEqual(destination.packets, [[0xB6, 47, 65]], "one step up")
 
-        sink.reset()
+        destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(sink.packets, [[0xB6, 47, 63]], "one step down")
+        XCTAssertEqual(destination.packets, [[0xB6, 47, 63]], "one step down")
     }
 }
 
@@ -171,13 +171,13 @@ final class TX6TransportTests: XCTestCase {
 final class TP7ProfileTests: XCTestCase {
 
     private let profile = DeviceProfile.tp7
-    private var sink: RecordingSink!
+    private var destination: RecordingDestination!
     private var ctrl: Controller!
 
     override func setUp() {
         super.setUp()
-        sink = RecordingSink()
-        ctrl = Controller(router: sink)
+        destination = RecordingDestination()
+        ctrl = Controller(router: destination)
         ctrl.setProfile(.tp7)
     }
 
@@ -185,9 +185,9 @@ final class TP7ProfileTests: XCTestCase {
         guard let spec = profile.param(id) else {
             XCTFail("no such parameter '\(id)'"); return []
         }
-        sink.reset()
+        destination.reset()
         ctrl.send(spec: spec, track: track, value: value)
-        return sink.packets.first ?? []
+        return destination.packets.first ?? []
     }
 
     func testMixVolumeOnAllSixChannels() {
@@ -396,21 +396,21 @@ final class TX6TransmitReceiveCollisionTests: XCTestCase {
 /// the transport map would arm recording on every play. Caught during hardware testing.
 final class TP7TransportTests: XCTestCase {
 
-    private var sink: RecordingSink!
+    private var destination: RecordingDestination!
     private var clock: ClockEngine!
 
     override func setUp() {
         super.setUp()
-        sink = RecordingSink()
+        destination = RecordingDestination()
         clock = ClockEngine()
-        clock.router = sink
+        clock.router = destination
         clock.transport = DeviceProfile.tp7.transport
     }
 
     func testPlayResumesAndSendsNoCC() {
-        sink.reset()
+        destination.reset()
         clock.play()
-        XCTAssertEqual(sink.packets, [[0xFB]], "play must resume, and must not send any CC")
+        XCTAssertEqual(destination.packets, [[0xFB]], "play must resume, and must not send any CC")
     }
 
     /// Stopping a normally-playing tape must NOT send CC 18 — the device reads a redundant
@@ -418,15 +418,15 @@ final class TP7TransportTests: XCTestCase {
     /// Verified on hardware: one 0xFC stops and holds; a second rewinds.
     func testStopWhileMerelyPlayingSendsOnlyStop() {
         clock.play()
-        sink.reset()
+        destination.reset()
         clock.stop()
-        XCTAssertEqual(sink.packets, [[0xFC]], "must not recentre CC 18 when it never engaged")
+        XCTAssertEqual(destination.packets, [[0xFC]], "must not recentre CC 18 when it never engaged")
     }
 
     /// The safety property: no transport action may ever emit CC 14 (record).
     func testTransportNeverSendsRecordCC() {
         clock.play(); clock.stop(); clock.tapePrev(); clock.tapeNext()
-        for p in sink.packets where p.count == 3 {
+        for p in destination.packets where p.count == 3 {
             XCTAssertFalse(p[0] & 0xF0 == 0xB0 && p[1] == 14,
                            "transport emitted CC 14 (record): \(p)")
         }
@@ -441,39 +441,39 @@ final class TP7TransportTests: XCTestCase {
 
     /// CC 18 is a persistent bipolar speed control: below 64 reverse, 64 stop, above forward.
     func testSeekIsBipolarAroundSixtyFour() {
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(sink.packets, [[0xB0, 18, 72]], "forward = 64 + speed")
-        sink.reset()
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "forward = 64 + speed")
+        destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(sink.packets, [[0xB0, 18, 56]], "reverse = 64 - speed")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 56]], "reverse = 64 - speed")
     }
 
     /// Speed is a multiple of normal playback, not a raw CC offset. unitSpeed 4 = 1x on the
     /// TP-7, verified by ear: 60 (=64-4) played reverse at about normal speed.
     func testSpeedIsAMultipleOfNormalPlayback() {
         clock.transportSpeed = 1.0            // 1x
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(sink.packets, [[0xB0, 18, 68]], "64 + 4 = forward at 1x")
-        sink.reset()
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 68]], "64 + 4 = forward at 1x")
+        destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(sink.packets, [[0xB0, 18, 60]], "64 - 4 = reverse at 1x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 60]], "64 - 4 = reverse at 1x")
     }
 
     /// The default is 2x — a fast-forward, matching the "chipmunks" heard at CC 18 = 72.
     func testDefaultSpeedIsDoubleNormal() {
         XCTAssertEqual(clock.transportSpeed, 2.0)
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(sink.packets, [[0xB0, 18, 72]], "64 + 8 = forward at 2x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "64 + 8 = forward at 2x")
     }
 
     func testHalfSpeed() {
         clock.transportSpeed = 0.5
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(sink.packets, [[0xB0, 18, 66]], "64 + 2 = forward at 0.5x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 66]], "64 + 2 = forward at 0.5x")
     }
 
     /// Speed must never push CC 18 out of range, and never round down to zero — an offset of 0
@@ -481,24 +481,24 @@ final class TP7TransportTests: XCTestCase {
     func testSpeedIsClampedAndNeverRoundsToZero() {
         clock.transportSpeed = 99
         XCTAssertEqual(clock.transportSpeed, 8.0, "clamped to 8x")
-        sink.reset()
+        destination.reset()
         clock.tapeNext()
-        XCTAssertLessThanOrEqual(Int(sink.packets[0][2]), 127)
+        XCTAssertLessThanOrEqual(Int(destination.packets[0][2]), 127)
 
         clock.transportSpeed = 0.01
         XCTAssertEqual(clock.transportSpeed, 0.25, "clamped to 0.25x")
-        sink.reset()
+        destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(sink.packets, [[0xB0, 18, 63]], "0.25x = offset 1, the slowest crawl")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 63]], "0.25x = offset 1, the slowest crawl")
     }
 
     /// But stopping a tape that IS seeking under CC 18 must recentre it — 0xFC alone will not
     /// release the grab, so the tape would keep rolling. Verified on hardware.
     func testStopWhileSeekingRecentresFirst() {
         clock.tapeNext()          // CC 18 now has the transport
-        sink.reset()
+        destination.reset()
         clock.stop()
-        XCTAssertEqual(sink.packets, [[0xB0, 18, 64], [0xFC]],
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 64], [0xFC]],
                        "a seeking tape needs CC 18 = 64 before 0xFC")
     }
 
@@ -506,9 +506,9 @@ final class TP7TransportTests: XCTestCase {
     func testSecondStopDoesNotResendCentre() {
         clock.tapeNext()
         clock.stop()
-        sink.reset()
+        destination.reset()
         clock.stop()
-        XCTAssertEqual(sink.packets, [[0xFC]], "grab already released")
+        XCTAssertEqual(destination.packets, [[0xFC]], "grab already released")
     }
 
     /// The engine tracks which way it last told the tape to go.
