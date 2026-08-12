@@ -143,6 +143,11 @@ enum TransportOp: Hashable {
     /// 0xFA the first time, 0xFB to resume — ClockEngine tracks which.
     case midiStartOrContinue
     case midiStop
+    /// Press the play button, exactly as the UI does — routed straight into `ClockEngine.play()`
+    /// rather than expanded into bytes here. That delegation is the point: a parameter built
+    /// this way cannot drift from the button, however play's behaviour changes (today, pressing
+    /// it while already playing reverses a TP-7 instead of restarting it).
+    case pressPlay
     /// OP-1 tape seek: a CC nudge, then a Song Position Pointer, then resume if playing.
     case tapeSeek(cc: Int, steps: Int)
     case cc(ch: Int, cc: Int, value: Int)

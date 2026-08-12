@@ -454,7 +454,10 @@ The following was established by probing a real TP-7 in `sync` mode with a file 
 1. While the tape is rolling under its own transport, `CC 18 = 64` does **nothing** — CC 18 has
    not taken control yet. (Verified: sent three times, no effect.)
 2. Sending any value **other than 64** takes control of the transport.
-3. Once engaged, `64` means **zero speed** and the tape stops moving.
+3. Once engaged, `64` **removes the CC 18 offset**, leaving whatever the transport itself is
+   doing. (This was originally recorded as "zero speed, the tape stops" — true only when the
+   transport is parked. With the transport rolling, `64` hands motion back to it rather than
+   stopping it. See *CC 18 is additive* below.)
 4. `0xFC` (MIDI stop) does **not** release that control — a tape seeking under CC 18 keeps
    going. (Verified.)
 
@@ -585,6 +588,48 @@ because CC 18 has no resolution between offsets.
 the Mac) measured **44.06 ticks/s over 30 s = x1.000** — so the TP-7's native reverse is the same
 rate as forward, and the calibrated app reverse sits **0.25% away** from it. Also confirmed by
 ear in a direct forward/reverse A/B.
+
+### CC 18 is additive — it stacks on the device's own direction
+
+Found by driving the app's reverse while the tape was already reversing under its **own**
+transport (play pressed twice on the device): it went to roughly **3x backwards** instead of 1x.
+
+`CC 18` does not set an absolute speed. Like pitch bend, it is a **signed velocity added to
+whatever the transport is already doing**:
+
+```
+net = transport (±44) + CC 18 contribution + bend contribution
+CC 18 contribution = -11.69 * offset ticks/s
+```
+
+| internal transport | CC 18 = 56 | net | |
+|---|---|---|---|
+| forward +44 | -93.5 | **-49.5** | matches the measured 49.55 |
+| reverse -44 | -93.5 | **-137.5** | ~3x backwards — the bug |
+
+This also reframes the "dead zone" recorded above. Offset 3.76 is not a motor threshold, it is
+where -44 exactly **cancels** forward playback. That is why offset 4 looked like a stall: it is a
+null point, not a limit. The affine formula the app uses is therefore correct *only while the
+device is internally playing forward*.
+
+**Confirmed by a prediction it was not fitted to.** With reverse engaged, sending `CC 18 = 64`
+alone (no `0xFC`) gave *forward, faster than normal* rather than a stop:
+
+```
+with CC 18:     +44 - 93.5 + 5.6 (bend trim)  = -43.9   1x reverse
+CC 18 removed:  +44        + 5.6              = +49.6   1.13x forward
+```
+
+The leftover 13% is the bend trim still applied — which is exactly why the app releases the trim
+before returning to forward.
+
+**The fix: force a known direction.** The device never reports its state, so the app cannot read
+the direction — but it can *impose* one. Sending `CC 18 = centre`, `0xFC`, `0xFB` resets the
+internal transport to forward, after which CC 18 lands predictably. Verified on hardware sent
+back to back, with **no settling delay needed and no audible gap**, so it costs nothing.
+
+Without this, driving transport from both the app and the hardware buttons desyncs and reverse
+runs at 3x.
 
 **Method notes for anyone repeating this:**
 - The clock rate is **unsigned** — it measures speed, never direction. Direction always needs ears.

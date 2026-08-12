@@ -288,7 +288,17 @@ final class ClockEngine {
             let ops = transport.prev.filter {
                 if case .directionalTransport = $0 { return true } else { return false }
             }
-            guard !ops.isEmpty else { return }
+            guard case .directionalTransport(let ch, let cc, let center, _, _, _) = ops.first else { return }
+
+            // Force a known direction first. CC 18 *adds* to whatever the transport is already
+            // doing, and the device never reports its state — so if the user reversed with the
+            // hardware play button, reversing again here would stack to about 3x rather than 1x.
+            // Stop-and-continue resets the internal transport to forward. Verified on hardware:
+            // sent back to back with no settling delay, and with no audible gap.
+            sendCC(ch: ch, cc: cc, val: center)
+            router?.send([0xFC])
+            router?.send([0xFB])
+
             let saved = transportSpeed
             transportSpeed = 1.0
             run(ops)
@@ -392,6 +402,11 @@ final class ClockEngine {
                 }
             case .midiStop:
                 router?.send([0xFC])
+            case .pressPlay:
+                // Delegate, never duplicate: this is the same entry point the UI button uses, so
+                // the parameter and the button cannot diverge. Safe from recursion because
+                // `transport.play` contains no `.pressPlay`.
+                play()
             case .tapeSeek(let cc, let steps):
                 sppPos = max(0, sppPos + steps * tapeArrowStep)
                 router?.send([0xB0, UInt8(cc), 127])

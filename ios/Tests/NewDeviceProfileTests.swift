@@ -814,15 +814,18 @@ final class TP7ScrubAndReverseTests: XCTestCase {
         clock.play()
         XCTAssertEqual(destination.packets, [[0xFB]], "first press plays")
 
-        // Reverse is CC 18 at the measured 1x offset (dead zone 4 + unitSpeed 4), then a pitch
-        // bend trim, because CC 18 alone cannot express 1x — it falls between offsets 7 and 8.
+        // Reverse first forces a known direction (CC 18 to centre, stop, continue) because CC 18
+        // adds to the device's own direction and the device never reports it — without this, a
+        // tape already reversing from the hardware button would stack to ~3x. Then CC 18 at the
+        // measured 1x offset, then a bend trim, because CC 18 alone cannot express 1x.
         destination.reset()
         clock.play()
         let trim = clock.reverseTrimBend
         XCTAssertEqual(destination.packets,
-                       [[0xB0, 18, 56],
+                       [[0xB0, 18, 64], [0xFC], [0xFB],
+                        [0xB0, 18, 56],
                         [0xE0, UInt8(trim & 0x7F), UInt8((trim >> 7) & 0x7F)]],
-                       "second press reverses via CC 18 plus the bend trim")
+                       "second press resyncs direction, then reverses via CC 18 plus the trim")
         XCTAssertEqual(clock.transportDirection, -1)
 
         // Forward hands control back to the device's own transport rather than driving CC 18,
@@ -853,7 +856,8 @@ final class TP7ScrubAndReverseTests: XCTestCase {
         // And the cycle restarts cleanly: the next press reverses again.
         destination.reset()
         clock.play()
-        XCTAssertEqual(destination.packets[0], [0xB0, 18, 56], "second press reverses again")
+        XCTAssertEqual(destination.packets[0], [0xB0, 18, 64], "second press resyncs, then reverses")
+        XCTAssertTrue(destination.packets.contains([0xB0, 18, 56]), "and engages reverse")
     }
 
     /// Stopping mid-reverse must hand the machine back in a neutral state. Bend persists across

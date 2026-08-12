@@ -318,10 +318,21 @@ extension DeviceProfile {
                               encoding: .switching(SwitchEncoding(onValue: 72, offValue: 56,
                                                                   threshold: 64)))),
 
-        // Transport as a parameter: above the threshold plays, below stops. Edge-triggered in
-        // Controller, so a sustained LFO value does not re-fire transport every clock tick.
-        // A square wave on this gates playback in rhythm.
-        ParamSpec(id: "tp7.play", name: "play/stop", short: "ply",
+        // The play *button*, as a parameter. Each rising edge is one press, so it inherits the
+        // button's behaviour exactly — including play-while-playing reversing the tape. Falling
+        // edges do nothing: a press is a press, not a hold.
+        //
+        // This is `.pressPlay` rather than a list of bytes precisely so it delegates to
+        // ClockEngine.play(). A square wave on this alternates forward and reverse.
+        ParamSpec(id: "tp7.playPress", name: "play", short: "ply",
+                  track: nil,
+                  master: .transport(onOps: [.pressPlay], offOps: [])),
+
+        // Transport as a gate, which is a different thing: above the threshold plays, below
+        // stops. Edge-triggered in Controller, so a sustained LFO value does not re-fire
+        // transport every clock tick. A square wave on this gates playback in rhythm rather
+        // than flipping direction.
+        ParamSpec(id: "tp7.play", name: "play/stop", short: "p/s",
                   track: nil,
                   master: .transport(onOps: [.midiStartOrContinue], offOps: [.midiStop])),
 

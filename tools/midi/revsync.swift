@@ -111,6 +111,57 @@ Thread.sleep(forTimeInterval: 6)
 // difference between 1x and 3x reverse is obvious by ear anyway.
 let byEar = mode.hasSuffix("ear")
 
+// Did the app's CC 18 actually take control, or did the device simply carry on with its own
+// reverse and ignore the burst? Both sound like unchanged normal-speed reverse. This settles it:
+// after the burst, send CC 18 = 64 on its own. Once engaged, 64 means zero speed and the tape
+// stops; if CC 18 never engaged, 64 does nothing and the tape keeps reversing.
+if mode == "probeear" {
+    say("BY EAR. tape must ALREADY be reversing under its own transport.")
+    say("")
+    say("step 1: the app's resync burst, back to back")
+    send([0xB0, 0x12, 0x40])
+    send([0xFC])
+    send([0xFB])
+    send([0xB0, 0x12, 0x38])
+    send([0xE0, 0x64, 0x4B])
+    Thread.sleep(forTimeInterval: 7)
+
+    say("step 2: CC 18 = 64 ALONE — no 0xFC. does the tape stop?")
+    say("        stops  -> CC 18 had the transport, the resync is real")
+    say("        keeps going -> CC 18 never engaged, the burst was ignored")
+    send([0xB0, 0x12, 0x40])
+    Thread.sleep(forTimeInterval: 7)
+
+    say("cleaning up")
+    send([0xE0, 0x00, 0x40])
+    send([0xFC])
+    say("done — did it stop at step 2, or keep reversing?")
+    exit(0)
+}
+
+// Same resync as fix2ear, but with no pauses between the transport messages — the app would
+// send them back to back. If the device still registers the stop, the fix costs nothing; if it
+// needs settling time, every direction flip gets an audible gap.
+if mode == "fastear" {
+    say("BY EAR — resync sent back to back, no delays. listen for the reverse speed.")
+    say("")
+    say("sending: CC 18 = 64, 0xFC, 0xFB, CC 18 = 56, bend 9700 — all at once")
+    send([0xB0, 0x12, 0x40])
+    send([0xFC])
+    send([0xFB])
+    send([0xB0, 0x12, 0x38])
+    send([0xE0, 0x64, 0x4B])
+    Thread.sleep(forTimeInterval: 8)
+
+    say("releasing and stopping")
+    send([0xB0, 0x12, 0x40])
+    send([0xE0, 0x00, 0x40])
+    send([0xFC])
+    say("done — was the reverse normal speed, or fast?")
+    say("normal = the fix is free. fast = the device needs settling time between messages.")
+    exit(0)
+}
+
 if byEar {
     say("BY EAR — no measurement. listen for the speed after each step.")
     say("")
