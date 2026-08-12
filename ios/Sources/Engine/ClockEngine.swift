@@ -72,8 +72,30 @@ final class ClockEngine {
         masterTimer?.cancel()
     }
 
+    /// When the device last sent a clock tick. Recorded for every tick, including while the app
+    /// is clock master — `handleSlaveTick` discards those, and the TP-7 forces app-master mode.
+    private var lastExternalTickTime: Double = 0
+
+    /// Whether the device's tape is rolling right now.
+    ///
+    /// In `sync` mode the TP-7 transmits clock only while the tape moves, so an arriving tick is
+    /// a direct "it is playing" signal — the only state this device ever reveals, since it
+    /// answers no queries. At 1x that is a tick every ~23 ms, so 250 ms of silence means stopped.
+    ///
+    /// This also makes the direction resync safe: its `0xFC` would rewind a *stopped* tape to
+    /// zero, and a live tick proves the tape is not stopped.
+    ///
+    /// False whenever the device is not in `sync` mode — there is no clock to hear, so the app
+    /// falls back to assuming nothing.
+    var deviceIsRolling: Bool {
+        lastExternalTickTime > 0 && CACurrentMediaTime() - lastExternalTickTime < 0.25
+    }
+
     private func wireRouter() {
-        router?.onClock = { [weak self] in self?.handleSlaveTick() }
+        router?.onClock = { [weak self] in
+            self?.lastExternalTickTime = CACurrentMediaTime()
+            self?.handleSlaveTick()
+        }
         router?.onStart = { [weak self] in self?.handleStart() }
         router?.onStop  = { [weak self] in self?.handleStop()  }
     }
@@ -236,7 +258,12 @@ final class ClockEngine {
     func play() {
         // Matches the hardware: on a device whose play button reverses, a second press while
         // rolling flips direction rather than restarting playback.
-        if playTogglesDirection && isPlaying {
+        //
+        // `deviceIsRolling` covers the case where the tape was started from the device itself:
+        // without it the app believes it is stopped, so the first press is spent re-asserting
+        // play on an already-playing tape and appears to do nothing.
+        if playTogglesDirection && (isPlaying || deviceIsRolling) {
+            isPlaying = true
             reverseDirection()
             return
         }

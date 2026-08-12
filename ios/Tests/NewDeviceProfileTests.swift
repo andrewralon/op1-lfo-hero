@@ -872,6 +872,31 @@ final class TP7ScrubAndReverseTests: XCTestCase {
                        "release the trim, then CC 18, then stop")
     }
 
+    /// A tape started from the device itself must not cost the user a button press. In `sync`
+    /// mode the TP-7 sends clock only while rolling, so an arriving tick is proof it is playing —
+    /// the only state signal this device emits.
+    func testIncomingClockMakesTheFirstPressReverse() {
+        XCTAssertFalse(clock.isPlaying, "the app does not know the device was started by hand")
+        destination.onClock?()                 // one tick from the device
+        XCTAssertTrue(clock.deviceIsRolling)
+
+        destination.reset()
+        clock.play()
+        XCTAssertEqual(destination.packets.first, [0xB0, 18, 64],
+                       "first press reverses instead of re-asserting play")
+        XCTAssertTrue(destination.packets.contains([0xB0, 18, 56]))
+        XCTAssertEqual(clock.transportDirection, -1)
+    }
+
+    /// Without a tick the app must assume nothing: `0xFC` on a genuinely stopped tape rewinds the
+    /// TP-7 to zero, so the resync may only run when the tape is known to be moving.
+    func testNoClockMeansFirstPressJustPlays() {
+        XCTAssertFalse(clock.deviceIsRolling)
+        destination.reset()
+        clock.play()
+        XCTAssertEqual(destination.packets, [[0xFB]], "no evidence of rolling — just play")
+    }
+
     /// The OP-1 has no such behaviour — play must keep meaning play.
     func testOP1PlayDoesNotReverse() {
         let c = ClockEngine()

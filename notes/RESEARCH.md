@@ -662,11 +662,28 @@ Isolated and confirmed separately from memo.
 (An earlier note here claimed memo was CC 28. That was wrong — it came from a capture where the
 bottom-left button was pressed by mistake. Corrected after re-testing each button in isolation.)
 
-**The wheel (CC 30) is a true relative encoder whose value is rotation speed.** Hand-scrubbing
-produced values across the full 1-127 range; the motorised reel turning on its own during
-playback produced a steady 1-2 at roughly 57 messages/second. So value = how fast, not merely
-that it moved. That makes it usable as a real control input, and also means a playing TP-7 in
-`ctrl` mode is a constant ~57 msg/s source of MIDI traffic.
+**The wheel (CC 30) is a signed relative encoder: magnitude is speed, sign is direction.**
+Measured by spinning the reel one way and then the other, 875 messages with no overlap between
+the ranges:
+
+| direction | values |
+|---|---|
+| clockwise | `1, 2, 3` |
+| counter-clockwise | `125, 126, 127` |
+
+Standard two's complement: `127 = -1`, `126 = -2`. The motorised reel turning on its own during
+forward playback produced a steady 1-2 at roughly 57 messages/second, so a playing TP-7 in
+`ctrl` mode is a constant ~57 msg/s source of traffic.
+
+(An earlier note here called this "a relative encoder whose value is rotation speed", concluding
+that the value was magnitude only. That came from watching forward playback exclusively, where
+the negative range never appears.)
+
+**But this cannot give the app playback direction.** CC 30 is transmitted only in `ctrl` mode,
+which refuses all incoming MIDI and stops the tape — so direction is readable only when the app
+cannot control the device, and controllable only when direction is unreadable. Confirmed both
+ways: every sync-mode measurement run counted `wheel 0 msgs`, and the ctrl-mode capture got 179
+in 15 s. To detect direction while driving the device, see the additive probe below.
 
 **At rest the TP-7 is completely silent** — 20 s of idle with the tape stopped produced nothing,
 no active sensing, no chatter.
