@@ -246,11 +246,6 @@ final class ClockEngine {
         isPlaying = true
     }
 
-    /// CC 18 offset below centre that plays backwards at about normal speed.
-    ///
-    /// Forward does not need an equivalent: releasing CC 18 and sending Continue gives the
-    /// device's own playback rate exactly, which is better than approximating it.
-    ///
     /// Pitch-bend value that trims reverse playback to exactly 1x.
     ///
     /// CC 18 is too coarse to hit 1x on its own: 1x reverse falls at offset 7.5, and the nearest

@@ -834,6 +834,40 @@ final class TP7ScrubAndReverseTests: XCTestCase {
                        "forward releases the bend trim and CC 18, then lets the device play")
     }
 
+    /// Reversal is gated on *playing*, not on direction: a stopped tape must always play
+    /// forward, however it was moving before it was stopped. This works only because `stop()`
+    /// resets `transportDirection` to 0 — without that the engine would still believe it was
+    /// reversing, and the next play would take the release-and-continue path instead of playing.
+    func testPlayAfterStopAlwaysPlaysForward() {
+        clock.play()                 // forward
+        clock.play()                 // reverse
+        clock.stop()
+        XCTAssertEqual(clock.transportDirection, 0, "stop must clear the direction")
+        XCTAssertFalse(clock.isPlaying)
+
+        destination.reset()
+        clock.play()
+        XCTAssertEqual(destination.packets, [[0xFB]],
+                       "a stopped tape plays forward — it must not reverse or re-send CC 18")
+
+        // And the cycle restarts cleanly: the next press reverses again.
+        destination.reset()
+        clock.play()
+        XCTAssertEqual(destination.packets[0], [0xB0, 18, 56], "second press reverses again")
+    }
+
+    /// Stopping mid-reverse must hand the machine back in a neutral state. Bend persists across
+    /// stop/play with no on-screen feedback, so a trim left applied would silently pitch-shift
+    /// the next playback with no visible cause.
+    func testStopWhileReversingReleasesTheBendTrim() {
+        clock.play()
+        clock.play()                 // reversing, trim applied
+        destination.reset()
+        clock.stop()
+        XCTAssertEqual(destination.packets, [[0xE0, 0, 64], [0xB0, 18, 64], [0xFC]],
+                       "release the trim, then CC 18, then stop")
+    }
+
     /// The OP-1 has no such behaviour — play must keep meaning play.
     func testOP1PlayDoesNotReverse() {
         let c = ClockEngine()
