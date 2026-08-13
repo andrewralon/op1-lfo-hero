@@ -309,6 +309,61 @@ xcrun devicectl device install app \
 xcrun xctrace list devices 2>&1 | grep -E "(iPad|iPhone)"
 ```
 
+**`devicectl install` will happily ship a stale binary.** It installs whatever is in DerivedData,
+so if the build failed the install still reports `App installed:` — with the *previous* build. A
+locked device produces exactly this:
+
+```
+error: Timed out waiting for all destinations matching the provided destination specifier
+       iPhone Dawg may need to be unlocked
+```
+
+Always confirm `** BUILD SUCCEEDED **` before installing. To be certain the binary is new:
+
+```bash
+ls -l ~/Library/Developer/Xcode/DerivedData/op1-lfo-hero-*/Build/Products/Debug-iphoneos/op1-lfo-hero.app/op1-lfo-hero
+```
+
+## Running the tests
+
+Unit tests only (fast — the whole suite is well under a second):
+
+```bash
+cd ios
+xcodebuild test \
+  -project op1-lfo-hero.xcodeproj \
+  -scheme op1-lfo-hero \
+  -destination 'id=<simulator-udid>' \
+  -only-testing:op1-lfo-heroTests 2>&1 | grep -E "error:|Executed .* tests"
+```
+
+**A launch failure is not a test failure — just rerun.** This appears intermittently and has
+nothing to do with the code:
+
+```
+Simulator device failed to launch com.andrewralon.op1-lfo-hero
+Application failed preflight checks … RequestDenied … Busy
+```
+
+It usually succeeds on the next attempt. Don't start editing tests over it; check for real
+`error:` lines first — a genuine failure names a file, a line and an assertion.
+
+## Hardware MIDI probes (`tools/midi/`)
+
+Standalone Swift tools for measuring what a device actually does, since the simulator has no MIDI
+and by-ear testing has repeatedly produced wrong conclusions. `./build.sh` compiles them all. See
+`tools/midi/README.md` for the full list and the traps.
+
+Before running anything that measures:
+
+- The TP-7 must be in **`sync`** mode and its **tape rolling** — it transmits clock only while
+  moving, and `off`/`cue` transmit nothing at all while still *receiving* CC, which looks exactly
+  like broken hardware.
+- To prove a receive path works independently of all that, use **`ctrl`** mode and press buttons:
+  it transmits unconditionally. (It also refuses incoming MIDI, so it cannot be used for control.)
+- `./mididiag` first if anything looks wrong. Unplugging leaves stale same-named endpoints behind,
+  and binding to one is indistinguishable from a device that has stopped transmitting.
+
 ## MIDI reference
 
 CC mapping, transport messages, and the OP-1 MIDI spec link are documented in `README.md` — refer there rather than duplicating the tables here.
