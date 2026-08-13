@@ -117,13 +117,15 @@ let byEar = mode.hasSuffix("ear")
 if mode == "wheelear" {
     say("BY EAR. tape STOPPED, mid-file. does incoming CC 30 move the tape?")
     say("")
-    for (label, value) in [("forward (+2, 60x)", 2), ("reverse (-2, 60x)", 126)] {
-        say("sending CC 30 = \(value) — \(label)")
-        for _ in 0..<60 {
+    // Big steps, sustained: 250 messages of +/-30 over ~4s each. The first attempt used +/-2 for
+    // 1.2s, which would be an almost invisible amount of jog even if the device does listen.
+    for (label, value) in [("forward (+30, 4s)", 30), ("reverse (-30, 4s)", 98)] {
+        say(">>> \(label) — CC 30 = \(value), watch the reel NOW")
+        for _ in 0..<250 {
             send([0xB0, 0x1E, UInt8(value)])
-            Thread.sleep(forTimeInterval: 0.02)
+            Thread.sleep(forTimeInterval: 0.016)
         }
-        say("  (watch the reel and the position)")
+        say("    (stopped sending — 3s pause)")
         Thread.sleep(forTimeInterval: 3)
     }
     say("done — did the tape move at all, and did the two bursts move it opposite ways?")

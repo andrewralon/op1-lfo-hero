@@ -679,7 +679,14 @@ forward playback produced a steady 1-2 at roughly 57 messages/second, so a playi
 that the value was magnitude only. That came from watching forward playback exclusively, where
 the negative range never appears.)
 
-**But this cannot give the app playback direction.** CC 30 is transmitted only in `ctrl` mode,
+**The wheel is transmit-only — the TP-7 does not receive CC 30.** Tested with the tape stopped
+mid-file in `sync` mode: ~250 messages of `CC 30 = 30` over 4 s, then the same at `= 98` (-30),
+with nothing else sent. Neither the reel nor the position moved at all. So there is no "wheel"
+parameter to expose: sending CC 30 to the device does nothing, and shuttling is already covered
+by `speed` (pitch bend), `direction` and CC 18 — all of which are absolute, and therefore usable
+as LFO targets in a way a relative encoder would not be.
+
+**Nor can it give the app playback direction.** CC 30 is transmitted only in `ctrl` mode,
 which refuses all incoming MIDI and stops the tape — so direction is readable only when the app
 cannot control the device, and controllable only when direction is unreadable. Confirmed both
 ways: every sync-mode measurement run counted `wheel 0 msgs`, and the ctrl-mode capture got 179
