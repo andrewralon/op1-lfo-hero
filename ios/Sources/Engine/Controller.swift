@@ -1,80 +1,95 @@
 import Foundation
 
+/// Turns parameter changes into MIDI bytes using the active `DeviceProfile`.
+///
+/// There are no CC numbers in this file — they all live in the profile tables, so supporting a
+/// new device is a data change rather than a new branch here. Mute state is deliberately *not*
+/// tracked: `AppState.mutes` is the single source of truth (a second copy here used to drift
+/// out of sync with incoming CC and with mute LFOs).
 final class Controller {
-    weak var router: MidiRouter?
+    weak var router: (any MidiDestination)?
 
-    private let CC_VOLUME    = 7
-    private let CC_MUTE      = 9
-    private let CC_PAN       = 10
-    private let CC_OCTAVE    = 79
-    private let CC_PAR_BASE   = 46
-    private let CC_ENV_BASE   = 50
-    private let CC_FX_BASE    = 54
-    private let CC_LFO_BASE   = 58
-    private let CC_MFX_BASE  = 70
-    private let CC_MCOMP_BASE = 74
-
-    private var muteState = [Int: Bool]()
+    private var _profile: DeviceProfile = .op1Field
     private let lock = NSLock()
 
-    init(router: MidiRouter) {
+    init(router: any MidiDestination) {
         self.router = router
     }
 
-    func setVolume(track: Int, value: Int) {
-        sendCC(ch: track - 1, cc: CC_VOLUME, val: value)
-    }
-
-    func setPan(track: Int, value: Int) {
-        sendCC(ch: track - 1, cc: CC_PAN, val: value)
-    }
-
-    // Returns the new mute state
-    @discardableResult
-    func toggleMute(track: Int) -> Bool {
-        lock.lock()
-        let now = !(muteState[track] ?? false)
-        muteState[track] = now
-        lock.unlock()
-        sendCC(ch: track - 1, cc: CC_MUTE, val: now ? 127 : 0)
-        return now
-    }
-
-    func mute(track: Int) {
-        lock.lock(); muteState[track] = true; lock.unlock()
-        sendCC(ch: track - 1, cc: CC_MUTE, val: 127)
-    }
-
-    func unmute(track: Int) {
-        lock.lock(); muteState[track] = false; lock.unlock()
-        sendCC(ch: track - 1, cc: CC_MUTE, val: 0)
-    }
-
-    func isMuted(_ track: Int) -> Bool {
+    var profile: DeviceProfile {
         lock.lock(); defer { lock.unlock() }
-        return muteState[track] ?? false
+        return _profile
     }
 
-    func setPar(track: Int, param: Int, value: Int) {
-        sendCC(ch: max(0, track - 1), cc: CC_PAR_BASE + param - 1, val: value)
+    func setProfile(_ p: DeviceProfile) {
+        lock.lock(); _profile = p; lock.unlock()
     }
 
-    func setEnv(track: Int, param: Int, value: Int) {
-        sendCC(ch: max(0, track - 1), cc: CC_ENV_BASE + param - 1, val: value)
+    // MARK: - Generic send
+
+    /// Send one parameter to one target. `track` 0 is master. `value` is in MIDI units (0-127),
+    /// or BPM for a tempo parameter. Pass `profile` explicitly from the automation thread so a
+    /// concurrent profile switch cannot split a clip's parameter from its device.
+    /// Fires transport ops for a `.transport` binding. Set by AppState so the Controller does
+    /// not need to know about ClockEngine's play state or song position.
+    var transportRunner: (([TransportOp]) -> Void)?
+
+    /// Last on/off state sent per parameter id, so `.transport` bindings only fire on a change.
+    /// Without this an LFO would re-trigger play or record on every clock tick.
+    private var lastSwitchState: [String: Bool] = [:]
+
+    func send(spec: ParamSpec, track: Int, value: Double, profile p: DeviceProfile? = nil) {
+        let prof = p ?? profile
+        guard let binding = prof.binding(spec, track: track) else { return }
+        switch binding {
+        case .transport(let onOps, let offOps, let threshold):
+            let on = Int(value.rounded()) >= threshold
+            lock.lock()
+            let changed = lastSwitchState[spec.id] != on
+            lastSwitchState[spec.id] = on
+            lock.unlock()
+            // Edge-triggered: a sustained value must not re-fire transport every tick.
+            guard changed else { return }
+            transportRunner?(on ? onOps : offOps)
+        case .virtualTempo:
+            // No MIDI — the app's own clock is the target. AppState reacts via updateCallback.
+            return
+        case .pitchBend(let rule):
+            // Parameters are always in MIDI units (0-127); pitch bend is 14-bit (0-16383).
+            // Map across the full range so an LFO sweeping 0-127 sweeps the whole bend range,
+            // with 64 landing near centre (8192 = no change).
+            let ch = prof.channel(rule, track: track)
+            let clamped = max(0, min(127, value))
+            let v = Int((clamped * 16383.0 / 127.0).rounded())
+            router?.send([UInt8(0xE0 | (ch & 0x0F)), UInt8(v & 0x7F), UInt8((v >> 7) & 0x7F)])
+        case .cc(let cc, let rule, let encoding):
+            sendCC(ch: prof.channel(rule, track: track), cc: cc, val: encoding.wireValue(from: value))
+        }
     }
 
-    func setFx(track: Int, param: Int, value: Int) {
-        let cc = track == 0 ? CC_MFX_BASE + param - 1 : CC_FX_BASE + param - 1
-        sendCC(ch: max(0, track - 1), cc: cc, val: value)
+    /// Send whichever parameter fills a semantic role on the active device. Used by the mixer
+    /// strip, which knows "volume" but not which CC that is on the attached hardware.
+    func send(role: ParamRole, track: Int, value: Double) {
+        let prof = profile
+        guard let spec = prof.param(role: role) else { return }
+        send(spec: spec, track: track, value: value, profile: prof)
     }
 
-    func setPatchLfo(track: Int, param: Int, value: Int) {
-        let cc = track == 0 ? CC_MCOMP_BASE + param - 1 : CC_LFO_BASE + param - 1
-        sendCC(ch: max(0, track - 1), cc: cc, val: value)
-    }
+    // MARK: - Mixer conveniences
 
-    func octaveUp()   { router?.send([0xB0, UInt8(CC_OCTAVE), 127]) }
-    func octaveDown() { router?.send([0xB0, UInt8(CC_OCTAVE), 0])   }
+    func setVolume(track: Int, value: Int) { send(role: .volume, track: track, value: Double(value)) }
+    func setPan(track: Int, value: Int)    { send(role: .pan,    track: track, value: Double(value)) }
+    /// The profile's switch encoding decides the actual bytes, so devices that mute with
+    /// CC 9 = 127/0 and devices that mute with CC 120 = 0-63/64-127 both work unchanged.
+    func setMute(track: Int, on: Bool)     { send(role: .mute,   track: track, value: on ? 127 : 0) }
+
+    // MARK: - Raw
+    // Transport lives in ClockEngine, which already owns the play state, song position and
+    // start/continue flag that transport ops depend on.
+
+    /// OP-1 octave shift. Not surfaced in the UI today; kept as a raw helper.
+    func octaveUp()   { router?.send([0xB0, 79, 127]) }
+    func octaveDown() { router?.send([0xB0, 79, 0])   }
 
     private func sendCC(ch: Int, cc: Int, val: Int) {
         let v = max(0, min(127, val))

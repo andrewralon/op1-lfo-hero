@@ -16,8 +16,8 @@ struct TransportBarView: View {
 
             Sep()
 
-            TransBtn(symbol: "arrow.left",  active: false) { app.tapePrev() }
-            TransBtn(symbol: "arrow.right", active: false) { app.tapeNext() }
+            ScrubBtn(symbol: app.profile.transport.prevSymbol, forward: false)
+            ScrubBtn(symbol: app.profile.transport.nextSymbol, forward: true)
 
             Sep()
 
@@ -29,7 +29,7 @@ struct TransportBarView: View {
                     Image(systemName: "metronome")
                         .font(.system(size: isPad ? 52 : 32, weight: .regular))
                         .scaleEffect(x: 0.50, y: 1.05, anchor: .center)
-                    Text(app.isClockMaster ? "app" : "op1")
+                    Text(app.isClockMaster ? "app" : app.profile.caps.clockLabel)
                         .font(.system(size: isPad ? 22 : 13, weight: .semibold, design: .monospaced))
                 }
                 .frame(width: isPad ? 72 : 42)
@@ -37,6 +37,9 @@ struct TransportBarView: View {
                 .foregroundColor(app.isClockMaster ? C.green : C.track(1))
             }
             .buttonStyle(.plain)
+            // Devices that never emit MIDI clock can't be the tempo source.
+            .disabled(!app.profile.caps.canBeClockMaster)
+            .opacity(app.profile.caps.canBeClockMaster ? 1 : 0.4)
             .padding(.leading, isPad ? 14 : 10)
 
             // BPM scrubber — compact fixed width with uniform 6pt margin
@@ -233,9 +236,9 @@ struct TransportColumnView: View {
 
             // Row 2: tape ← / →
             HStack(spacing: 0) {
-                TransColBtn(symbol: "arrow.left",  active: false) { app.tapePrev() }
+                ScrubColBtn(symbol: app.profile.transport.prevSymbol, forward: false)
                 Rectangle().fill(C.bg3).frame(width: 1)
-                TransColBtn(symbol: "arrow.right", active: false) { app.tapeNext() }
+                ScrubColBtn(symbol: app.profile.transport.nextSymbol, forward: true)
             }
             .frame(maxHeight: .infinity)
 
@@ -250,13 +253,16 @@ struct TransportColumnView: View {
                         Image(systemName: "metronome")
                             .font(.system(size: m.transportMetronomeSize, weight: .regular))
                             .scaleEffect(x: 0.50, y: 1.05, anchor: .center)
-                        Text(app.isClockMaster ? "app" : "op1")
+                        Text(app.isClockMaster ? "app" : app.profile.caps.clockLabel)
                             .font(.system(size: m.transportMetronomeLabel, weight: .semibold, design: .monospaced))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .foregroundColor(app.isClockMaster ? C.green : C.track(1))
                 }
                 .buttonStyle(.plain)
+                // Devices that never emit MIDI clock can't be the tempo source.
+                .disabled(!app.profile.caps.canBeClockMaster)
+                .opacity(app.profile.caps.canBeClockMaster ? 1 : 0.4)
 
                 Rectangle().fill(C.bg3).frame(width: 1)
 
@@ -287,6 +293,72 @@ private struct TransColBtn: View {
         }
         .buttonStyle(ImmediateButtonStyle())
         .disabled(disabled)
+    }
+}
+
+/// A scrub button that acts while held rather than on tap. Used where the device's seek is a
+/// persistent speed state (the TP-7's CC 18): the reel moves only while the finger is down and
+/// accelerates the longer it is held. Falls back to a plain tap on nudge-style devices.
+/// Landscape-column counterpart of `ScrubBtn`.
+private struct ScrubColBtn: View {
+    let symbol: String
+    let forward: Bool
+    @EnvironmentObject private var app: AppState
+    @Environment(\.metrics) private var m
+    @State private var held = false
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: m.transportColBtnSize))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(held ? C.green.opacity(0.18) : Color.clear)
+            .foregroundColor(held ? C.green : C.text)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !held else { return }
+                        held = true
+                        app.beginScrub(forward: forward)
+                    }
+                    .onEnded { _ in
+                        held = false
+                        app.endScrub()
+                    }
+            )
+            .accessibilityIdentifier(forward ? "scrubForwardButton" : "scrubBackButton")
+    }
+}
+
+private struct ScrubBtn: View {
+    let symbol: String
+    let forward: Bool
+    @EnvironmentObject private var app: AppState
+    @State private var held = false
+    @Environment(\.horizontalSizeClass) private var hSize
+    private var isPad: Bool { hSize == .regular }
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: isPad ? 32 : 20))
+            .frame(width: isPad ? 68 : 44)
+            .frame(maxHeight: .infinity)
+            .background(held ? C.green.opacity(0.18) : Color.clear)
+            .foregroundColor(held ? C.green : C.text)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !held else { return }   // onChanged repeats; only start once
+                        held = true
+                        app.beginScrub(forward: forward)
+                    }
+                    .onEnded { _ in
+                        held = false
+                        app.endScrub()
+                    }
+            )
+            .accessibilityIdentifier(forward ? "scrubForwardButton" : "scrubBackButton")
     }
 }
 

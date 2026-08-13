@@ -3,14 +3,14 @@ import CoreMIDI
 import Foundation
 import UIKit
 
-/// CoreMIDI USB MIDI transport. Auto-detects the OP-1 Field when plugged in via USB-C.
+/// CoreMIDI USB MIDI transport. Auto-detects any known TE device plugged in via USB-C.
 /// Sends raw MIDI bytes (no BLE timestamp wrapper). Calls the same onClock/onStart/onStop/onCC
 /// callbacks as BLEMidi so MidiRouter can treat both transports uniformly.
 final class USBMidi: NSObject, ObservableObject {
 
     enum State: Equatable {
         case disconnected
-        case found([String])     // MIDI destinations exist but none matched OP-1
+        case found([String])     // MIDI destinations exist but none matched a known device
         case connected(String)
 
         var label: String {
@@ -32,6 +32,8 @@ final class USBMidi: NSObject, ObservableObject {
 
     @Published var state: State = .disconnected
     @Published var discovered: [String] = []   // all named, non-virtual destinations
+    /// Profile id matched from the connected endpoint's name, nil when nothing matched.
+    @Published var matchedProfileId: String?
 
     var onClock: (() -> Void)?
     var onStart: (() -> Void)?
@@ -77,10 +79,10 @@ final class USBMidi: NSObject, ObservableObject {
         midiThread = thread
 
         // Retry scans in case iOS hasn't fully enumerated the USB device yet.
-        // Run on global queue — scanForOP1() dispatches state changes to main internally.
+        // Run on global queue — scanForDevices() dispatches state changes to main internally.
         let q = DispatchQueue.global(qos: .userInteractive)
-        q.asyncAfter(deadline: .now() + 1.0) { self.scanForOP1() }
-        q.asyncAfter(deadline: .now() + 1.5) { self.scanForOP1() }
+        q.asyncAfter(deadline: .now() + 1.0) { self.scanForDevices() }
+        q.asyncAfter(deadline: .now() + 1.5) { self.scanForDevices() }
 
         // Rescan when app foregrounds — catches any plug/unplug that happened while
         // backgrounded without relying on notifications that iOS may not deliver in background.
@@ -117,8 +119,8 @@ final class USBMidi: NSObject, ObservableObject {
 
             // msgSetupChanged / msgObjectRemoved — fall back to polling scans.
             let q = DispatchQueue.global(qos: .userInteractive)
-            q.asyncAfter(deadline: .now() + 0.15) { self.scanForOP1() }
-            q.asyncAfter(deadline: .now() + 0.50) { self.scanForOP1() }
+            q.asyncAfter(deadline: .now() + 0.15) { self.scanForDevices() }
+            q.asyncAfter(deadline: .now() + 0.50) { self.scanForDevices() }
         }
         MIDIOutputPortCreate(client, "LFOHeroOut" as CFString, &outPort)
         // MIDIInputPortCreateWithBlock is deprecated in iOS 14 but provides simple
@@ -140,16 +142,17 @@ final class USBMidi: NSObject, ObservableObject {
         // Dispatch the initial scan off the midiRunLoop thread. MIDIGetNumberOfDestinations()
         // is a blocking IPC call; running it on the midiRunLoop thread would prevent CoreMIDI
         // from delivering notifications until the scan returns.
-        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.3) { self.scanForOP1() }
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.3) { self.scanForDevices() }
     }
 
     // MARK: - Device discovery
 
-    private func scanForOP1() {
+    private func scanForDevices() {
         var allNamed: [String] = []
         var otherNames: [String] = []
-        var op1Dest: MIDIEndpointRef = 0
-        var op1Name: String?
+        var matchDest: MIDIEndpointRef = 0
+        var matchName: String?
+        var matchProfile: DeviceProfile?
 
         for i in 0..<MIDIGetNumberOfDestinations() {
             let dest = MIDIGetDestination(i)
@@ -157,8 +160,11 @@ final class USBMidi: NSObject, ObservableObject {
             let lower = name.lowercased()
             guard !USBMidi.virtualEndpointNames.contains(where: { lower.contains($0) }) else { continue }
             allNamed.append(name)
-            if isOP1(name) {
-                op1Dest = dest; op1Name = name
+            if let p = DeviceRegistry.profile(forEndpointName: name) {
+                // Registry order breaks ties if a hub exposes more than one known device.
+                if matchProfile == nil {
+                    matchDest = dest; matchName = name; matchProfile = p
+                }
             } else {
                 otherNames.append(name)
             }
@@ -172,10 +178,14 @@ final class USBMidi: NSObject, ObservableObject {
             manualTarget = nil  // target disappeared — fall through to normal scan
         }
 
-        if let name = op1Name {
-            if destRef != op1Dest {
-                destRef = op1Dest
-                DispatchQueue.main.async { self.state = .connected(name) }
+        if let name = matchName {
+            let pid = matchProfile?.id
+            if destRef != matchDest {
+                destRef = matchDest
+                DispatchQueue.main.async {
+                    self.state = .connected(name)
+                    self.matchedProfileId = pid
+                }
             }
             connectSource()
             return
@@ -185,11 +195,12 @@ final class USBMidi: NSObject, ObservableObject {
         let names = otherNames
         DispatchQueue.main.async {
             self.state = names.isEmpty ? .disconnected : .found(names)
+            self.matchedProfileId = nil
         }
     }
 
     func rescan() {
-        DispatchQueue.global(qos: .userInteractive).async { [weak self] in self?.scanForOP1() }
+        DispatchQueue.global(qos: .userInteractive).async { [weak self] in self?.scanForDevices() }
     }
 
     func connectTo(_ targetName: String) {
@@ -245,7 +256,7 @@ final class USBMidi: NSObject, ObservableObject {
         // Fallback: name-based search (original behavior).
         for i in 0..<MIDIGetNumberOfSources() {
             let src = MIDIGetSource(i)
-            guard let name = midiName(src), isOP1(name) else { continue }
+            guard let name = midiName(src), isKnownDevice(name) else { continue }
             if srcRef != src {
                 if srcRef != 0 { MIDIPortDisconnectSource(inPort, srcRef) }
                 srcRef = src
@@ -261,9 +272,9 @@ final class USBMidi: NSObject, ObservableObject {
         return prop?.takeRetainedValue() as String?
     }
 
-    private func isOP1(_ name: String) -> Bool {
-        let l = name.lowercased()
-        return l.contains("op-1") || l.contains("op1")
+    /// True when the endpoint name matches any device the app knows how to drive.
+    private func isKnownDevice(_ name: String) -> Bool {
+        DeviceRegistry.profile(forEndpointName: name) != nil
     }
 
     // MARK: - Send

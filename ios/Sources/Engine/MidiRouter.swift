@@ -1,9 +1,21 @@
 import Foundation
 
+/// Somewhere MIDI can be sent to and received from. Named to match CoreMIDI's own vocabulary,
+/// where the endpoint you send to is a "destination".
+///
+/// `MidiRouter` is the real implementation; tests substitute `RecordingDestination` so the
+/// outgoing wire format can be asserted without any hardware or transport.
+protocol MidiDestination: AnyObject {
+    func send(_ bytes: [UInt8])
+    var onClock: (() -> Void)? { get set }
+    var onStart: (() -> Void)? { get set }
+    var onStop:  (() -> Void)? { get set }
+}
+
 /// Routes MIDI to USB when the OP-1 is connected via USB-C, BLE otherwise.
 /// Owns both transports and aggregates their incoming callbacks.
 /// BLE callbacks are silenced while USB is active to prevent double clock ticks.
-final class MidiRouter {
+final class MidiRouter: MidiDestination {
     let ble = BLEMidi()
     let usb = USBMidi()
 

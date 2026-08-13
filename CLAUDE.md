@@ -1,6 +1,16 @@
 # CLAUDE.md
 
-Custom MIDI LFOs (low-frequency oscillators) for the Teenage Engineering OP-1 Field. Generates beat-synced automation curves for per-track volume/pan/mute/FX and master FX/compressor, plus MIDI clock master/slave sync with the OP-1.
+Custom MIDI LFOs (low-frequency oscillators) for Teenage Engineering field-system devices. Generates beat-synced automation curves for per-track volume/pan/mute/FX and master FX, plus MIDI clock master/slave sync.
+
+**Supported devices** (iOS app; one at a time). Each is a data-only `DeviceProfile` — adding a device means adding a profile literal, not new branches:
+
+| Device | tracks | channels | notes |
+|---|---|---|---|
+| OP-1 Field | 4 | tracks 0-3, master ch 0 | clock master/slave, tape SPP transport |
+| TX-6 | 6 | tracks 0-5, master ch 6, FX I/II ch 7/8 | ~17 params per channel; FX buses fold into the master (m) target |
+| TP-7 | 6 | tracks 0-5, global ch 0 | field recorder: no pan; input gain on channels 1-3 only |
+
+Auto-detected from the MIDI endpoint name, with a manual override in settings. See `notes/RESEARCH.md` for the full CC tables and the list of hardware questions still open.
 
 ## Three implementations in this repo
 
@@ -21,7 +31,9 @@ Build new features in `ios/` first. Treat `src/` as a reference for protocol/alg
   - `ClockEngine.swift` — MIDI clock master (generates 24 PPQN via `DispatchSourceTimer`) or slave (smooths incoming clock ticks into a BPM reading)
   - `AutomationEngine.swift` — evaluates LFO waveforms per clock tick, dispatches CC messages via `Controller`
   - `Controller.swift` — turns UI actions into MIDI CC messages
-  - `Models.swift` — `LfoWave`, `Parameter`, `LfoClip`, PPQN/rate constants, MIDI↔UI value conversion (see OP-1 MIDI scale note below)
+  - `Models.swift` — `LfoWave`, `LfoClip`, PPQN/rate constants, MIDI↔UI value conversion (see scale note below)
+  - `DeviceProfile.swift` — the device abstraction: `ParamSpec`, `ChannelRule`, `ValueEncoding`, `TransportMap`, `DeviceCapabilities`, `DeviceRegistry`
+  - `DeviceProfiles.swift` — the OP-1 / TX-6 / TP-7 profile literals (all CC numbers live here and nowhere else)
 - `UI/` — SwiftUI views, one file per major control: `TrackStripView`, `PanKnobView`, `VolumeFaderView`, `TransportView`, `LFOPanelView`, `WaveformView`, `SplashScreenView`, plus `Theme.swift` for shared colors/styles
 - `ios/UITests/` — XCUITest target
 
@@ -46,6 +58,8 @@ python -m src.app
   - Track 2 = `#bb9933` (ochre)
   - Track 3 = `#848c94` (blue-gray)
   - Track 4 = `#ff6a00` (orange)
+  - Track 5 = `#c25fa0` (magenta) — 6-channel devices only (TX-6 / TP-7)
+  - Track 6 = `#3fb0a8` (teal) — 6-channel devices only
 - Dark theme throughout — near-black backgrounds (iOS `Theme.swift`: `#111111` / `#1a1a1a` / `#2a2a2a`, with `#454545` reserved for borders that need more contrast)
 - **All UI text is lowercase** — labels, button text, status messages (e.g. "scanning…", "no device found", "tempo mode:", window title "op1 lfo hero"). Match this in any new strings.
 - Green (`#4ec94e`-ish) marks active/centered/selected state (e.g. pan knob indicator is green at dead-center, white/text-colored off-center).
@@ -144,6 +158,31 @@ Never use `List` inside a `NavigationStack` inside a `.sheet` (or `.fullScreenCo
 
 **Fix:** replace `List { ... }` with `ScrollView { VStack { ... } }`. Style section headers manually with `Text(...).font(.subheadline)` and `Divider()`. See `HelpView`, `DevicePickerView`, and `SettingsView` in `ContentView.swift` for examples.
 
+## MIDI cannot be tested in the simulator
+
+The iOS Simulator has **no MIDI at all**. Verified by probing CoreMIDI from a test running in
+the simulator with a TP-7 attached to the host Mac and visible to it:
+
+```
+MIDIGetNumberOfDestinations() = 0
+MIDIGetNumberOfSources()      = 0
+```
+
+It does not bridge the host's USB MIDI devices, and it has no Bluetooth radio. So the simulator
+can verify layout, navigation and anything that reads a `DeviceProfile` — but never that bytes
+reach a device.
+
+Anything involving real MIDI has to run on physical hardware:
+
+| | |
+|---|---|
+| `iPad Pro Dawg` (iPad8,9) | **USB-C** — connects the OP-1 / TX-6 / TP-7 directly |
+| `iPhone Dawg` (iPhone12,3) | Lightning — needs an adapter for USB MIDI, or use BLE |
+
+For byte-level verification without hardware, use `RecordingDestination` in the unit tests: it
+implements `MidiDestination` and records the exact wire bytes. That is how the OP-1 golden byte
+table works.
+
 ## Screenshots and simulator testing
 
 All testing/Xcode/simulator screenshots go in `/tmp/claude-ss/`. Create the directory if it doesn't exist (`mkdir -p /tmp/claude-ss`) before writing. Use this path in `xcrun simctl io` commands, UITest screenshot saves, and any other screenshot output.
@@ -155,20 +194,24 @@ Use XCUITest (not `cliclick` coordinate math) to drive the simulator — accessi
 **Known accessibility identifiers:**
 - `helpButton` — opens HelpView sheet
 - `settingsButton` — opens SettingsView sheet
+- `deviceOverridePicker` — device selection segmented control in SettingsView
+- `panKnob1` … `panKnob<n>` — per-track pan knob (absent on devices with `caps.hasPan == false`)
 - `paramPicker` — parameter CompactPicker button
 - `wavePicker` — wave shape CompactPicker button
-- `track1Button` / `track2Button` / `track3Button` / `track4Button` — track toggle buttons
+- `track1Button` … `track<n>Button` — track toggle buttons (4 on the OP-1, 6 on the TX-6/TP-7)
 - `masterButton` — master track toggle button
 - `previewButton` — preview (P) toggle button
 - `repeatButton` — looping LFO start button (↻)
 - `oneShotButton` — one-shot LFO start button (→|)
 - `trashButton` — delete all chips button
 
-**Reset app state in UITests** — pass `--uitest-reset` as a launch argument to clear UserDefaults before the test:
+**Reset app state in UITests** — pass `--uitest-reset` as a launch argument to clear UserDefaults before the test. Add `--uitest-profile <id>` (`op1` / `tx6` / `tp7`) to pin the device, so 6-track layouts can be tested with no hardware attached:
 ```swift
-app.launchArguments = ["--uitest-reset"]
+app.launchArguments = ["--uitest-reset", "--uitest-profile", "tx6"]
 app.launch()
 ```
+
+**Segmented controls in the settings sheet** need settling: a tap made while the sheet is still animating in is silently dropped by UIKit. Tap, verify `isSelected`, and retry — see `selectDevice` in `MultiDeviceUITests`.
 
 **Run specific tests from the command line:**
 ```bash
@@ -265,6 +308,61 @@ xcrun devicectl device install app \
 ```bash
 xcrun xctrace list devices 2>&1 | grep -E "(iPad|iPhone)"
 ```
+
+**`devicectl install` will happily ship a stale binary.** It installs whatever is in DerivedData,
+so if the build failed the install still reports `App installed:` — with the *previous* build. A
+locked device produces exactly this:
+
+```
+error: Timed out waiting for all destinations matching the provided destination specifier
+       iPhone Dawg may need to be unlocked
+```
+
+Always confirm `** BUILD SUCCEEDED **` before installing. To be certain the binary is new:
+
+```bash
+ls -l ~/Library/Developer/Xcode/DerivedData/op1-lfo-hero-*/Build/Products/Debug-iphoneos/op1-lfo-hero.app/op1-lfo-hero
+```
+
+## Running the tests
+
+Unit tests only (fast — the whole suite is well under a second):
+
+```bash
+cd ios
+xcodebuild test \
+  -project op1-lfo-hero.xcodeproj \
+  -scheme op1-lfo-hero \
+  -destination 'id=<simulator-udid>' \
+  -only-testing:op1-lfo-heroTests 2>&1 | grep -E "error:|Executed .* tests"
+```
+
+**A launch failure is not a test failure — just rerun.** This appears intermittently and has
+nothing to do with the code:
+
+```
+Simulator device failed to launch com.andrewralon.op1-lfo-hero
+Application failed preflight checks … RequestDenied … Busy
+```
+
+It usually succeeds on the next attempt. Don't start editing tests over it; check for real
+`error:` lines first — a genuine failure names a file, a line and an assertion.
+
+## Hardware MIDI probes (`tools/midi/`)
+
+Standalone Swift tools for measuring what a device actually does, since the simulator has no MIDI
+and by-ear testing has repeatedly produced wrong conclusions. `./build.sh` compiles them all. See
+`tools/midi/README.md` for the full list and the traps.
+
+Before running anything that measures:
+
+- The TP-7 must be in **`sync`** mode and its **tape rolling** — it transmits clock only while
+  moving, and `off`/`cue` transmit nothing at all while still *receiving* CC, which looks exactly
+  like broken hardware.
+- To prove a receive path works independently of all that, use **`ctrl`** mode and press buttons:
+  it transmits unconditionally. (It also refuses incoming MIDI, so it cannot be used for control.)
+- `./mididiag` first if anything looks wrong. Unplugging leaves stale same-named endpoints behind,
+  and binding to one is indistinguishable from a device that has stopped transmitting.
 
 ## MIDI reference
 

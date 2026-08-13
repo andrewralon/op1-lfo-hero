@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4795F3EA185146A3B08825F25A220B31 /* AppPreviewUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3009F425A432421994D6531CF8F18855 /* AppPreviewUITests.swift */; };
+		F3D1001B2FF000000000001B /* MultiDeviceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D1001A2FF000000000001A /* MultiDeviceUITests.swift */; };
 		4B2D1C66F4F73C31243ED771 /* HelpSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */; };
 		71BEA300AD3743FA9B870E02 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D11E2853B035905A9EAF4CE6 /* Foundation.framework */; };
 		CB702C2BCF38D9ECF9C48486 /* SplashScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E24B5EECD649B0D8B5B840 /* SplashScreenView.swift */; };
@@ -33,10 +34,23 @@
 		F350020E2FE371CE00C6E1AF /* SnapshotHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F350020D2FE371CE00C6E1AF /* SnapshotHelper.swift */; };
 		F35002102FE371D800C6E1AF /* ScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F350020F2FE371D800C6E1AF /* ScreenshotTests.swift */; };
 		F3BF244C2FE3A926009FFE84 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F3BF244B2FE3A926009FFE84 /* PrivacyInfo.xcprivacy */; };
+		F3D100112FF0000000000011 /* DeviceProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100102FF0000000000010 /* DeviceProfile.swift */; };
+		F3D100132FF0000000000013 /* DeviceProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100122FF0000000000012 /* DeviceProfiles.swift */; };
+		F3D100152FF0000000000015 /* DeviceProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100142FF0000000000014 /* DeviceProfileTests.swift */; };
+		F3D100192FF0000000000019 /* NewDeviceProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100182FF0000000000018 /* NewDeviceProfileTests.swift */; };
+		F3D100172FF0000000000017 /* SettingsMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100162FF0000000000016 /* SettingsMigrationTests.swift */; };
+		F3D1000D2FF000000000000D /* GoldenMidiTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D1000C2FF000000000000C /* GoldenMidiTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		910AC4505E6A299D483BCA57 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F303F7962FDE4A770060AA2D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F303F79D2FDE4A770060AA2D;
+			remoteInfo = "op1-lfo-hero";
+		};
+		F3D1000A2FF000000000000A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = F303F7962FDE4A770060AA2D /* Project object */;
 			proxyType = 1;
@@ -50,6 +64,7 @@
 		C1C450ADF47CC354A624CD6E /* op1-lfo-heroUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "op1-lfo-heroUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D11E2853B035905A9EAF4CE6 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		3009F425A432421994D6531CF8F18855 /* AppPreviewUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppPreviewUITests.swift; path = UITests/AppPreviewUITests.swift; sourceTree = "<group>"; };
+		F3D1001A2FF000000000001A /* MultiDeviceUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MultiDeviceUITests.swift; path = UITests/MultiDeviceUITests.swift; sourceTree = "<group>"; };
 		D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HelpSettingsUITests.swift; path = UITests/HelpSettingsUITests.swift; sourceTree = "<group>"; };
 		F303F79E2FDE4A770060AA2D /* op1-lfo-hero.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "op1-lfo-hero.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F303F7B82FDE4BC80060AA2D /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -75,6 +90,13 @@
 		F350020D2FE371CE00C6E1AF /* SnapshotHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SnapshotHelper.swift; path = UITests/SnapshotHelper.swift; sourceTree = "<group>"; };
 		F350020F2FE371D800C6E1AF /* ScreenshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ScreenshotTests.swift; path = UITests/ScreenshotTests.swift; sourceTree = "<group>"; };
 		F3BF244B2FE3A926009FFE84 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		F3D100022FF0000000000002 /* op1-lfo-heroTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "op1-lfo-heroTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F3D100102FF0000000000010 /* DeviceProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceProfile.swift; sourceTree = "<group>"; };
+		F3D100122FF0000000000012 /* DeviceProfiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceProfiles.swift; sourceTree = "<group>"; };
+		F3D100142FF0000000000014 /* DeviceProfileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeviceProfileTests.swift; path = Tests/DeviceProfileTests.swift; sourceTree = "<group>"; };
+		F3D100182FF0000000000018 /* NewDeviceProfileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NewDeviceProfileTests.swift; path = Tests/NewDeviceProfileTests.swift; sourceTree = "<group>"; };
+		F3D100162FF0000000000016 /* SettingsMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsMigrationTests.swift; path = Tests/SettingsMigrationTests.swift; sourceTree = "<group>"; };
+		F3D1000C2FF000000000000C /* GoldenMidiTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GoldenMidiTests.swift; path = Tests/GoldenMidiTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -102,10 +124,22 @@
 			children = (
 				3009F425A432421994D6531CF8F18855 /* AppPreviewUITests.swift */,
 				D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */,
+				F3D1001A2FF000000000001A /* MultiDeviceUITests.swift */,
 				F350020D2FE371CE00C6E1AF /* SnapshotHelper.swift */,
 				F350020F2FE371D800C6E1AF /* ScreenshotTests.swift */,
 			);
 			name = UITests;
+			sourceTree = SOURCE_ROOT;
+		};
+		F3D1000B2FF000000000000B /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				F3D1000C2FF000000000000C /* GoldenMidiTests.swift */,
+				F3D100142FF0000000000014 /* DeviceProfileTests.swift */,
+				F3D100162FF0000000000016 /* SettingsMigrationTests.swift */,
+				F3D100182FF0000000000018 /* NewDeviceProfileTests.swift */,
+			);
+			name = Tests;
 			sourceTree = SOURCE_ROOT;
 		};
 		878BB0369DB9376895CFDC31 /* iOS */ = {
@@ -126,6 +160,7 @@
 				F303F7C92FDE4BC80060AA2D /* Sources */,
 				F303F7E62FDE4BC80060AA2D /* Frameworks */,
 				3360AFD87F589C9055429704 /* UITests */,
+				F3D1000B2FF000000000000B /* Tests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -134,6 +169,7 @@
 			children = (
 				F303F79E2FDE4A770060AA2D /* op1-lfo-hero.app */,
 				C1C450ADF47CC354A624CD6E /* op1-lfo-heroUITests.xctest */,
+				F3D100022FF0000000000002 /* op1-lfo-heroTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -146,6 +182,8 @@
 				F303F7BA2FDE4BC80060AA2D /* BLEMidi.swift */,
 				F303F7BB2FDE4BC80060AA2D /* ClockEngine.swift */,
 				F303F7BC2FDE4BC80060AA2D /* Controller.swift */,
+				F3D100102FF0000000000010 /* DeviceProfile.swift */,
+				F3D100122FF0000000000012 /* DeviceProfiles.swift */,
 				F303F7E22FDE4BC80060AA2D /* MidiRouter.swift */,
 				F303F7BD2FDE4BC80060AA2D /* Models.swift */,
 				F303F7E02FDE4BC80060AA2D /* USBMidi.swift */,
@@ -226,6 +264,24 @@
 			productReference = F303F79E2FDE4A770060AA2D /* op1-lfo-hero.app */;
 			productType = "com.apple.product-type.application";
 		};
+		F3D100012FF0000000000001 /* op1-lfo-heroTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F3D100032FF0000000000003 /* Build configuration list for PBXNativeTarget "op1-lfo-heroTests" */;
+			buildPhases = (
+				F3D100062FF0000000000006 /* Sources */,
+				F3D100072FF0000000000007 /* Frameworks */,
+				F3D100082FF0000000000008 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F3D100092FF0000000000009 /* PBXTargetDependency */,
+			);
+			name = "op1-lfo-heroTests";
+			productName = "op1-lfo-heroTests";
+			productReference = F3D100022FF0000000000002 /* op1-lfo-heroTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -257,6 +313,7 @@
 			targets = (
 				F303F79D2FDE4A770060AA2D /* op1-lfo-hero */,
 				EE6DB896AE67FB18A6CE5EBE /* op1-lfo-heroUITests */,
+				F3D100012FF0000000000001 /* op1-lfo-heroTests */,
 			);
 		};
 /* End PBXProject section */
@@ -278,6 +335,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F3D100082FF0000000000008 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -287,6 +351,7 @@
 			files = (
 				4795F3EA185146A3B08825F25A220B31 /* AppPreviewUITests.swift in Sources */,
 				4B2D1C66F4F73C31243ED771 /* HelpSettingsUITests.swift in Sources */,
+				F3D1001B2FF000000000001B /* MultiDeviceUITests.swift in Sources */,
 				F350020E2FE371CE00C6E1AF /* SnapshotHelper.swift in Sources */,
 				F35002102FE371D800C6E1AF /* ScreenshotTests.swift in Sources */,
 			);
@@ -300,6 +365,8 @@
 				F303F7CB2FDE4BC80060AA2D /* ContentView.swift in Sources */,
 				F303F7CC2FDE4BC80060AA2D /* TransportView.swift in Sources */,
 				F303F7CD2FDE4BC80060AA2D /* Controller.swift in Sources */,
+				F3D100112FF0000000000011 /* DeviceProfile.swift in Sources */,
+				F3D100132FF0000000000013 /* DeviceProfiles.swift in Sources */,
 				F303F7CE2FDE4BC80060AA2D /* AppState.swift in Sources */,
 				F303F7CF2FDE4BC80060AA2D /* ClockEngine.swift in Sources */,
 				F303F7D02FDE4BC80060AA2D /* VolumeFaderView.swift in Sources */,
@@ -317,6 +384,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F3D100062FF0000000000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F3D1000D2FF000000000000D /* GoldenMidiTests.swift in Sources */,
+				F3D100152FF0000000000015 /* DeviceProfileTests.swift in Sources */,
+				F3D100172FF0000000000017 /* SettingsMigrationTests.swift in Sources */,
+				F3D100192FF0000000000019 /* NewDeviceProfileTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -325,6 +403,12 @@
 			name = "op1-lfo-hero";
 			target = F303F79D2FDE4A770060AA2D /* op1-lfo-hero */;
 			targetProxy = 910AC4505E6A299D483BCA57 /* PBXContainerItemProxy */;
+		};
+		F3D100092FF0000000000009 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "op1-lfo-hero";
+			target = F303F79D2FDE4A770060AA2D /* op1-lfo-hero */;
+			targetProxy = F3D1000A2FF000000000000A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -567,6 +651,45 @@
 			};
 			name = Release;
 		};
+		F3D100042FF0000000000004 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 8RG5QJVST3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.andrewralon.op1-lfo-hero.Tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/op1-lfo-hero.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/op1-lfo-hero";
+			};
+			name = Debug;
+		};
+		F3D100052FF0000000000005 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 8RG5QJVST3;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.andrewralon.op1-lfo-hero.Tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/op1-lfo-hero.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/op1-lfo-hero";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -593,6 +716,15 @@
 			buildConfigurations = (
 				F303F7AA2FDE4A780060AA2D /* Debug */,
 				F303F7AB2FDE4A780060AA2D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F3D100032FF0000000000003 /* Build configuration list for PBXNativeTarget "op1-lfo-heroTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F3D100042FF0000000000004 /* Debug */,
+				F3D100052FF0000000000005 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

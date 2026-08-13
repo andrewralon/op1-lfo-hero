@@ -1,0 +1,7 @@
+# compiled probes
+*.o
+anymidi
+clockrate
+mididiag
+playpress
+revsync
