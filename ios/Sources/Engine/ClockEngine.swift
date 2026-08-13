@@ -122,6 +122,16 @@ final class ClockEngine {
         if isPlaying && slaveTick % 6 == 0 { sppPos += 1 }
         if lastTickTime > 0 {
             let interval = now - lastTickTime
+            // Defence in depth against a burst of ticks sharing one arrival time. BLE delivers a
+            // whole packet at once, so several ticks can look microseconds apart and drag the
+            // average to an absurd tempo. 5 ms is ~500 BPM at 24 PPQN, far above anything real;
+            // 2 s is ~1.25 BPM. Anything outside that is a transport artefact, not a tempo.
+            guard interval > 0.005, interval < 2.0 else {
+                lastTickTime = now
+                lock.unlock()
+                tickCallback?(tick)
+                return
+            }
             bpmHistory.append(interval)
             if bpmHistory.count > smoothN { bpmHistory.removeFirst() }
             if bpmHistory.count >= 8 {

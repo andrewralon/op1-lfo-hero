@@ -103,43 +103,74 @@ final class BLEMidi: NSObject, ObservableObject {
 
     // MARK: - BLE MIDI packet parser
 
+    /// Parse one BLE-MIDI packet.
+    ///
+    /// Layout: a header byte, then for each message a **timestamp byte** followed by the MIDI
+    /// bytes. Both timestamp and status bytes have the high bit set, so they can only be told
+    /// apart by position — a timestamp always comes first, and exactly one precedes each message.
+    ///
+    /// Consuming that timestamp *before* looking at the byte is essential. Timestamps span
+    /// 0x80-0xFF, which includes 0xF8, 0xFA and 0xFC — so an earlier version that tested for
+    /// real-time messages first read ordinary timestamps as clock, start and stop. A stream of
+    /// CC from a TX-6 injected phantom clock ticks that all landed in the same packet, and the
+    /// app computed a BPM from microsecond intervals (observed: 640000 BPM).
     private func parse(_ data: Data) {
-        guard data.count >= 2 else { return }
-        var i = 1  // skip header byte; timestamp byte follows per-message below
+        BleMidiPacket.parse(data, onClock: onClock, onStart: onStart, onStop: onStop, onCC: onCC)
+    }
+}
+
+/// The BLE-MIDI packet parser, split out so it can be tested without CoreBluetooth.
+enum BleMidiPacket {
+
+    static func parse(_ data: Data,
+                      onClock: (() -> Void)?,
+                      onStart: (() -> Void)?,
+                      onStop: (() -> Void)?,
+                      onCC: ((Int, Int, Int) -> Void)?) {
+        guard data.count >= 3 else { return }   // header + timestamp + at least one status
+        var i = 1                               // skip the header
+        var status: UInt8 = 0                   // running status, survives between messages
 
         while i < data.count {
-            let b = data[i]
-
-            // Single-byte real-time messages (may appear mid-packet)
-            switch b {
-            case 0xF8: onClock?(); i += 1; continue
-            case 0xFA: onStart?(); i += 1; continue
-            case 0xFB:             i += 1; continue  // Continue
-            case 0xFC: onStop?();  i += 1; continue
-            default: break
+            // Exactly one timestamp byte precedes every message, including real-time ones.
+            if data[i] & 0x80 != 0 {
+                i += 1
+                guard i < data.count else { return }
             }
 
-            // BLE MIDI timestamps have MSB=1 and appear before each status byte
+            var b = data[i]
             if b & 0x80 != 0 {
-                // Could be a per-message timestamp — peek at next byte
-                if i + 1 < data.count && data[i + 1] & 0x80 != 0 {
-                    i += 1  // skip timestamp, fall through to parse status
+                // System real-time: one byte, no data, and it does not disturb running status.
+                if b >= 0xF8 {
+                    switch b {
+                    case 0xF8: onClock?()
+                    case 0xFA: onStart?()
+                    case 0xFC: onStop?()
+                    default: break              // 0xFB continue, 0xFE sensing, 0xFF reset
+                    }
+                    i += 1
                     continue
                 }
+                // System common has no running status and is not used here — resync on it.
+                if b >= 0xF0 { status = 0; i += 1; continue }
+
+                status = b
+                i += 1
+                guard i < data.count else { return }
+                b = data[i]
             }
 
-            guard b & 0x80 != 0 else { i += 1; continue }  // unexpected data byte
-
-            let ch = Int(b & 0x0F)
-            switch b & 0xF0 {
+            // `b` is the first data byte of `status` (possibly running status).
+            guard status != 0 else { i += 1; continue }
+            switch status & 0xF0 {
             case 0xB0:
-                guard i + 2 < data.count else { i += 1; continue }
-                onCC?(ch, Int(data[i + 1]), Int(data[i + 2]))
-                i += 3
+                guard i + 1 < data.count else { return }
+                onCC?(Int(status & 0x0F), Int(b), Int(data[i + 1]))
+                i += 2
             case 0x80, 0x90, 0xA0, 0xE0:
-                i += i + 2 < data.count ? 3 : 1
+                i += 2
             case 0xC0, 0xD0:
-                i += i + 1 < data.count ? 2 : 1
+                i += 1
             default:
                 i += 1
             }

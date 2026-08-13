@@ -39,6 +39,7 @@
 		F3D100152FF0000000000015 /* DeviceProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100142FF0000000000014 /* DeviceProfileTests.swift */; };
 		F3D100192FF0000000000019 /* NewDeviceProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100182FF0000000000018 /* NewDeviceProfileTests.swift */; };
 		F3D100172FF0000000000017 /* SettingsMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100162FF0000000000016 /* SettingsMigrationTests.swift */; };
+		F3D100172FF000000000BE01 /* BleMidiParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100162FF000000000BE02 /* BleMidiParserTests.swift */; };
 		F3D1000D2FF000000000000D /* GoldenMidiTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D1000C2FF000000000000C /* GoldenMidiTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -96,6 +97,7 @@
 		F3D100142FF0000000000014 /* DeviceProfileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeviceProfileTests.swift; path = Tests/DeviceProfileTests.swift; sourceTree = "<group>"; };
 		F3D100182FF0000000000018 /* NewDeviceProfileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NewDeviceProfileTests.swift; path = Tests/NewDeviceProfileTests.swift; sourceTree = "<group>"; };
 		F3D100162FF0000000000016 /* SettingsMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsMigrationTests.swift; path = Tests/SettingsMigrationTests.swift; sourceTree = "<group>"; };
+		F3D100162FF000000000BE02 /* BleMidiParserTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BleMidiParserTests.swift; path = Tests/BleMidiParserTests.swift; sourceTree = "<group>"; };
 		F3D1000C2FF000000000000C /* GoldenMidiTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GoldenMidiTests.swift; path = Tests/GoldenMidiTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -137,6 +139,7 @@
 				F3D1000C2FF000000000000C /* GoldenMidiTests.swift */,
 				F3D100142FF0000000000014 /* DeviceProfileTests.swift */,
 				F3D100162FF0000000000016 /* SettingsMigrationTests.swift */,
+				F3D100162FF000000000BE02 /* BleMidiParserTests.swift */,
 				F3D100182FF0000000000018 /* NewDeviceProfileTests.swift */,
 			);
 			name = Tests;
@@ -391,6 +394,7 @@
 				F3D1000D2FF000000000000D /* GoldenMidiTests.swift in Sources */,
 				F3D100152FF0000000000015 /* DeviceProfileTests.swift in Sources */,
 				F3D100172FF0000000000017 /* SettingsMigrationTests.swift in Sources */,
+				F3D100172FF000000000BE01 /* BleMidiParserTests.swift in Sources */,
 				F3D100192FF0000000000019 /* NewDeviceProfileTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
