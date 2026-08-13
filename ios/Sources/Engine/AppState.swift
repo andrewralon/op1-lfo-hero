@@ -125,7 +125,11 @@ final class AppState: ObservableObject {
             trackOn   = v(.trackOn, [1: 1])
             masterOn  = v(.masterOn, 0)
             isClockMaster = v(.isClockMaster, true)
-            bpm       = v(.bpm, 100.0)
+            // A tempo saved from a bad clock reading must not survive a relaunch. 0 is the
+            // "slaved, no data yet" sentinel and is allowed through.
+            let savedBpm = v(.bpm, 100.0)
+            bpm = (savedBpm == 0 || (savedBpm >= AppState.minBpm && savedBpm <= AppState.maxBpm))
+                ? savedBpm : 100.0
             volumes   = v(.volumes, [:])
             pans      = v(.pans, [:])
             mutes     = v(.mutes, [:])
@@ -433,6 +437,10 @@ final class AppState: ObservableObject {
 
         // BPM from clock engine
         clock.bpmCallback = { [weak self] newBpm in
+            // A measured tempo, so it can be nonsense if the incoming stream is. Ignore rather
+            // than clamp: a reading outside musical range is a transport artefact, and pinning
+            // it to 300 would show a plausible-looking number that was never real.
+            guard newBpm >= Self.minBpm, newBpm <= Self.maxBpm else { return }
             DispatchQueue.main.async { self?.bpm = newBpm }
         }
 
@@ -539,9 +547,17 @@ final class AppState: ObservableObject {
     func endScrub()                { clock.endScrub() }
     var hasMomentaryScrub: Bool    { clock.hasMomentaryScrub }
 
+    /// Musical range for any tempo the app will accept or display. 0 is kept as a separate
+    /// sentinel meaning "slaved, no clock data yet", so it is deliberately outside this.
+    static let minBpm = 20.0
+    static let maxBpm = 300.0
+
     func enableClock() {
         isClockMaster = true
-        let startBpm = bpm > 1.0 ? bpm : 100.0  // handle sentinel (0) from OP-1 mode
+        // Anything outside musical range is treated as the sentinel: taking over as master with
+        // a junk tempo would drive the master timer with it. A bad slave reading used to survive
+        // the switch back to app-master this way.
+        let startBpm = (bpm >= Self.minBpm && bpm <= Self.maxBpm) ? bpm : 100.0
         bpm = startBpm
         clock.enableClock(bpm: startBpm)
     }
