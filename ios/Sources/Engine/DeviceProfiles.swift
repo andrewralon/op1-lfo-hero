@@ -278,16 +278,16 @@ extension DeviceProfile {
     )
 
     private static let tp7Params: [ParamSpec] = [
-        perTrack("tp7.vol",  "mix volume", "vol", cc: 7,   role: .volume),
-        perTrack("tp7.mute", "mix mute",   "mut", cc: 120, role: .mute, encoding: teSwitch),
+        perTrack("tp7.vol",  "volume", "vol", cc: 7,   role: .volume),
+        perTrack("tp7.mute", "mute",   "mut", cc: 120, role: .mute, encoding: teSwitch),
         // CC 9 is the preamp for the three physical INPUT JACKS, which sit upstream of the mix
         // channels: jack -> gain -> mix. So it is addressed per jack, not per track, and
         // changing it does nothing audible unless a signal is actually arriving on that jack.
         // Verified on hardware. Modelled as master-level controls because a track number would
         // wrongly imply gain 1 belongs to track 1. See notes/RESEARCH.md.
-        masterOnly("tp7.in1Gain", "in1 gain", "g1", cc: 9, channel: 0),
-        masterOnly("tp7.in2Gain", "in2 gain", "g2", cc: 9, channel: 1),
-        masterOnly("tp7.in3Gain", "in3 gain", "g3", cc: 9, channel: 2),
+        masterOnly("tp7.in1Gain", "gain 1", "g1", cc: 9, channel: 0),
+        masterOnly("tp7.in2Gain", "gain 2", "g2", cc: 9, channel: 1),
+        masterOnly("tp7.in3Gain", "gain 3", "g3", cc: 9, channel: 2),
         // Verified on hardware: CC 14 ARMS record (blinking light, 0s, no audio) rather than
         // starting it, and it is absolute — sending 127 twice leaves it armed, it does not
         // toggle. The arm persists indefinitely; 0xFC cancels it.

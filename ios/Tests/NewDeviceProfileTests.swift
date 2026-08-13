@@ -496,7 +496,7 @@ final class TP7TransportTests: XCTestCase {
     /// would read as "stopped" no matter which direction was asked for.
     func testSpeedIsClampedAndNeverRoundsToZero() {
         clock.transportSpeed = 99
-        XCTAssertEqual(clock.transportSpeed, 8.0, "clamped to 8x")
+        XCTAssertEqual(clock.transportSpeed, 16.0, "clamped to 16x — CC 18 saturates before that")
         destination.reset()
         clock.tapeNext()
         XCTAssertLessThanOrEqual(Int(destination.packets[0][2]), 127)
@@ -919,12 +919,25 @@ final class TP7ScrubAndReverseTests: XCTestCase {
         XCTAssertFalse(c.hasMomentaryScrub, "the OP-1 seeks by SPP nudge, not a held speed")
     }
 
-    /// Holding starts the reel at about 1x rather than jumping straight to the configured speed.
-    func testScrubStartsAtNormalSpeed() {
+    /// Holding starts at the ramp's start speed rather than jumping straight to the top.
+    func testScrubStartsAtTheRampStartSpeed() {
+        XCTAssertEqual(clock.scrubStartSpeed, 1.0)
         destination.reset()
         clock.beginScrub(forward: true)
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "64 + 8 = forward at 1x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "64 + deadZone 4 + 4*1 = 1x")
         clock.endScrub()
+    }
+
+    /// The top of the ramp must stay inside CC 18's range. At deadZone 4 + unitSpeed 4 the
+    /// offset saturates at 63 (about 14.75x), so a max above that would ramp into a wall.
+    func testMaxScrubSpeedStaysWithinCC18Range() {
+        XCTAssertLessThanOrEqual(clock.maxScrubSpeed, 14.75, "beyond this CC 18 saturates")
+        clock.transportSpeed = clock.maxScrubSpeed
+        destination.reset()
+        clock.tapeNext()
+        let value = destination.packets[0][2]
+        XCTAssertLessThanOrEqual(value, 127)
+        XCTAssertEqual(value, 124, "64 + 4 + 4*14 = 124, just inside the ceiling")
     }
 
     /// Releasing must return CC 18 to centre, or the tape keeps rolling after the finger lifts.

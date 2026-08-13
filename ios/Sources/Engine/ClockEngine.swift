@@ -46,9 +46,19 @@ final class ClockEngine {
     /// persistent playback speed, and because the offset that means "1x" is device-specific
     /// (the op's `unitSpeed` carries it). Defaults to 2x so the seek buttons feel like a
     /// fast-forward rather than plain playback.
+    /// The ceiling is 16x because CC 18 runs out of room before that: at `deadZone 4 +
+    /// unitSpeed 4` the offset reaches its maximum of 63 at about 14.75x, and anything beyond
+    /// saturates rather than going faster.
     var transportSpeed: Double = 2.0 {
-        didSet { transportSpeed = max(0.25, min(8.0, transportSpeed)) }
+        didSet { transportSpeed = max(0.25, min(16.0, transportSpeed)) }
     }
+
+    /// Scrub ramp shape. Holding a seek button starts at `scrubStartSpeed` and reaches
+    /// `maxScrubSpeed` after `scrubRampSeconds`, then holds there. 14x is just under the point
+    /// where CC 18 saturates, so the top of the ramp is the fastest the tape can actually go.
+    var scrubStartSpeed = 1.0
+    var maxScrubSpeed = 14.0
+    var scrubRampSeconds = 1.5
 
     /// Last direction sent by a `.directionalTransport` op: -1 reverse, 0 stopped, +1 forward.
     private(set) var transportDirection = 0
@@ -371,7 +381,7 @@ final class ClockEngine {
         }
     }
 
-    /// Begin scrubbing. Speed starts near 1x and ramps toward 8x over a few seconds of holding.
+    /// Begin scrubbing. Speed starts at `scrubStartSpeed` and ramps to `maxScrubSpeed`.
     func beginScrub(forward: Bool) {
         guard hasMomentaryScrub else {
             // Nudge-style devices have nothing to hold; fire once.
@@ -381,7 +391,7 @@ final class ClockEngine {
         endScrub(resend: false)
         speedBeforeScrub = transportSpeed
         scrubHeldSeconds = 0
-        transportSpeed = 1.0
+        transportSpeed = scrubStartSpeed
         run(forward ? transport.next : transport.prev)
 
         let t = DispatchSource.makeTimerSource(queue: masterQueue)
@@ -389,8 +399,10 @@ final class ClockEngine {
         t.setEventHandler { [weak self] in
             guard let self else { return }
             self.scrubHeldSeconds += 0.15
-            // Ramp 1x -> 8x over ~3s held, then hold at the top.
-            let ramped = min(8.0, 1.0 + self.scrubHeldSeconds * 2.3)
+            // Ramp start -> max over scrubRampSeconds held, then hold at the top.
+            let perSecond = (self.maxScrubSpeed - self.scrubStartSpeed) / self.scrubRampSeconds
+            let ramped = min(self.maxScrubSpeed,
+                             self.scrubStartSpeed + self.scrubHeldSeconds * perSecond)
             guard abs(ramped - self.transportSpeed) > 0.05 else { return }
             self.transportSpeed = ramped
             self.run(forward ? self.transport.next : self.transport.prev)

@@ -111,6 +111,25 @@ Thread.sleep(forTimeInterval: 6)
 // difference between 1x and 3x reverse is obvious by ear anyway.
 let byEar = mode.hasSuffix("ear")
 
+// Does the TP-7 *receive* CC 30, or is the wheel transmit-only? It appears in the controller-mode
+// map, where the device drives other gear; nothing says it listens. If it does listen, a stream
+// of small deltas should jog the tape — 1..63 one way, 127..65 the other (127 = -1).
+if mode == "wheelear" {
+    say("BY EAR. tape STOPPED, mid-file. does incoming CC 30 move the tape?")
+    say("")
+    for (label, value) in [("forward (+2, 60x)", 2), ("reverse (-2, 60x)", 126)] {
+        say("sending CC 30 = \(value) — \(label)")
+        for _ in 0..<60 {
+            send([0xB0, 0x1E, UInt8(value)])
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+        say("  (watch the reel and the position)")
+        Thread.sleep(forTimeInterval: 3)
+    }
+    say("done — did the tape move at all, and did the two bursts move it opposite ways?")
+    exit(0)
+}
+
 // Did the app's CC 18 actually take control, or did the device simply carry on with its own
 // reverse and ignore the burst? Both sound like unchanged normal-speed reverse. This settles it:
 // after the burst, send CC 18 = 64 on its own. Once engaged, 64 means zero speed and the tape
