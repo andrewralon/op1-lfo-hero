@@ -2,7 +2,8 @@
 
 > Multi-device support (op-1 field / tx-6 / tp-7) has its own status file:
 > [FIELD_DEVICE_SUPPORT.md](FIELD_DEVICE_SUPPORT.md) — what is done, what is untested, and what
-> is still only assumed. Protocol detail is in [RESEARCH.md](RESEARCH.md).
+> is still only assumed. Protocol detail is in [RESEARCH.md](RESEARCH.md), and planning documents
+> (deferred, shipped and superseded) are in [PLANS.md](PLANS.md).
 
 ## To fix
 - [ ] HIGH - nothing has been tested over BLE. all hardware testing so far was usb-c. ble peripheral names for tx-6/tp-7 are still guesses, so auto-detect may silently fail and require the manual device override
@@ -15,6 +16,7 @@
 - [ ] LOW - tx-6: its faders/knobs/track buttons transmit a full control-surface map on ch 1 (faders cc1-6, knobs cc7-24, track buttons cc25-30). could drive the app's mixer UI from the hardware — needs a separate transmit table, since it collides with the receive map (see RESEARCH.md)
 - [ ] MED - tx-6: CC 120 mute polarity unverified — does 127 mute or unmute?
 - [ ] MED - tx-6: CC 46 is a stateless start/stop toggle, so app and device transport can desync if play is pressed on the device
+- [ ] MED - tx-6: replace the play/stop buttons with FX I / FX II toggles, matching the two buttons on the device. spec in [PLANS.md](PLANS.md) — blocked on confirming CC 46 does anything, since play/stop also send the start/stop a clock-slaved sequencer needs
 - [ ] MED - tx-6/tp-7: BLE peripheral names unverified (the tx-6 may not expose BLE MIDI at all). manual device override in settings is the escape hatch
 - [ ] LOW - tp-7: pitch bend = playback speed as an lfo target (ParamBinding.pitchBend exists but is unused)
 - [ ] LOW - tp-7: input gain only exists on channels 1-3 — grey it out on 4-6 rather than just hiding the binding
