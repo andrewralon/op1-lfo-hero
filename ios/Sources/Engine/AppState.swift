@@ -183,9 +183,20 @@ final class AppState: ObservableObject {
 
     private let settingsKey = "AppSettings"
 
-    /// Old `Parameter` raw value → new `ParamSpec.id`. Empty on purpose: the OP-1 profile's ids
-    /// *are* the old raw values. Kept as the documented hook if an id ever has to change.
-    private static let legacyParamIdMap: [String: String] = [:]
+    /// Old `ParamSpec.id` → current id, so renaming one does not orphan saved clips.
+    ///
+    /// The OP-1's ids are the old `Parameter` raw values, so nothing was needed for the
+    /// multi-device refactor. Entries here are renames made since.
+    private static let legacyParamIdMap: [String: String] = [
+        // Renamed once it was measured: bend is a signed velocity offset, and calling it
+        // "speed" implied a multiplier it never was.
+        "tp7.speed": "tp7.pitchbend",
+    ]
+
+    /// Resolve a saved parameter id to its current one. Must be applied everywhere a persisted
+    /// id is read — the selected parameter *and* every saved clip — or a rename fixes one and
+    /// silently drops the other.
+    static func migratedParamId(_ id: String) -> String { legacyParamIdMap[id] ?? id }
 
     private func loadSettings() {
         if CommandLine.arguments.contains("--uitest-reset") {
@@ -246,14 +257,19 @@ final class AppState: ObservableObject {
         if !on.values.contains(where: { $0 != 0 }) { on[1] = 1 }
         trackOn = Dictionary(uniqueKeysWithValues: tracks.map { ($0, on[$0] ?? 0) })
 
-        let savedId = Self.legacyParamIdMap[st.lfoParamId] ?? st.lfoParamId
+        let savedId = Self.migratedParamId(st.lfoParamId)
         lfoParam = newProfile.param(savedId)
                 ?? newProfile.param(newProfile.defaultParamId)
                 ?? newProfile.params[0]   // set last — didSet may adjust masterOn
 
         if st.isClockMaster || !newProfile.caps.canBeClockMaster { enableClock() } else { disableClock() }
 
-        for lfo in st.activeLfos where lfo.loop {
+        for saved in st.activeLfos where saved.loop {
+            // Saved clips carry a paramId too, so a rename has to be applied here as well —
+            // otherwise the map fixes the selected parameter while every chip using it is
+            // silently dropped as unresolvable.
+            var lfo = saved
+            lfo.paramId = Self.migratedParamId(lfo.paramId)
             guard lfo.deviceId == newProfile.id,
                   newProfile.param(lfo.paramId) != nil,
                   lfo.track == 0 || tracks.contains(lfo.track) else {

@@ -656,20 +656,20 @@ final class TP7PlaybackParamsTests: XCTestCase {
     /// Pitch bend is 14-bit, but parameters are always 0-127, so the value must be mapped
     /// across the full range — otherwise an LFO would only ever reach the slowest speeds.
     func testSpeedMapsAcrossTheFullPitchBendRange() {
-        XCTAssertEqual(send("tp7.speed", 0),   [[0xE0, 0, 0]], "slowest = x0.25")
-        XCTAssertEqual(send("tp7.speed", 127), [[0xE0, 127, 127]], "fastest = x2.0")
+        XCTAssertEqual(send("tp7.pitchbend", 0),   [[0xE0, 0, 0]], "slowest = x0.25")
+        XCTAssertEqual(send("tp7.pitchbend", 127), [[0xE0, 127, 127]], "fastest = x2.0")
     }
 
     /// Mid-scale must land at pitch-bend centre, which the device treats as normal speed.
     func testSpeedMidScaleIsAboutCentre() {
-        let p = send("tp7.speed", 64)[0]
+        let p = send("tp7.pitchbend", 64)[0]
         let value = Int(p[1]) | Int(p[2]) << 7
         XCTAssertEqual(p[0], 0xE0)
         XCTAssertEqual(Double(value), 8192, accuracy: 100, "64 should sit at x1.0 (8192)")
     }
 
     func testSpeedIsMasterOnlyAndTargetable() {
-        let spec = DeviceProfile.tp7.param("tp7.speed")!
+        let spec = DeviceProfile.tp7.param("tp7.pitchbend")!
         XCTAssertTrue(spec.isMasterOnly)
         XCTAssertTrue(spec.lfoTargetable, "speed is exactly the kind of thing to modulate")
     }
@@ -715,7 +715,7 @@ final class TP7PlaybackParamsTests: XCTestCase {
 
     func testAllThreeAppearInThePicker() {
         let ids = DeviceProfile.tp7.pickerParams.map(\.id)
-        XCTAssertTrue(ids.contains("tp7.speed"))
+        XCTAssertTrue(ids.contains("tp7.pitchbend"))
         XCTAssertTrue(ids.contains("tp7.direction"))
         XCTAssertTrue(ids.contains("tp7.tempo"))
     }

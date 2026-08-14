@@ -306,7 +306,7 @@ extension DeviceProfile {
         // reverse), which is what proves it is signed rather than scaling.
         // NOTE: it persists across stop/play with no on-screen feedback, so a stray value
         // silently pitch-shifts everything until returned to centre.
-        masterPitchBend("tp7.speed", "speed", "spd", channel: 0),
+        masterPitchBend("tp7.pitchbend", "pitch bend", "pit", channel: 0),
 
         // Direction, behaving like mute: a two-state control on CC 18. Above the threshold
         // plays forward, below plays reverse. CC 18 takes over the transport as soon as it is

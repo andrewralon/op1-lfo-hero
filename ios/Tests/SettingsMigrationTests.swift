@@ -198,3 +198,41 @@ final class SettingsMigrationTests: XCTestCase {
         }
     }
 }
+
+/// Renaming a `ParamSpec.id` orphans anything that saved the old one, so every rename needs a
+/// `legacyParamIdMap` entry — and it has to be applied to saved *clips*, not just the selected
+/// parameter, or the chips using it are dropped as unresolvable while the picker looks fine.
+@MainActor
+final class ParamIdRenameTests: XCTestCase {
+
+    /// `tp7.speed` became `tp7.pitchbend` once measurement showed bend is a signed velocity
+    /// offset rather than a speed multiplier.
+    func testSpeedMigratesToPitchBend() {
+        XCTAssertEqual(AppState.migratedParamId("tp7.speed"), "tp7.pitchbend")
+    }
+
+    /// Ids with no rename must pass through untouched.
+    func testUnrenamedIdsAreUnchanged() {
+        for id in ["volume", "pan", "mute", "fx 1", "tx6.vol", "tp7.loop", "nonsense"] {
+            XCTAssertEqual(AppState.migratedParamId(id), id)
+        }
+    }
+
+    /// The point of the map: the migrated id must actually resolve in the profile.
+    func testMigratedIdResolvesButTheOldOneIsGone() {
+        let p = DeviceProfile.tp7
+        XCTAssertNil(p.param("tp7.speed"), "the old id should no longer exist")
+        XCTAssertNotNil(p.param(AppState.migratedParamId("tp7.speed")),
+                        "and the migrated id must resolve")
+    }
+
+    /// Every entry in the map must point at an id that exists in some profile — a typo there
+    /// would silently drop clips instead of rescuing them.
+    func testEveryMigrationTargetExists() {
+        for old in ["tp7.speed"] {
+            let new = AppState.migratedParamId(old)
+            XCTAssertTrue(DeviceRegistry.all.contains { $0.param(new) != nil },
+                          "migration target '\(new)' resolves in no profile")
+        }
+    }
+}
