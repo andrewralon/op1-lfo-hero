@@ -325,14 +325,24 @@ Faders **do** transmit; an earlier session that saw none simply had no fader mov
 
 ### MIDI clock
 
-**Zero `0xF8` ticks in ~12 minutes**, including 10 minutes of continuous hands-on use, and zero
-active sensing. MIDI clock transmits continuously when enabled, independent of which control is
-touched, so this is strong evidence the TX-6 does not send clock in its default configuration —
-supporting `canBeClockMaster: false` (the app is always the tempo source).
+**It does send clock — but only when configured to.** With `clock SRC` set to internal and clock
+`out` enabled, the TX-6 streams 24 PPQN steadily: **32.00 ticks/s measured over 20 s against a
+device display reading 80 BPM**, which is exact (32 / 24 x 60 = 80.0).
 
-Remaining caveat: some devices only emit clock while their sequencer runs, and it was not
-confirmed that the TX-6's sequencer was started during these captures. The TX-6's outgoing
-table lists no transport control at all, so pressing play may simply transmit nothing.
+An earlier capture here recorded **zero `0xF8` in ~12 minutes**, including 10 minutes of hands-on
+use, and concluded the TX-6 does not send clock — which set `canBeClockMaster: false` and
+disabled the app's metronome toggle for this device. That capture was in the **default**
+configuration, with clock out off. The caveat noted at the time (that the test conditions might
+not have been right) turned out to be the whole story.
+
+Worth generalising: *"it sent nothing while I watched"* is not the same as *"it cannot send"*.
+The same mistake was made on the TP-7, also marked `canBeClockMaster: false` before it was found
+to stream clock in `sync` mode. Both are now `true`, and both are off by default — so the app
+remains the tempo source unless the user switches deliberately.
+
+Consequence for the app: with the TX-6 as clock source, its −/+ tempo nudges move both displays
+together. While the app is master the two tempos are independent and drift apart, which is what
+the nudge buttons appear to do from the app's side.
 
 ### Two device settings are required before any of this works
 

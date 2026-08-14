@@ -152,9 +152,12 @@ extension DeviceProfile {
         ),
         caps: DeviceCapabilities(
             hasPan: true,
-            // The TX-6 guide documents no MIDI clock output, so the app stays master.
-            canBeClockMaster: false,
-            followsClock: true,     // UNVERIFIED — see notes/RESEARCH.md
+            // Measured: with `clock SRC` internal and clock `out` enabled, the TX-6 streams
+            // 24 PPQN — 32.00 ticks/s against a device reading 80 BPM, exact. An earlier capture
+            // saw zero ticks in 12 minutes, but that was the default configuration with clock
+            // out off. Off by default, so the app is still master unless the user switches.
+            canBeClockMaster: true,
+            followsClock: true,     // verified: the device tracks the app's tempo over usb/ble
             hasTempoParam: false,
             clockLabel: "tx6",
             // Verified on hardware: in controller mode the TX-6 transmits its own map on
@@ -166,6 +169,7 @@ extension DeviceProfile {
         setupSteps: [
             "set `midi control` to `in` — until you do, the tx-6 ignores everything the app sends. note this also stops the tx-6 sending its own knob/fader messages.",
             "set `clock SRC` to `usb` — otherwise it won't follow the app's tempo.",
+            "to go the other way and have the app follow the tx-6, set `clock SRC` to internal and enable clock `out`, then tap the metronome so it reads `tx6`. the −/+ buttons then move both tempos together.",
             "while an lfo drives a channel, moving that channel's fader on the tx-6 will fight the lfo rather than take over. pause the chip first.",
         ]
     )

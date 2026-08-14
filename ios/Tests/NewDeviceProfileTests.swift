@@ -112,7 +112,9 @@ final class TX6ProfileTests: XCTestCase {
 
     func testCapabilities() {
         XCTAssertTrue(profile.caps.hasPan)
-        XCTAssertFalse(profile.caps.canBeClockMaster, "no documented clock output")
+        // Measured at 32.00 ticks/s against a device reading 80 BPM, with clock SRC internal
+        // and clock out enabled. An earlier capture saw none, but that was the default config.
+        XCTAssertTrue(profile.caps.canBeClockMaster, "streams clock when clock out is enabled")
         XCTAssertFalse(profile.caps.hasTempoParam)
     }
 }
@@ -272,11 +274,16 @@ final class TP7ProfileTests: XCTestCase {
         XCTAssertFalse(profile.caps.mirrorsIncomingCC)
     }
 
-    /// The TX-6 genuinely never sends clock; the TP-7 does. Same manufacturer, opposite
-    /// behaviour — a reminder not to generalise one TE device's behaviour to another.
-    func testClockBehaviourDiffersFromTheTX6() {
-        XCTAssertTrue(DeviceProfile.tp7.caps.canBeClockMaster)
-        XCTAssertFalse(DeviceProfile.tx6.caps.canBeClockMaster)
+    /// Both 6-channel devices can be the tempo source, but only once configured for it — and
+    /// the configuration differs: the TP-7 needs `sync` midi mode, the TX-6 needs internal clock
+    /// SRC plus clock `out`. Neither does it by default, so the app stays master until asked.
+    ///
+    /// Both were originally marked `false` from captures taken in the default configuration.
+    /// "It sent nothing while I watched" is not the same as "it cannot send".
+    func testBothSixChannelDevicesCanBeTheTempoSource() {
+        XCTAssertTrue(DeviceProfile.tp7.caps.canBeClockMaster, "streams clock in `sync` mode")
+        XCTAssertTrue(DeviceProfile.tx6.caps.canBeClockMaster, "streams clock when clock out is on")
+        XCTAssertTrue(DeviceProfile.op1Field.caps.canBeClockMaster)
     }
 }
 
