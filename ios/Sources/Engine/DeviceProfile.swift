@@ -143,6 +143,13 @@ enum TransportOp: Hashable {
     /// 0xFA the first time, 0xFB to resume — ClockEngine tracks which.
     case midiStartOrContinue
     case midiStop
+    /// Set the tape direction absolutely: forward above the threshold, reverse below.
+    ///
+    /// Distinct from `.pressPlay`, which is momentary — one press per rising edge. This follows
+    /// the waveform's *shape*, so a square LFO plays forward on the high half and reverse on the
+    /// low half. Routed into ClockEngine so it inherits the direction resync; without that, CC 18
+    /// is additive and lands on 1.13x or ~3x depending on what the device was already doing.
+    case setDirection(forward: Bool)
     /// Press the play button, exactly as the UI does — routed straight into `ClockEngine.play()`
     /// rather than expanded into bytes here. That delegation is the point: a parameter built
     /// this way cannot drift from the button, however play's behaviour changes (today, pressing

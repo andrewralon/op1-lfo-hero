@@ -308,15 +308,19 @@ extension DeviceProfile {
         // silently pitch-shifts everything until returned to centre.
         masterPitchBend("tp7.pitchbend", "pitch bend", "pit", channel: 0),
 
-        // Direction, behaving like mute: a two-state control on CC 18. Above the threshold
-        // plays forward, below plays reverse. CC 18 takes over the transport as soon as it is
-        // sent. The values are offset 8 either side of centre, not 4: measurement showed offset
-        // 4 is inside the dead zone and barely moves the tape (x0.06), while 8 is x1.13.
+        // Direction: absolute, forward above the threshold and reverse below, so a square LFO
+        // plays forward on the high half and reverse on the low half.
+        //
+        // Not a raw CC. This used to send CC 18 = 72/56 directly, which was wrong once CC 18 was
+        // measured to be *additive*: the same value lands on x1.13 or ~3x depending on which way
+        // the device was already going, and the device never reports that. Going through
+        // ClockEngine gets the stop/continue resync, so both directions are a real 1x.
+        //
+        // Edge-triggered by Controller, so a sustained value does not re-send the resync.
         ParamSpec(id: "tp7.direction", name: "direction", short: "dir",
                   track: nil,
-                  master: .cc(cc: 18, channel: .pinned(0),
-                              encoding: .switching(SwitchEncoding(onValue: 72, offValue: 56,
-                                                                  threshold: 64)))),
+                  master: .transport(onOps: [.setDirection(forward: true)],
+                                     offOps: [.setDirection(forward: false)])),
 
         // The play *button*, as a parameter. Each rising edge is one press, so it inherits the
         // button's behaviour exactly — including play-while-playing reversing the tape. Falling

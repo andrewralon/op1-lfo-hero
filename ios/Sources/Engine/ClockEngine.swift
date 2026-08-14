@@ -320,8 +320,20 @@ final class ClockEngine {
     /// play backwards.
     func reverseDirection() {
         guard hasMomentaryScrub else { return }   // no directional transport on this device
+        setDirection(forward: transportDirection < 0)
+    }
 
-        if transportDirection < 0 {
+    /// Drive the tape in an absolute direction, for the `direction` parameter.
+    ///
+    /// No-op when already going that way, so a sustained LFO value does not re-send the
+    /// stop/continue resync on every crossing. `transportDirection == 0` counts as forward: the
+    /// device is either playing forward under its own transport or parked, and neither needs
+    /// CC 18 to reach forward.
+    func setDirection(forward: Bool) {
+        guard hasMomentaryScrub else { return }
+        guard forward == (transportDirection < 0) else { return }   // already there
+
+        if forward {
             // Currently reversing -> go forward. Release the reverse trim first, then CC 18, and
             // let the device play at its own rate.
             releaseTrim()
@@ -451,6 +463,10 @@ final class ClockEngine {
                 }
             case .midiStop:
                 router?.send([0xFC])
+            case .setDirection(let forward):
+                // Delegated for the same reason as .pressPlay: CC 18 is additive, so reaching a
+                // known direction needs the resync, not a raw value.
+                setDirection(forward: forward)
             case .pressPlay:
                 // Delegate, never duplicate: this is the same entry point the UI button uses, so
                 // the parameter and the button cannot diverge. Safe from recursion because

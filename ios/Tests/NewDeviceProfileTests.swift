@@ -676,22 +676,31 @@ final class TP7PlaybackParamsTests: XCTestCase {
 
     // MARK: - Direction
 
-    /// Behaves like mute: a two-state control, forward above the threshold, reverse below.
-    /// 72 and 56 are offset 8, the nearest step to 1x — measured against the sync-mode clock.
-    /// The old values (68/60, offset 4) sit inside the dead zone and barely move the tape.
-    func testDirectionSnapsForwardOrReverse() {
-        XCTAssertEqual(send("tp7.direction", 127), [[0xB0, 18, 72]], "forward at 1x")
-        XCTAssertEqual(send("tp7.direction", 64),  [[0xB0, 18, 72]], "threshold is forward")
-        XCTAssertEqual(send("tp7.direction", 63),  [[0xB0, 18, 56]], "below threshold reverses")
-        XCTAssertEqual(send("tp7.direction", 0),   [[0xB0, 18, 56]], "reverse at 1x")
+    /// Direction must NOT be a raw CC. CC 18 is additive, so a fixed value lands on x1.13 or
+    /// ~3x depending on which way the device was already going — state the app cannot read.
+    /// Going through ClockEngine gets the stop/continue resync instead.
+    func testDirectionIsATransportBindingNotARawCC() {
+        let spec = DeviceProfile.tp7.param("tp7.direction")!
+        guard case .transport(let onOps, let offOps, _)? = DeviceProfile.tp7.binding(spec, track: 0) else {
+            return XCTFail("direction must be a .transport binding, not a raw CC")
+        }
+        XCTAssertEqual(onOps,  [.setDirection(forward: true)])
+        XCTAssertEqual(offOps, [.setDirection(forward: false)])
+        XCTAssertTrue(spec.isMasterOnly)
     }
 
-    /// A square-wave LFO on direction should alternate cleanly between the two, never landing
-    /// on an intermediate speed.
-    func testDirectionNeverEmitsAnIntermediateValue() {
+    /// Absolute, not momentary: high is forward and low is reverse, whatever the current state.
+    /// That is what makes a square LFO play forward on the high half and reverse on the low.
+    func testDirectionIsAbsoluteAndSnapsAtTheThreshold() {
+        let spec = DeviceProfile.tp7.param("tp7.direction")!
+        guard case .transport(let onOps, let offOps, let threshold)? =
+                DeviceProfile.tp7.binding(spec, track: 0) else { return XCTFail("not transport") }
+        XCTAssertEqual(threshold, 64)
+        // Every value resolves to one of exactly two op lists — never an intermediate speed.
         for v in stride(from: 0.0, through: 127.0, by: 1.0) {
-            let byte = send("tp7.direction", v)[0][2]
-            XCTAssertTrue(byte == 72 || byte == 56, "value \(v) produced \(byte)")
+            let ops = Int(v.rounded()) >= threshold ? onOps : offOps
+            XCTAssertTrue(ops == [.setDirection(forward: true)] || ops == [.setDirection(forward: false)],
+                          "value \(v) produced \(ops)")
         }
     }
 
@@ -895,6 +904,62 @@ final class TP7ScrubAndReverseTests: XCTestCase {
         destination.reset()
         clock.play()
         XCTAssertEqual(destination.packets, [[0xFB]], "no evidence of rolling — just play")
+    }
+
+    // MARK: - Absolute direction
+
+    /// Reverse must go through the same resync as a play-press: recentre CC 18, stop, continue,
+    /// then engage CC 18 and trim. Without it, CC 18 is additive and stacks on whatever the
+    /// device was doing.
+    func testSetDirectionReverseResyncsThenEngages() {
+        clock.play()                 // rolling forward
+        destination.reset()
+        clock.setDirection(forward: false)
+        let trim = clock.reverseTrimBend
+        XCTAssertEqual(destination.packets,
+                       [[0xB0, 18, 64], [0xFC], [0xFB],
+                        [0xB0, 18, 56],
+                        [0xE0, UInt8(trim & 0x7F), UInt8((trim >> 7) & 0x7F)]])
+        XCTAssertEqual(clock.transportDirection, -1)
+    }
+
+    /// Forward releases the trim and hands the transport back, so the tape runs at the device's
+    /// own rate rather than an approximation.
+    func testSetDirectionForwardReleasesAndContinues() {
+        clock.play()
+        clock.setDirection(forward: false)
+        destination.reset()
+        clock.setDirection(forward: true)
+        XCTAssertEqual(destination.packets, [[0xE0, 0, 64], [0xB0, 18, 64], [0xFB]])
+        XCTAssertEqual(clock.transportDirection, 0)
+    }
+
+    /// Idempotent. An LFO holding a value must not re-send the stop/continue resync — that
+    /// would stutter the tape on every clock tick.
+    func testSetDirectionIsIdempotent() {
+        clock.play()
+        clock.setDirection(forward: false)
+        destination.reset()
+        clock.setDirection(forward: false)
+        clock.setDirection(forward: false)
+        XCTAssertEqual(destination.packets, [], "already reversing — nothing to send")
+
+        clock.setDirection(forward: true)
+        destination.reset()
+        clock.setDirection(forward: true)
+        XCTAssertEqual(destination.packets, [], "already forward — nothing to send")
+    }
+
+    /// The OP-1 has no directional transport, so this must do nothing at all rather than
+    /// emitting CC 18 at a device that has no such control.
+    func testSetDirectionIsANoOpWithoutADirectionalTransport() {
+        let c = ClockEngine()
+        c.router = destination
+        c.transport = DeviceProfile.op1Field.transport
+        destination.reset()
+        c.setDirection(forward: false)
+        c.setDirection(forward: true)
+        XCTAssertEqual(destination.packets, [])
     }
 
     /// The OP-1 has no such behaviour — play must keep meaning play.
