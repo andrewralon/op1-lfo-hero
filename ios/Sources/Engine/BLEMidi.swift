@@ -93,12 +93,10 @@ final class BLEMidi: NSObject, ObservableObject {
         if let p = peripheral { central.cancelPeripheralConnection(p) }
     }
 
-    /// Wraps raw MIDI bytes in a minimal BLE MIDI single-packet and writes without response.
+    /// Wraps raw MIDI bytes in a BLE MIDI packet and writes without response.
     func send(_ bytes: [UInt8]) {
         guard let c = midiChar, let p = peripheral, p.state == .connected else { return }
-        var pkt: [UInt8] = [0x80, 0x80]
-        pkt.append(contentsOf: bytes)
-        p.writeValue(Data(pkt), for: c, type: .withoutResponse)
+        p.writeValue(Data(BleMidiPacket.frame(bytes)), for: c, type: .withoutResponse)
     }
 
     // MARK: - BLE MIDI packet parser
@@ -119,8 +117,25 @@ final class BLEMidi: NSObject, ObservableObject {
     }
 }
 
-/// The BLE-MIDI packet parser, split out so it can be tested without CoreBluetooth.
+/// BLE-MIDI packet framing and parsing, split out so it can be tested without CoreBluetooth.
 enum BleMidiPacket {
+
+    /// Wrap MIDI bytes in a BLE-MIDI packet: header, timestamp, then the message.
+    ///
+    /// The timestamp is a **13-bit millisecond counter** — the high 6 bits ride in the header,
+    /// the low 7 in the timestamp byte. It is not decoration: the receiver uses it to recover
+    /// when each message was meant to happen, because BLE delivers packets in bursts with
+    /// unpredictable latency.
+    ///
+    /// This used to send a constant `[0x80, 0x80]`, i.e. "everything happened at time zero". A
+    /// TX-6 receiving the app's 24 PPQN clock therefore saw every tick as simultaneous and
+    /// displayed **640000 BPM** on its own screen.
+    static func frame(_ bytes: [UInt8], timestampMs: Int? = nil) -> [UInt8] {
+        let ms = UInt16(truncatingIfNeeded: timestampMs ?? Int(Date().timeIntervalSince1970 * 1000)) & 0x1FFF
+        var pkt: [UInt8] = [UInt8(0x80 | (ms >> 7)), UInt8(0x80 | (ms & 0x7F))]
+        pkt.append(contentsOf: bytes)
+        return pkt
+    }
 
     static func parse(_ data: Data,
                       onClock: (() -> Void)?,

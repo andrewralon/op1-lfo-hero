@@ -102,6 +102,50 @@ final class BleMidiParserTests: XCTestCase {
         XCTAssertEqual(ccs.first?.ch, 5)
     }
 
+    // MARK: - Outgoing framing
+
+    /// The timestamp must actually advance. It used to be a constant `[0x80, 0x80]`, meaning
+    /// "everything happened at time zero" — a TX-6 receiving the app's 24 PPQN clock saw every
+    /// tick as simultaneous and showed 640000 BPM on its own display.
+    func testFramingCarriesAMovingTimestamp() {
+        let a = BleMidiPacket.frame([0xF8], timestampMs: 1000)
+        let b = BleMidiPacket.frame([0xF8], timestampMs: 1001)
+        XCTAssertNotEqual(a, b, "consecutive messages must not share a timestamp")
+
+        // 13 bits: high 6 in the header, low 7 in the timestamp byte.
+        XCTAssertEqual(a[0], UInt8(0x80 | (1000 >> 7)))
+        XCTAssertEqual(a[1], UInt8(0x80 | (1000 & 0x7F)))
+        XCTAssertEqual(Array(a.dropFirst(2)), [0xF8])
+    }
+
+    /// Both framing bytes must have the high bit set, or the receiver cannot find the boundary.
+    func testFramingBytesAlwaysHaveTheHighBitSet() {
+        for ms in [0, 1, 127, 128, 8191, 99999] {
+            let p = BleMidiPacket.frame([0xB0, 7, 100], timestampMs: ms)
+            XCTAssertEqual(p[0] & 0x80, 0x80, "header high bit, ms \(ms)")
+            XCTAssertEqual(p[1] & 0x80, 0x80, "timestamp high bit, ms \(ms)")
+        }
+    }
+
+    /// What we send must be readable by what we parse.
+    func testFramedMessagesRoundTrip() {
+        parse(BleMidiPacket.frame([0xB3, 74, 42], timestampMs: 5000))
+        XCTAssertEqual(ccs.map { [$0.ch, $0.cc, $0.val] }, [[3, 74, 42]])
+
+        parse(BleMidiPacket.frame([0xF8], timestampMs: 5001))
+        XCTAssertEqual(clocks, 1)
+    }
+
+    /// A timestamp landing on 0xF8 is the aliasing case, now reachable from our own framing.
+    func testRoundTripSurvivesATimestampThatLooksLikeClock() {
+        // Low 7 bits = 0x78 puts 0xF8 in the timestamp byte.
+        let p = BleMidiPacket.frame([0xB0, 7, 64], timestampMs: 0x78)
+        XCTAssertEqual(p[1], 0xF8, "this packet's timestamp byte is 0xF8")
+        parse(p)
+        XCTAssertEqual(clocks, 0, "and it must still not be read as a clock tick")
+        XCTAssertEqual(ccs.count, 1)
+    }
+
     /// Truncated and undersized packets must not read past the end or emit garbage.
     func testTruncatedPacketsAreSafe() {
         for bytes: [UInt8] in [[], [0x80], [0x80, 0x81], [0x80, 0x81, 0xB0], [0x80, 0x81, 0xB0, 7]] {
