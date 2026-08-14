@@ -1031,3 +1031,46 @@ final class TP7ScrubAndReverseTests: XCTestCase {
         XCTAssertEqual(destination.packets, [[0xB0, 83, 127], [0xF2, 16, 0]], "one tape seek")
     }
 }
+
+/// A `direction` LFO driven through the real chain: AutomationEngine -> Controller ->
+/// ClockEngine -> destination. Reproduces "the direction LFO does nothing" end to end.
+final class TP7DirectionLfoTests: XCTestCase {
+
+    private var destination: RecordingDestination!
+    private var clock: ClockEngine!
+    private var ctrl: Controller!
+    private var automation: AutomationEngine!
+
+    override func setUp() {
+        super.setUp()
+        destination = RecordingDestination()
+        clock = ClockEngine()
+        clock.router = destination
+        clock.transport = DeviceProfile.tp7.transport
+        ctrl = Controller(router: destination)
+        ctrl.setProfile(.tp7)
+        ctrl.transportRunner = { [weak clock] ops in clock?.runOps(ops) }
+        automation = AutomationEngine()
+        automation.controller = ctrl
+        automation.setProfile(.tp7)
+    }
+
+    /// A square wave spanning the threshold must flip the tape both ways as it cycles.
+    func testSquareLfoOnDirectionFlipsTheTape() {
+        clock.play()                       // rolling forward
+        let clip = LfoClip(deviceId: "tp7", track: 0, paramId: "tp7.direction",
+                           wave: .square, rateTicks: 24, depth: 50, centerValue: 64,
+                           inverted: false, loop: true, originalValue: 64)
+        automation.add(clip)
+
+        destination.reset()
+        var sawReverse = false, sawForward = false
+        for t in 1...96 {
+            automation.onTick(t)
+            if destination.packets.contains([0xB0, 18, 56]) { sawReverse = true }
+            if destination.packets.contains([0xE0, 0, 64]) { sawForward = true }
+        }
+        XCTAssertTrue(sawReverse, "the low half of the square must engage reverse")
+        XCTAssertTrue(sawForward, "the high half must return to forward")
+    }
+}
