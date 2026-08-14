@@ -53,6 +53,12 @@ final class ClockEngine {
         didSet { transportSpeed = max(0.25, min(16.0, transportSpeed)) }
     }
 
+    /// Nudge the app's own tempo, in BPM. Set by AppState.
+    ///
+    /// Only reached by `.ccRelative`, which only the TX-6 uses (the OP-1 seeks tape by SPP and
+    /// the TP-7 scrubs with CC 18), so no other device can be affected by it.
+    var appTempoNudge: ((Double) -> Void)?
+
     /// Scrub ramp shape. Holding a seek button starts at `scrubStartSpeed` and reaches
     /// `maxScrubSpeed` after `scrubRampSeconds`, then holds there. 14x is just under the point
     /// where CC 18 saturates, so the top of the ramp is the fastest the tape can actually go.
@@ -480,6 +486,14 @@ final class ClockEngine {
             case .cc(let ch, let cc, let value):
                 sendCC(ch: ch, cc: cc, val: value)
             case .ccRelative(let ch, let cc, let delta):
+                // A tempo nudge has to go to whoever owns the clock. While the app is master the
+                // device is slaved to us and its own tempo is ignored, so sending the CC changes
+                // a number nothing is using — the buttons appear dead. Nudge the app's tempo
+                // instead and the device follows, so both displays move together.
+                if isClockMaster, let nudge = appTempoNudge {
+                    nudge(Double(delta))
+                    break
+                }
                 // Two's complement, not centred on 64: 1...63 count up, 127...65 count down.
                 // Measured on TE hardware — the TP-7's wheel sends 1,2,3 one way and
                 // 125,126,127 the other. Sending `64 + delta` made + read as -63 and - as +63,

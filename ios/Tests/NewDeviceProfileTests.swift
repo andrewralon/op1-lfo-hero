@@ -1116,3 +1116,59 @@ final class DefaultCentreTests: XCTestCase {
         }
     }
 }
+
+/// Tempo nudges have to reach whoever owns the clock. While the app is master the TX-6 is slaved
+/// to it, so its internal tempo is ignored and sending CC 47 changes a number nothing is using —
+/// which is exactly how it looked on hardware: the buttons did nothing over BLE.
+final class TempoNudgeRoutingTests: XCTestCase {
+
+    private var destination: RecordingDestination!
+    private var clock: ClockEngine!
+
+    override func setUp() {
+        super.setUp()
+        destination = RecordingDestination()
+        clock = ClockEngine()
+        clock.router = destination
+        clock.transport = DeviceProfile.tx6.transport
+    }
+
+    func testNudgesTheAppTempoWhileAppIsMaster() {
+        clock.enableClock(bpm: 120)
+        var nudges: [Double] = []
+        clock.appTempoNudge = { nudges.append($0) }
+
+        destination.reset()
+        clock.tapeNext()
+        clock.tapePrev()
+        XCTAssertEqual(nudges, [1, -1])
+        // The master clock is running, so 0xF8 ticks are expected here — what must not appear is
+        // a CC to a device whose own tempo is being ignored.
+        let ccs = destination.packets.filter { $0.count == 3 && $0[0] & 0xF0 == 0xB0 }
+        XCTAssertEqual(ccs, [], "must not send CC to a device that is slaved to us")
+        clock.disableClock()
+    }
+
+    func testSendsTheRelativeCCWhenTheDeviceOwnsTheClock() {
+        clock.disableClock()
+        var nudged = false
+        clock.appTempoNudge = { _ in nudged = true }
+
+        destination.reset()
+        clock.tapeNext()
+        XCTAssertEqual(destination.packets, [[0xB6, 47, 1]], "one step up, two's complement")
+        XCTAssertFalse(nudged, "the device owns the tempo — do not move the app's")
+    }
+
+    /// Scoping: only the TX-6 nudges tempo from these buttons. The OP-1 seeks tape by SPP and the
+    /// TP-7 scrubs with CC 18, so neither can reach this path however the clock mode is set.
+    func testOnlyTheTX6UsesRelativeNudges() {
+        for p in DeviceRegistry.all where p.id != "tx6" {
+            let ops = p.transport.prev + p.transport.next
+            XCTAssertFalse(ops.contains { if case .ccRelative = $0 { return true } else { return false } },
+                           "\(p.id) must not use .ccRelative")
+        }
+        let tx6Ops = DeviceProfile.tx6.transport.prev + DeviceProfile.tx6.transport.next
+        XCTAssertTrue(tx6Ops.contains { if case .ccRelative = $0 { return true } else { return false } })
+    }
+}

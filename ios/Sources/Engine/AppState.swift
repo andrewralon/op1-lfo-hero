@@ -405,6 +405,14 @@ final class AppState: ObservableObject {
         automation.controller = controller
         // `.transport` parameters need ClockEngine, which owns play state and song position.
         controller.transportRunner = { [weak clock] ops in clock?.runOps(ops) }
+        // A tempo nudge from the transport buttons while the app is clock master: move the app's
+        // own tempo, which the device is following anyway. TX-6 only — see appTempoNudge.
+        clock.appTempoNudge = { [weak self] delta in
+            Task { @MainActor in
+                guard let self else { return }
+                self.setBpm(self.bpm + delta)
+            }
+        }
         clock.router = router
 
         wireCallbacks()
