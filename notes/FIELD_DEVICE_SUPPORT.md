@@ -5,8 +5,9 @@ Tracks the multi-device feature (OP-1 Field / TX-6 / TP-7) on `feature/support-f
 Protocol details and hardware measurements live in [RESEARCH.md](RESEARCH.md). This file is
 just what is done, what is not, and what is still only assumed.
 
-**Current state:** 104 unit tests, 20 UI tests. TP-7 validated end to end through the app.
-OP-1 and TX-6 not yet run through the app on hardware.
+**Current state:** 156 unit tests, 20 UI tests. TP-7 and TX-6 both validated through the app over
+BLE. **The OP-1 has still never been run on hardware since its MIDI path was rewritten** — that is
+the largest remaining risk on this branch.
 
 ---
 
@@ -59,7 +60,10 @@ Found by hardware testing — **all five would have shipped**:
 - [x] Requires `midi control = in` and `clock SRC = usb` — surfaced in the app's help
 - [x] Mute `CC 120` is absolute, 127 = muted
 - [x] FX bus on pinned channel 8 works; FX enable is global, per-channel send is separate
-- [x] Sends no MIDI clock (~12 minutes of monitoring, zero ticks)
+- [x] Sends MIDI clock **only when configured to** — `clock SRC` internal plus clock `out`.
+      Measured 32.00 ticks/s against a device reading 80 BPM. An earlier 12-minute capture saw
+      zero ticks and concluded it never sends clock; that was the default configuration
+- [x] Follows the app's clock (68 → 101 BPM), so either side can be the tempo source
 - [x] Transmit and receive maps collide (knobs 1-3 transmit CC 7/8/9 = volume/pan/gain inbound)
 - [x] Physical faders fight an LFO rather than taking over — last writer wins
 
@@ -67,7 +71,9 @@ Found by hardware testing — **all five would have shipped**:
 - [x] All four `midi` modes mapped; only `ctrl` blocks input, and it blocks *everything*
 - [x] **Sends MIDI clock** in `sync` mode — undocumented; `canBeClockMaster` is true
 - [x] `CC 18` is a persistent bipolar speed state that must engage before `64` means stop
-- [x] Offset 4 from centre = 1x playback; speed modelled as a multiplier
+- [x] `CC 18` is **additive** and affine: it stacks on the device's own direction, and there is a
+      dead zone before motion starts. Offset 4 is the stall point (x0.06), not 1x — 1x falls at
+      offset ~7.5, so no integer reaches it and reverse trims the rest with pitch bend
 - [x] Play resumes (`0xFB`); a second stop rewinds — the device implements double-stop itself
 - [x] Mute `CC 120` absolute, 127 = muted
 - [x] Input gain linear in dB, 0 to +42 dB, addressing the three input jacks
@@ -76,9 +82,20 @@ Found by hardware testing — **all five would have shipped**:
 - [x] `ctrl` mode transmits the full control surface; found an undocumented `mode` button on CC 28
 - [x] Cue subsystem (CC 16 and note-triggered markers) has no observable effect in any mode
 
+### Hardware validation — over BLE, through the app
+- [x] **BLE is now the tested path.** Every TP-7 and TX-6 test on iPhone ran over Bluetooth, and
+      both devices auto-detect by peripheral name (`tx-6 (ble)` in the status bar) — closing the
+      "the names are guesses" risk
+- [x] Outgoing packets stamped every message with timestamp zero, so a TX-6 read the app's 24 PPQN
+      clock as **640000 BPM**
+- [x] The receive parser read timestamp bytes as clock/start/stop — timestamps span 0x80-0xFF,
+      which includes 0xF8/0xFA/0xFC, so knob traffic injected phantom transport
+- [x] TX-6 mixer, FX buses, tempo nudges and clock sync all driven from the UI
+
 ### End-to-end
-- [x] **TP-7 driven by the app on iPhone over USB** — auto-detect, 6 strips, no pan knobs,
-      profile transport symbols, faders reaching the device, and a working volume LFO
+- [x] **TP-7 driven by the app on iPhone over BLE** — auto-detect, 6 strips, no pan knobs,
+      profile transport symbols, faders reaching the device, and a working volume LFO. Play /
+      reverse / scrub and the parameter set were all exercised the same way
 
 ### Documentation
 - [x] `RESEARCH.md` — full CC tables, hardware findings, and an at-a-glance table of the six
@@ -100,12 +117,10 @@ Found by hardware testing — **all five would have shipped**:
 - [ ] **Decide whether play-resumes applies to the OP-1.** Play now sends Continue rather than
       Start, so the first play no longer rewinds. Applied to all devices; not yet judged on the
       OP-1. Reversible — move it into `TransportMap` if it should be per-device
-- [ ] **Run the TX-6 through the app.** Protocol is verified by script but the UI has never
-      driven it. Bigger profile than the TP-7 (33 params, master bus, two FX buses), so more
-      surface to get wrong. Needs `midi control = in` on the device
-- [ ] **Test BLE.** Nothing has been tested over Bluetooth. The peripheral names for TX-6 and
-      TP-7 are guesses — if they differ from the USB names, auto-detect silently fails and the
-      user has to find the manual override. The TX-6 may not expose BLE MIDI at all
+- [ ] **Run the remaining TX-6 parameters through the app.** The mixer, FX buses and tempo have
+      now been driven from the UI over BLE, but the 13 per-channel params below still have not.
+      Needs `midi control = in` on the device
+
 
 ### 🟠 Medium — verifying things currently taken on trust
 
@@ -116,7 +131,6 @@ Found by hardware testing — **all five would have shipped**:
       track) in one test, but the guide's record menu is images-only and could not be read. If
       an overwrite setting exists, the app must warn before arming record
 - [ ] **TP-7: transport in `cue` mode** — the last empty cell in the mode table
-- [ ] **TX-6: does it follow MIDI clock?** It never sends clock, but following is untested
 - [ ] Verify the 6-track layout on iPad, both orientations. Only iPhone has been checked on
       hardware; iPad has simulator screenshots only
 
