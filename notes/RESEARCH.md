@@ -249,6 +249,15 @@ On/off encoding: 0-63 = off, 64-127 = on.
 it would drift the tempo in one direction forever instead of oscillating. It is reachable only
 from the −/+ transport buttons.
 
+**Relative encoders are two's complement, not centred on 64.** `1...63` count up, `127...65`
+count down (`127` = -1). The app originally sent `64 + delta`, so `+` transmitted 65 (read as
+**-63**) and `-` transmitted 63 (read as **+63**): each press moved the tempo hugely in the wrong
+direction, reported from hardware as "+ halves the bpm and - doubles it". Confirmed independently
+by the TP-7's wheel, which sends `1,2,3` clockwise and `125,126,127` counter-clockwise.
+
+Note this is the opposite convention to `CC 18` on the TP-7, which *is* centred on 64. Both
+appear on the same manufacturer's devices, so neither can be assumed.
+
 **CC 120 is standard MIDI "all sound off".** TE reuses it per channel for mute. Sending it will
 also silence unrelated gear sharing a hub.
 

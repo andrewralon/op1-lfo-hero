@@ -158,8 +158,12 @@ enum TransportOp: Hashable {
     /// OP-1 tape seek: a CC nudge, then a Song Position Pointer, then resume if playing.
     case tapeSeek(cc: Int, steps: Int)
     case cc(ch: Int, cc: Int, value: Int)
-    /// Relative encoder nudge — sends `64 + delta`. For genuine relative encoders only
-    /// (the TX-6's tempo CC 47), where each message is an independent increment.
+    /// Relative encoder nudge, in **two's complement**: `1...63` count up, `127...65` count
+    /// down (127 = -1). For genuine relative encoders only (the TX-6's tempo CC 47), where each
+    /// message is an independent increment rather than a position.
+    ///
+    /// Not centred on 64 — that convention belongs to `.directionalTransport`. Measured on TE
+    /// hardware via the TP-7's wheel, which sends 1,2,3 clockwise and 125,126,127 counter.
     case ccRelative(ch: Int, cc: Int, delta: Int)
     /// A persistent bipolar transport state: `center` stops, below plays backwards, above
     /// plays forwards, and distance from centre is speed. The TP-7's CC 18 works this way —

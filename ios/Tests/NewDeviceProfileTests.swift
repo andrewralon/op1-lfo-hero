@@ -154,15 +154,18 @@ final class TX6TransportTests: XCTestCase {
         XCTAssertEqual(destination.packets, [[0xFC]], "the toggle must not fire again")
     }
 
-    /// −/+ nudge tempo via the relative encoder on CC 47, centred at 64.
-    func testTempoNudgeUsesRelativeEncoder() {
+    /// −/+ nudge tempo via the relative encoder on CC 47, in two's complement: 1...63 count up,
+    /// 127...65 count down. NOT centred on 64 — sending 65/63 for ±1 made the device read -63
+    /// and +63, so a press lurched the tempo hugely the wrong way (reported as "+ halves the
+    /// bpm, - doubles it"). Confirmed by the TP-7's wheel: 1,2,3 clockwise, 125,126,127 counter.
+    func testTempoNudgeUsesTwosComplementRelative() {
         destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB6, 47, 65]], "one step up")
+        XCTAssertEqual(destination.packets, [[0xB6, 47, 1]], "one step up")
 
         destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(destination.packets, [[0xB6, 47, 63]], "one step down")
+        XCTAssertEqual(destination.packets, [[0xB6, 47, 127]], "one step down = -1")
     }
 }
 

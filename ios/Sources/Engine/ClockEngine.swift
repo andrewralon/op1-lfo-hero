@@ -480,7 +480,12 @@ final class ClockEngine {
             case .cc(let ch, let cc, let value):
                 sendCC(ch: ch, cc: cc, val: value)
             case .ccRelative(let ch, let cc, let delta):
-                sendCC(ch: ch, cc: cc, val: 64 + delta)
+                // Two's complement, not centred on 64: 1...63 count up, 127...65 count down.
+                // Measured on TE hardware — the TP-7's wheel sends 1,2,3 one way and
+                // 125,126,127 the other. Sending `64 + delta` made + read as -63 and - as +63,
+                // so the TX-6's tempo lurched the wrong way by a huge step on every press.
+                let d = max(-63, min(63, delta))
+                sendCC(ch: ch, cc: cc, val: d >= 0 ? d : 128 + d)
             case .directionalTransport(let ch, let cc, let center, let deadZone, let unitSpeed, let direction):
                 // direction 0 releases the grab. Only send it if this control actually HAS the
                 // transport: on a TP-7 a redundant stop is read as "stop while already stopped",
