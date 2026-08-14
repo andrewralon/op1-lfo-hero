@@ -10,6 +10,9 @@ struct LayoutMetrics {
     /// How many mixer strips the active device has (4 on the OP-1, 6 on the TX-6 / TP-7).
     /// Every column formula below divides by this rather than by a literal.
     var trackCount: Int = 4
+    /// Whether the active device has a pan knob. In landscape the knob sits beside the fader and
+    /// takes most of the strip, so `faderColW` — and the digit size derived from it — depend on it.
+    var hasPan: Bool = true
 
     // ── Tier 1: structural — how the screen is divided into zones ───────────
 
@@ -129,10 +132,51 @@ struct LayoutMetrics {
 
     // ── Tier 2: track strip content ─────────────────────────────────────
 
-    /// Fader digit font size. Proportional to the column so it shrinks on 6-track devices;
-    /// the cap is what 4-track layouts already used, so those are unchanged.
-    var volValueFont: CGFloat    { min(trackColW * 0.30, isIpad ? 58 : 28) }
-    var volValueSpacing: CGFloat { volValueFont * 0.25 }
+    /// Clearance between a volume digit and the fader thumb it sits beside — half the thumb, so
+    /// the digit stops exactly where the thumb's widest point begins. Derived from the thumb
+    /// rather than the font, which is what it is actually protecting against and which breaks
+    /// the circular dependency with `volValueFont` below.
+    var volValueSpacing: CGFloat { faderThumbW / 2 }
+
+    /// Monospaced digit advance as a fraction of point size. SF Mono is 0.6em; used to work out
+    /// whether a digit fits the space it has.
+    private var digitAdvance: CGFloat { 0.6 }
+
+    /// Fader digit font size, sized from the width the digits actually get.
+    ///
+    /// Two digits sit either side of the thumb inside the *fader*, not the track column — in
+    /// landscape the pan knob takes most of the column. Sizing this against `trackColW` (which
+    /// also ignores the inter-strip gaps) made the digits about twice the available width, so
+    /// both glyphs were clipped on their right edge. The caps are unchanged, so any layout with
+    /// room to spare looks exactly as before.
+    var volValueFont: CGFloat {
+        let perDigit = faderColW / 2 - volValueSpacing
+        return min(perDigit / digitAdvance, isIpad ? 58 : 28)
+    }
+
+    /// Padding between a strip's edge and its contents, and between the pan knob and the fader.
+    /// Deliberately tight: this is the width the volume digits are competing for.
+    var stripInnerPad: CGFloat { trackGapUnit * 1.4 }
+    var panFaderGap: CGFloat   { trackGapUnit * 1.4 }
+
+    /// The width one strip's *content* actually gets. `trackColW` is the nominal column and
+    /// ignores the gaps `TracksView` and `TrackStripView` add — about 5% narrower in practice —
+    /// so anything sized against it overestimates.
+    var stripContentW: CGFloat {
+        let mixerW  = isLandscape ? screen.width - transportColW : screen.width
+        let n       = CGFloat(max(1, trackCount))
+        let perStrip = (mixerW - 2 * trackGapUnit - (n - 1) * trackGapUnit) / n
+        return perStrip - 2 * trackGapUnit
+    }
+
+    /// Width available to the fader itself. In landscape the pan knob sits beside it; in portrait
+    /// the knob is above, so the fader has the whole strip. Devices without pan (the TP-7) give
+    /// the fader the strip in both orientations.
+    var faderColW: CGFloat {
+        guard isLandscape else { return stripContentW }
+        guard hasPan else { return stripContentW - 2 * stripInnerPad }
+        return stripContentW - panKnobLandscape - 2 * stripInnerPad - panFaderGap
+    }
 
     /// Gap unit between track columns: total visual gap = 3 × trackGapUnit (right pad + spacing + left pad).
     /// Portrait: 0.5% of width → ~2pt iPhone, ~5pt iPad. Landscape: 0.24% → ~2pt iPhone, ~3pt iPad.
@@ -184,7 +228,8 @@ struct ContentView: View {
             let needsCombinedLfoRow = isLandscape
             let needsSideBySide     = isLandscape
             let m = LayoutMetrics(screen: geo.size, isLandscape: isLandscape, isIpad: isIpad,
-                                  trackCount: app.profile.trackCount)
+                                  trackCount: app.profile.trackCount,
+                                  hasPan: app.profile.caps.hasPan)
 
             VStack(spacing: 0) {
                 if isLandscape {

@@ -127,16 +127,26 @@ Do **not** scale hairline borders or dividers. A `lineWidth: 1` border looks vis
 
 #### Standard gap reference
 
-**6pt** is the validated visual distance between major UI elements or groups. Its derived percentages are:
+**6pt** is the validated visual distance between major UI elements or groups, for spacing between
+*zones*. Use `screen.width * 0.015` (portrait) / `0.007` (landscape) — ~6pt on iPhone, ~10-15pt on
+iPad.
 
-| Device | Layout | Formula | ~pts |
+`trackGapUnit` is **not** that constant, despite what this section used to claim. It is much
+tighter, because it is applied three times per column boundary (each strip's own padding on both
+sides plus the `HStack` spacing):
+
+| Layout | Formula | iPhone | iPad |
 |---|---|---|---|
-| iPhone | portrait | `screen.width * 0.015` | ~6pt |
-| iPhone | landscape | `screen.width * 0.007` | ~6pt |
-| iPad | portrait | `screen.width * 0.015` | ~15pt |
-| iPad | landscape | `screen.width * 0.007` | ~10pt |
+| portrait | `screen.width * 0.005` | ~2pt | ~5pt |
+| landscape | `screen.width * 0.0024` | ~2pt | ~3pt |
 
-The reference implementation is `trackGapUnit` in `LayoutMetrics`. Reuse these constants for any new spacing between zones or element groups.
+Read the value out of `LayoutMetrics` rather than from this table before doing arithmetic with it
+— quoting the old 0.007 here made a layout bug look 4x worse than it was.
+
+**Do not size text against `trackColW`.** It is the *nominal* column and subtracts none of those
+gaps, so it overstates the real width by ~5%. `stripContentW` is what a strip's content actually
+gets, and `faderColW` is what is left after the pan knob in landscape — see `volValueFont`, which
+was clipping digits because it was derived from the column instead of the space they occupy.
 
 ### Rules
 

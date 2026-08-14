@@ -65,11 +65,21 @@ struct VolumeFaderView: View {
                 HStack(alignment: .bottom, spacing: 0) {
                     Text(String(Int(display) / 10))
                         .font(.system(size: m.volValueFont, weight: .bold, design: .monospaced))
+                        // Belt and braces: volValueFont is derived from an assumed 0.6em digit
+                        // advance, so an unusual size could still overflow. Shrink rather than
+                        // clip — a clipped glyph is unreadable, a slightly small one is not.
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .padding(.trailing, m.volValueSpacing)
                     Text(String(Int(display) % 10))
                         .font(.system(size: m.volValueFont, weight: .bold, design: .monospaced))
+                        // Belt and braces: volValueFont is derived from an assumed 0.6em digit
+                        // advance, so an unusual size could still overflow. Shrink rather than
+                        // clip — a clipped glyph is unreadable, a slightly small one is not.
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.leading, m.volValueSpacing)

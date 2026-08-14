@@ -40,17 +40,20 @@ struct TrackStripView: View {
                             onLiveChange: { app.controller.setPan(track: track, value: $0 + 64) }
                         ) { app.setPan(track: track, value: $0) }
                             .frame(width: panSize, height: panSize)
-                            .padding(.leading, 6)
-                            .padding(.trailing, 4)
+                            .padding(.leading, m.stripInnerPad)
+                            .padding(.trailing, m.panFaderGap)
                             .accessibilityIdentifier("panKnob\(track)")
                     }
 
+                    // No leading padding: the knob's trailing `panFaderGap` already separates
+                    // them. These insets are what `faderColW` subtracts, so they must match.
                     VolumeFaderView(
                         value: vol,
                         onLiveChange: { app.controller.setVolume(track: track, value: uiToMidi($0)) }
                     ) { app.setVolume(track: track, value: $0) }
                         .padding(.vertical, 8)
-                        .padding(.horizontal, 6)
+                        .padding(.trailing, m.stripInnerPad)
+                        .padding(.leading, hasPan ? 0 : m.stripInnerPad)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .frame(maxHeight: .infinity)
