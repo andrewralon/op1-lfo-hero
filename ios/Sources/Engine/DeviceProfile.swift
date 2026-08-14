@@ -110,8 +110,13 @@ struct ParamSpec: Identifiable, Hashable {
     /// Restricts the parameter to a subset of tracks (the TP-7's input gain is inputs 1-3 only).
     /// nil = every track the profile has.
     var availableTracks: ClosedRange<Int>? = nil
-    /// Center value (MIDI units) a new LFO on this parameter starts at.
-    var defaultCenter: Double = 90
+    /// Where a new LFO on this parameter should be centred, in **display units (0-99)**.
+    ///
+    /// nil means "leave the centre where the user had it", which is right for most parameters —
+    /// a filter or an EQ has no privileged value. Set it only where the parameter has a genuine
+    /// neutral point that is not the global default of 90, such as pitch bend, where 90 would
+    /// start the tape at roughly 1.9x speed.
+    var defaultCenter: Double? = nil
     /// false → hidden from the LFO parameter picker (relative encoders).
     var lfoTargetable = true
 

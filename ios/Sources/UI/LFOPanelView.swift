@@ -18,6 +18,12 @@ struct LFOPanelView: View {
             app.lfoCenter = app.bpm
             return
         }
+        // A declared neutral point wins, and must be applied before the track lookup below —
+        // master-only parameters (pitch bend among them) have no track and would return early.
+        if let centre = app.lfoParam.defaultCenter {
+            app.lfoCenter = centre
+            return
+        }
         guard let track = app.profile.trackIndices.first(where: { (app.trackOn[$0] ?? 0) > 0 })
         else { return }
         switch app.lfoParam.role {

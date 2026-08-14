@@ -1084,3 +1084,35 @@ final class TP7DirectionLfoTests: XCTestCase {
         XCTAssertTrue(sawForward, "the high half must return to forward")
     }
 }
+
+/// Where a new LFO starts. Most parameters have no privileged value and keep whatever the user
+/// had; pitch bend does, and the global default of 90 is badly wrong for it.
+final class DefaultCentreTests: XCTestCase {
+
+    /// 90 in display units is MIDI 116, which is bend ~14963 — roughly 1.9x speed. A fresh chip
+    /// would start the tape at nearly double speed and leave it pitched up when stopped, with
+    /// nothing on the device to show why.
+    func testPitchBendCentresNearNeutral() {
+        let spec = DeviceProfile.tp7.param("tp7.pitchbend")!
+        let centre = try! XCTUnwrap(spec.defaultCenter)
+        XCTAssertEqual(centre, 49)
+
+        // Display 49 -> MIDI 63 -> bend 8126, within 1% of true centre (8192).
+        let midi = uiToMidi(centre)
+        XCTAssertEqual(midi, 63)
+        let bend = Int((Double(midi) * 16383.0 / 127.0).rounded())
+        XCTAssertLessThan(abs(bend - 8192), 100, "should sit within ~1% of neutral bend")
+    }
+
+    /// Only parameters with a real neutral point declare one — otherwise selecting a parameter
+    /// would yank the centre away from wherever the user had put it.
+    func testOnlyPitchBendDeclaresACentre() {
+        for p in DeviceRegistry.all {
+            for spec in p.params where spec.defaultCenter != nil {
+                guard case .pitchBend? = spec.master else {
+                    return XCTFail("\(p.id) '\(spec.id)' declares a centre but is not pitch bend")
+                }
+            }
+        }
+    }
+}

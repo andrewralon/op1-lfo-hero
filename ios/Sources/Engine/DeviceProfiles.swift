@@ -115,10 +115,19 @@ private func masterOnly(_ id: String, _ name: String, _ short: String,
 }
 
 /// A master-level pitch-bend control (the TP-7's playback speed).
+///
+/// Centred at 49 rather than the global default of 90. Bend's neutral point is the middle of the
+/// range, and 90 would start a new LFO at roughly **1.9x speed** — then leave the tape pitched up
+/// when the chip stops, with nothing on the device to show why.
+///
+/// 49 rather than 50 because the 0-99 display scale cannot express MIDI 64 exactly: display 49
+/// maps to MIDI 63 and bend 8126, within 1% of true centre (8192). Display 50 lands on MIDI 65,
+/// which is nearly 3% fast.
 private func masterPitchBend(_ id: String, _ name: String, _ short: String,
                              channel: Int) -> ParamSpec {
     ParamSpec(id: id, name: name, short: short,
-              track: nil, master: .pitchBend(channel: .pinned(channel)))
+              track: nil, master: .pitchBend(channel: .pinned(channel)),
+              defaultCenter: 49)
 }
 
 /// TE's documented on/off convention for the 6-channel devices: 0-63 off, 64-127 on.
