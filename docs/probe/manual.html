@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>op1 lfo hero — device report (manual)</title>
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="probe.css">
+</head>
+
+<body>
+
+  <h1><img src="../icon.png" class="app-icon" alt=""><a href="../index.html">op1 lfo hero</a></h1>
+  <p class="meta">device report &nbsp;·&nbsp; manual method &nbsp;·&nbsp; ~15 minutes</p>
+
+  <div class="warn note">
+    <strong>there is an easier way.</strong> if you are on chrome, edge or firefox on a computer,
+    <a href="index.html">the guided probe</a> does all of this for you and produces a file to send.
+    this page is the fallback for safari, for anyone who would rather use a midi monitor they
+    already trust, or for anyone the probe does not work for.
+  </div>
+
+  <h2>what this is for</h2>
+  <p>
+    lfo hero drives the <strong>op-1 field</strong>, with <strong>tx-6</strong> and
+    <strong>tp-7</strong> support in testing. every one of those was mapped by measuring real
+    hardware, because the published midi references turned out to be wrong in at least six places.
+  </p>
+  <p>
+    to support any other teenage engineering device — <strong>op-1 (original)</strong>, op-z,
+    ep-133, ob-4, po series — we need someone who owns one to record what it actually sends. that
+    is what this page asks you to do. you do not need to know anything about midi.
+  </p>
+
+  <h2>1 — pick a midi monitor</h2>
+  <table>
+    <tr><th>you are on</th><th>use</th><th>notes</th></tr>
+    <tr>
+      <td>anything, no install</td>
+      <td><a href="https://midilli.tech/midi-web-tool/">midilli midi web tool</a></td>
+      <td>runs in the browser, free, no signup, has an <code>export</code> button. needs chrome, edge or firefox — <strong>not safari</strong></td>
+    </tr>
+    <tr>
+      <td>mac</td>
+      <td><a href="https://www.snoize.com/MIDIMonitor/">snoize midi monitor</a></td>
+      <td>free, long-standing, saves the log to a file. use this if you are on safari</td>
+    </tr>
+    <tr>
+      <td>windows</td>
+      <td><a href="http://www.midiox.com/">midi-ox</a></td>
+      <td>free, the long-standing windows equivalent</td>
+    </tr>
+  </table>
+  <p>
+    plug your device in over usb, open the monitor, and select your device as the input. if you see
+    nothing at all in later steps, check the <a href="#trouble">nothing is showing up</a> section —
+    several te devices transmit nothing until you change a setting on the device itself.
+  </p>
+
+  <h2>2 — two rules that make or break this</h2>
+  <div class="warn">
+    <p style="margin:0 0 8px 0"><strong>a midi log does not say where a message came from.</strong>
+    it records that <code>cc 7</code> appeared, not that it was track 2's fader. these two rules are
+    the only thing that lets us tell them apart afterwards:</p>
+    <ul style="margin:0">
+      <li><strong>do the steps in order, and skip none.</strong> if your device has no such control,
+        that is a useful answer — note <code>skipped 6 — no pan</code> and move on. just don't
+        silently leave it out.</li>
+      <li><strong>pause about 3 seconds between steps, touching nothing.</strong> the gaps are what
+        chop the log back up into one block per control. without them the log is close to
+        unreadable.</li>
+    </ul>
+  </div>
+  <p>
+    start recording in the monitor, do every step below, then stop and export. one continuous log
+    for the whole run is what we want — please don't export one file per step.
+  </p>
+
+  <h2>3 — the steps</h2>
+  <label>
+    how many tracks / channels does your device's mixer have?
+    <input type="number" id="trackCount" min="1" max="8" value="4">
+  </label>
+  <p class="meta" style="margin-bottom:12px">
+    the list below updates to match. if your device has no per-track mixer at all, set this to 1.
+  </p>
+  <ol class="steps" id="stepList"></ol>
+
+  <h2>4 — answer these too</h2>
+  <p>the log alone doesn't tell us everything. please send answers to these as well:</p>
+  <ul>
+    <li>what is the device, and what firmware version is it running?</li>
+    <li>what does the monitor call the port — copy the <strong>name</strong> and
+      <strong>manufacturer</strong> exactly as shown, including capitals and punctuation</li>
+    <li>how many tracks did you set above?</li>
+    <li>which steps did you skip, and was it because the control doesn't exist or because you
+      couldn't find it? <em>(these mean very different things to us)</em></li>
+    <li><strong>did you have to change any setting on the device to make it send midi?</strong>
+      this one matters a lot — the tx-6 sends nothing until you set <code>midi control = in</code>
+      and <code>clock src = usb</code>, and we would never have guessed that</li>
+    <li>if your monitor can <em>send</em> midi and you tried it: did the device visibly react?
+      (a fader moving on screen, a value changing.) don't worry if you skipped this</li>
+    <li>anything that seemed weird</li>
+  </ul>
+
+  <h2>5 — send it</h2>
+  <p>
+    send the exported log plus your answers back to whoever pointed you here — a reply or a dm with
+    the file attached is all it takes.
+  </p>
+  <p class="meta">
+    would rather use github? <a href="https://github.com/andrewralon/op1-lfo-hero/issues/new?template=device-report.yml">open an issue</a> and attach them there instead.
+  </p>
+  <p>thank you — genuinely. this is the only way devices we don't own ever get supported.</p>
+
+  <h2 id="trouble">nothing is showing up</h2>
+  <ul>
+    <li><strong>try a different usb cable.</strong> plenty of usb-c cables are charge-only and carry
+      no data at all.</li>
+    <li><strong>check the device's midi settings.</strong> several te devices ship with midi output
+      off, or have mutually exclusive in/out modes where selecting one disables the other.</li>
+    <li><strong>a recorder may only transmit while rolling.</strong> the tp-7, for instance, sends
+      nothing at all while the tape is stopped — which looks exactly like broken hardware.</li>
+    <li><strong>if you unplugged and replugged</strong>, the monitor may still be listening to the
+      old, dead port. reselect the input, or restart the monitor.</li>
+  </ul>
+
+  <footer>
+    op1 lfo hero &nbsp;·&nbsp; <a href="../index.html">home</a> &nbsp;·&nbsp;
+    <a href="index.html">guided probe</a> &nbsp;·&nbsp;
+    <a href="../privacy.html">privacy policy</a>
+  </footer>
+
+  <script src="steps.js"></script>
+  <script>
+    var listEl = document.getElementById('stepList');
+    var countEl = document.getElementById('trackCount');
+
+    function render() {
+      var n = Math.max(1, Math.min(8, parseInt(countEl.value, 10) || 4));
+      var steps = expandSteps(n);
+      listEl.innerHTML = '';
+      var lastId = null;
+      steps.forEach(function (s) {
+        var li = document.createElement('li');
+        var isFirstOfGroup = s.id !== lastId;
+        if (lastId !== null && isFirstOfGroup) li.className = 'newgroup';
+        lastId = s.id;
+        li.appendChild(document.createTextNode(s.prompt));
+        // the hint is identical for every track of a group — show it once, on the first
+        if (s.why && isFirstOfGroup) {
+          var w = document.createElement('span');
+          w.className = 'why';
+          w.textContent = s.why;
+          li.appendChild(w);
+        }
+        listEl.appendChild(li);
+      });
+    }
+
+    countEl.addEventListener('input', render);
+    render();
+  </script>
+
+</body>
+
+</html>
