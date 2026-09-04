@@ -1,11 +1,11 @@
-// self-test for the device-report probe's inference logic.
+// self-test for the device mapper's inference logic.
 //
 // feeds synthetic captures that mimic controls measured on real hardware and asserts
-// the probe re-derives the same conclusion.
-// if the probe cannot reproduce profiles we already know, it cannot be trusted on
+// the mapper re-derives the same conclusion.
+// if the mapper cannot reproduce profiles we already know, it cannot be trusted on
 // a device we don't own.
 //
-//   node tools/probe/selftest.js
+//   node tools/mapper/selftest.js
 
 const fs = require('fs');
 const path = require('path');
@@ -13,7 +13,7 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '../..');
 
-// ── minimal dom stub, enough for probe.js's IIFE to run ─────────────────────
+// ── minimal dom stub, enough for mapper.js's IIFE to run ─────────────────────
 function stubEl() {
   const el = {
     hidden: false, disabled: false, value: '', textContent: '', innerHTML: '',
@@ -42,10 +42,10 @@ const sandbox = {
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 
-vm.runInContext(fs.readFileSync(path.join(ROOT, 'docs/probe/steps.js'), 'utf8'), sandbox);
-vm.runInContext(fs.readFileSync(path.join(ROOT, 'docs/probe/probe.js'), 'utf8'), sandbox);
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'docs/mapper/steps.js'), 'utf8'), sandbox);
+vm.runInContext(fs.readFileSync(path.join(ROOT, 'docs/mapper/mapper.js'), 'utf8'), sandbox);
 
-const { analyze, classify } = sandbox.window.__probe;
+const { analyze, classify } = sandbox.window.__mapper;
 const { expandSteps, CAPTURE_STEPS } = sandbox;
 
 // ── helpers to build synthetic captures ────────────────────────────────────
@@ -226,7 +226,7 @@ console.log('\nshared step list:');
 // can arm a recording or silence unrelated gear on the same hub.
 console.log('\nsend-test safety filter:');
 {
-  const { candidateCCs, report } = sandbox.window.__probe;
+  const { candidateCCs, report } = sandbox.window.__mapper;
   const cap = (stepId, ch, num, vals, extra = {}) => ({
     stepId, key: stepId, track: 1, label: '', skipped: false, skipReason: null,
     analysis: analyze(cc(ch, num, vals)), ...extra
@@ -258,17 +258,17 @@ console.log('\nsend-test safety filter:');
   report.captures.length = 0;
 }
 
-// ── 7. element ids referenced by probe.js exist in index.html ───────────────
+// ── 7. element ids referenced by mapper.js exist in index.html ───────────────
 console.log('\nhtml/js wiring:');
 {
-  const html = fs.readFileSync(path.join(ROOT, 'docs/probe/index.html'), 'utf8');
-  const js = fs.readFileSync(path.join(ROOT, 'docs/probe/probe.js'), 'utf8');
+  const html = fs.readFileSync(path.join(ROOT, 'docs/mapper/index.html'), 'utf8');
+  const js = fs.readFileSync(path.join(ROOT, 'docs/mapper/mapper.js'), 'utf8');
   const defined = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
   // ids the script injects into the dom itself, so they are not in the static html
   const injected = new Set(['btnSendDone']);
   const used = new Set([...js.matchAll(/\$\('([^']+)'\)/g)].map((m) => m[1]));
   const missing = [...used].filter((id) => !defined.has(id) && !injected.has(id));
-  check('no probe.js id is missing from index.html', missing.join(',') || 'none', 'none');
+  check('no mapper.js id is missing from index.html', missing.join(',') || 'none', 'none');
   for (const id of injected) {
     check(`injected id ${id} is actually created`, js.includes(`id="${id}"`), true);
   }
@@ -281,7 +281,7 @@ console.log('\nreport -> profile converter:');
 {
   const { execFileSync } = require('child_process');
   const os = require('os');
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'probe-selftest-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mapper-selftest-'));
 
   const cap = (stepId, key, track, raw, extra = {}) => ({
     stepId, key, track, label: stepId, skipped: false, skipReason: null,

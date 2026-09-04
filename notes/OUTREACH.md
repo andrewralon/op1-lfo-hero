@@ -1,4 +1,4 @@
-# Asking people to run the device probe
+# Asking people to run the device mapper
 
 Copy-paste templates for recruiting device reports. Primary venue is **op-forums.com** — people
 there own the gear, and they can DM the file straight back.
@@ -7,8 +7,8 @@ there own the gear, and they can DM the file straight back.
 
 | | |
 |---|---|
-| Guided probe | `https://andrewralon.github.io/op1-lfo-hero/probe/` |
-| Manual method (Safari / any monitor) | `https://andrewralon.github.io/op1-lfo-hero/probe/manual.html` |
+| Guided mapper | `https://andrewralon.github.io/op1-lfo-hero/mapper/` |
+| Manual method (Safari / any monitor) | `https://andrewralon.github.io/op1-lfo-hero/mapper/manual.html` |
 
 > ⚠️ **Both 404 until this work is on the live site.** Merge before you post, or the first person
 > who clicks bounces and won't come back.
@@ -22,7 +22,7 @@ there own the gear, and they can DM the file straight back.
 3. **EP-133 K.O. II / EP-1320** — current gear, lots of owners.
 4. **OB-4, PO series** — long shots, but a report costs them ten minutes.
 5. **TX-6 / TP-7 owners** — worth accepting too. An independent report on hardware you've already
-   measured is the only way you'd catch a bug in the probe itself.
+   measured is the only way you'd catch a bug in the mapper itself.
 
 ---
 
@@ -49,7 +49,7 @@ announcement, which lands fine most places, but posting it repeatedly does not.
 >
 > so instead: **a browser page that measures your device for you.**
 >
-> https://andrewralon.github.io/op1-lfo-hero/probe/
+> https://andrewralon.github.io/op1-lfo-hero/mapper/
 >
 > plug the op-1 in over usb, open that in chrome or edge, and it walks you through one prompt at a
 > time — "move track 1's volume", "press play", that sort of thing. it records what your device
@@ -63,7 +63,7 @@ announcement, which lands fine most places, but posting it repeatedly does not.
 >   useful.
 > - **safari won't work** — apple has never shipped web midi. chrome, edge or firefox on a computer
 >   will. if you'd rather use a midi monitor you already trust, there's a manual version:
->   https://andrewralon.github.io/op1-lfo-hero/probe/manual.html
+>   https://andrewralon.github.io/op1-lfo-hero/mapper/manual.html
 >
 > most useful right now: **op-1 og**, op-z, ep-133. but any te device is welcome — including a
 > tx-6 or tp-7, since an independent report is the only way i'd catch a bug in the tool itself.
@@ -86,7 +86,7 @@ the next three people better than any wording change.
 > "move track 1's volume", and it spits out a file you dm me. about 10 minutes, no midi knowledge
 > needed, nothing gets uploaded anywhere. needs chrome or edge on a computer.
 >
-> https://andrewralon.github.io/op1-lfo-hero/probe/
+> https://andrewralon.github.io/op1-lfo-hero/mapper/
 
 Swap the device name. Keep it this short — the page does the explaining.
 
@@ -95,7 +95,7 @@ Swap the device name. Keep it this short — the page does the explaining.
 ## 3. When someone says yes
 
 > amazing, thank you. link again:
-> https://andrewralon.github.io/op1-lfo-hero/probe/
+> https://andrewralon.github.io/op1-lfo-hero/mapper/
 >
 > **chrome or edge on a computer** — safari can't do this, apple never implemented the browser midi
 > api. plug the op-1 in over usb first, then open the page and hit "connect to midi". it'll ask
@@ -165,7 +165,7 @@ tell the next person it was worth their time. A bare "thanks!" does not.
 > that'll be safari — apple has never implemented web midi, on mac or ios, so there's no version of
 > that page that would work there. chrome, edge or firefox on a computer will. or use the manual
 > method, which works with any midi monitor including on safari:
-> https://andrewralon.github.io/op1-lfo-hero/probe/manual.html
+> https://andrewralon.github.io/op1-lfo-hero/mapper/manual.html
 
 **"I plugged it in and nothing shows up."**
 > three things, in order: try a different usb cable (loads of usb-c cables are charge-only and carry

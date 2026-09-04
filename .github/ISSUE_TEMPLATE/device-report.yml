@@ -11,9 +11,9 @@ body:
         often enough that we don't trust them.
 
         haven't captured anything yet? start here:
-        **[guided probe](https://andrewralon.github.io/op1-lfo-hero/probe/)** (chrome / edge /
+        **[guided mapper](https://andrewralon.github.io/op1-lfo-hero/mapper/)** (chrome / edge /
         firefox on a computer) or
-        **[manual instructions](https://andrewralon.github.io/op1-lfo-hero/probe/manual.html)**
+        **[manual instructions](https://andrewralon.github.io/op1-lfo-hero/mapper/manual.html)**
         (any midi monitor, including on safari).
 
   - type: input
@@ -38,7 +38,7 @@ body:
     attributes:
       label: how did you capture this?
       options:
-        - guided probe (json report)
+        - guided mapper (json report)
         - manual, with a midi monitor (raw log)
     validations:
       required: true
@@ -56,7 +56,7 @@ body:
     id: capture
     attributes:
       label: report file or pasted log
-      description: attach the probe's json report, or the exported log from your midi monitor
+      description: attach the mapper's json report, or the exported log from your midi monitor
       placeholder: drag the file here, or paste the log
     validations:
       required: true
@@ -65,8 +65,8 @@ body:
     attributes:
       value: |
         ### the rest
-        the fields below are what the probe fills in automatically. **if you attached a probe
-        json report you can skip all of them** — they're already in the file. if you captured
+        the fields below are what the mapper fills in automatically. **if you attached a mapper
+        report you can skip all of them** — they're already in the file. if you captured
         manually, please fill them in, because the log on its own doesn't say any of this.
 
   - type: input

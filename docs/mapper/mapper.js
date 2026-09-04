@@ -1,4 +1,4 @@
-// device report probe. everything runs locally; nothing is ever sent anywhere.
+// device mapper. everything runs locally; nothing is ever sent anywhere.
 // the capture step list lives in steps.js and is shared with manual.html.
 (function () {
   'use strict';
@@ -697,6 +697,6 @@
   }).observe($('s-done'), { attributes: true, attributeFilter: ['hidden'] });
 
   // expose for the browser-side self-test in tests/
-  window.__probe = { analyze: analyze, inferEncoding: inferEncoding, classify: classify,
+  window.__mapper = { analyze: analyze, inferEncoding: inferEncoding, classify: classify,
     candidateCCs: candidateCCs, summarise: summarise, report: report };
 })();

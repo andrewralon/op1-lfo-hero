@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Turn a device report from docs/probe/ into a draft DeviceProfile Swift literal.
+"""Turn a device report from docs/mapper/ into a draft DeviceProfile Swift literal.
 
     python3 scripts/report_to_profile.py notes/DEVICE_REPORTS/op-1-2026-09-04.json
 
@@ -7,7 +7,7 @@ Emits a Swift `DeviceProfile` literal — the data-only device abstraction that 
 with the multi-device work. This script is standalone and needs nothing from the app, so
 reports can be gathered and converted before that lands.
 
-It produces a *first draft*, not an answer. Every inference the probe was unsure about is
+It produces a *first draft*, not an answer. Every inference the mapper was unsure about is
 carried through as an `UNVERIFIED` comment rather than silently resolved, because the
 whole reason this pipeline exists is that guessing at MIDI maps has been wrong before —
 checking the published TE references against real hardware turned up six that were not
@@ -69,7 +69,7 @@ def swift_encoding(enc, ident):
 
     if enc.get("ambiguous"):
         notes.append(
-            "UNVERIFIED: the probe could not tell this apart from another encoding. "
+            "UNVERIFIED: the mapper could not tell this apart from another encoding. "
             + (enc.get("note") or "")
         )
     if enc.get("confidence") == "low":
