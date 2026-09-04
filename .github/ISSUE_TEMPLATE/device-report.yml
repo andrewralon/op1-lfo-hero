@@ -1,0 +1,132 @@
+name: device report
+description: share what your teenage engineering device sends over midi, so it can be supported
+title: "device report: "
+labels: ["device-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        thank you for doing this. lfo hero can only support a device once someone who owns one
+        has measured what it actually sends — the published midi references have been wrong
+        often enough that we don't trust them.
+
+        haven't captured anything yet? start here:
+        **[guided probe](https://andrewralon.github.io/op1-lfo-hero/probe/)** (chrome / edge /
+        firefox on a computer) or
+        **[manual instructions](https://andrewralon.github.io/op1-lfo-hero/probe/manual.html)**
+        (any midi monitor, including on safari).
+
+  - type: input
+    id: device
+    attributes:
+      label: device
+      description: model name as printed on the hardware
+      placeholder: op-1 (original, not field)
+    validations:
+      required: true
+
+  - type: input
+    id: firmware
+    attributes:
+      label: firmware version
+      placeholder: "1.0.3 — or 'unknown'"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: method
+    attributes:
+      label: how did you capture this?
+      options:
+        - guided probe (json report)
+        - manual, with a midi monitor (raw log)
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ### the capture
+
+        **drag your file into the box below** — github accepts `.json`, `.txt` and `.log`
+        attachments on a comment. if yours won't attach, rename it to `.txt`, or paste the
+        contents inside a fenced code block.
+
+  - type: textarea
+    id: capture
+    attributes:
+      label: report file or pasted log
+      description: attach the probe's json report, or the exported log from your midi monitor
+      placeholder: drag the file here, or paste the log
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ### the rest
+        the fields below are what the probe fills in automatically. **if you attached a probe
+        json report you can skip all of them** — they're already in the file. if you captured
+        manually, please fill them in, because the log on its own doesn't say any of this.
+
+  - type: input
+    id: port
+    attributes:
+      label: port name and manufacturer
+      description: copy exactly as your monitor displays them, including capitals and punctuation
+      placeholder: name "OP-1 Midi Device", manufacturer "Teenage Engineering"
+    validations:
+      required: false
+
+  - type: input
+    id: tracks
+    attributes:
+      label: how many tracks / channels does the mixer have?
+      placeholder: "4"
+    validations:
+      required: false
+
+  - type: textarea
+    id: skipped
+    attributes:
+      label: which steps did you skip, and why?
+      description: >
+        "the control doesn't exist" and "i couldn't find it" mean very different things to us,
+        so please say which.
+      placeholder: |
+        skipped 5-8 (pan) — this device has no pan at all
+        skipped 19 (record) — didn't want to risk it
+    validations:
+      required: false
+
+  - type: textarea
+    id: setup
+    attributes:
+      label: did you have to change any setting on the device to make it send midi?
+      description: >
+        this one matters more than it sounds. the tx-6 transmits nothing until you set
+        `midi control = in` and `clock src = usb`, and that was only ever discovered by someone
+        hitting it. the app shows these as setup steps to other users.
+      placeholder: had to set midi > out = on, and pick channel 1
+    validations:
+      required: false
+
+  - type: dropdown
+    id: receives
+    attributes:
+      label: if you tried sending midi to it, did the device react?
+      description: fine to leave as "didn't try" — this is the optional part
+      options:
+        - didn't try
+        - "yes — it reacted to what was sent"
+        - "no — it ignored everything sent to it"
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: anything else that seemed weird
+      description: unexpected behaviour, things that only worked sometimes, anything that surprised you
+    validations:
+      required: false
