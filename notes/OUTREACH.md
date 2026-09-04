@@ -152,9 +152,9 @@ tell the next person it was worth their time. A bare "thanks!" does not.
 
 **"What data does it collect? Where does it go?"**
 > nothing leaves your browser. it runs entirely locally — no server, no analytics, no account. at
-> the end it hands you a file and you decide whether to send it. the file has the midi your device
-> sent, the port name, and whatever you typed in the boxes. open it and read the whole thing before
-> sending; it's plain text.
+> the end it gives you a summary to copy and a file to download, and you decide whether to send
+> either. they hold the midi your device sent, the port name, and whatever you typed in the boxes.
+> read the whole thing before sending; it's plain text.
 
 **"Can't you just read the MIDI implementation chart?"**
 > i tried that. when i checked the published references against real hardware, six things were

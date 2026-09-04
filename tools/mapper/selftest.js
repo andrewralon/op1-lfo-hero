@@ -373,5 +373,30 @@ console.log('\nreport -> profile converter:');
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 
+// ── 9. how the results leave the page ──────────────────────────────────────
+// the file exists to be attached to a forum message, and the summary exists to
+// be pasted into one. both routes have to keep working.
+console.log('\nsending results back:');
+{
+  const js = fs.readFileSync(path.join(ROOT, 'docs/mapper/mapper.js'), 'utf8');
+  const html = fs.readFileSync(path.join(ROOT, 'docs/mapper/index.html'), 'utf8');
+  const manual = fs.readFileSync(path.join(ROOT, 'docs/mapper/manual.html'), 'utf8');
+
+  // .json uploads are rejected by discourse and several chat apps; .txt is not
+  check('download is named .txt, not .json', /\.txt';/.test(js), true);
+  check('download blob is text/plain', js.includes("type: 'text/plain'"), true);
+  check('no .json filename left behind', js.includes("+ '.json'"), false);
+
+  // pasting needs no upload permission, which a new forum account may not have
+  check('copy-summary button exists', html.includes('id="btnCopy"'), true);
+  check('copy-summary handler is wired', js.includes("$('btnCopy').addEventListener"), true);
+  check('clipboard has a non-secure-context fallback', js.includes('execCommand'), true);
+
+  // both pages must name the same destination
+  for (const [name, src] of [['guided mapper', html], ['manual page', manual]]) {
+    check(`${name} names the op-forums route`, src.includes('op-forums.com/new-message?username=andrewralon'), true);
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

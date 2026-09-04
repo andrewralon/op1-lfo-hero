@@ -681,14 +681,40 @@
   $('btnDownload').addEventListener('click', function () {
     finalise();
     var name = (report.device.userProvidedName || 'device').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    var fn = 'device-report-' + (name || 'device') + '-' + report.capturedAt.slice(0, 10) + '.json';
-    var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    // .txt rather than .json: the content is identical, but forums and chat apps
+    // routinely reject a .json upload while accepting .txt, and this file exists to
+    // be attached to a message.
+    var fn = 'device-report-' + (name || 'device') + '-' + report.capturedAt.slice(0, 10) + '.txt';
+    var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'text/plain' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url; a.download = fn;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     $('downloadNote').textContent = 'saved as ' + fn;
+  });
+
+  $('btnCopy').addEventListener('click', function () {
+    finalise();
+    var text = summarise();
+    var note = $('downloadNote');
+    function ok() { note.textContent = 'summary copied — paste it into the message'; }
+    function fail() { note.textContent = 'could not copy — select the text below and copy it manually'; }
+    // clipboard API needs a secure context; fall back for anything that refuses
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok, legacy);
+    } else { legacy(); }
+    function legacy() {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        var done = document.execCommand('copy');
+        document.body.removeChild(ta);
+        done ? ok() : fail();
+      } catch (e) { fail(); }
+    }
   });
 
   // keep the summary current whenever the last screen appears

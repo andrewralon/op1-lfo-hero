@@ -150,7 +150,7 @@ device through recording what it sends, and produces a JSON report.
 | `docs/mapper/steps.js` | **canonical capture step list** — the single source of truth |
 | `docs/mapper/index.html` + `mapper.js` | guided wizard: identity → guided capture → opt-in send tests → JSON download |
 | `docs/mapper/manual.html` | the same steps as instructions for an off-the-shelf MIDI monitor |
-| `.github/ISSUE_TEMPLATE/device-report.yml` | optional structured intake; most reports arrive as a DM |
+| `.github/ISSUE_TEMPLATE/device-report.yml` | optional structured intake; most reports arrive as an op-forums DM to `andrewralon` |
 | `notes/DEVICE_REPORTS/` | submitted reports, kept verbatim |
 | `notes/OUTREACH.md` | copy-paste templates for asking people to run it |
 | `scripts/report_to_profile.py` | turns a report into a **draft** device profile literal |
