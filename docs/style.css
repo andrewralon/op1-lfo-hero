@@ -43,3 +43,5 @@ footer {
   color: #666666;
   font-size: 12px;
 }
+footer .sep { margin: 0 8px; }
+footer .here { color: #d8d8d8; }
