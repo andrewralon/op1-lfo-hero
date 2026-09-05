@@ -122,7 +122,13 @@
     nav.hidden = !t;
     if (!t) return;
     var anchor = backAnchor();
-    if (anchor && nav.parentElement !== anchor) anchor.insertBefore(nav, anchor.firstChild);
+    if (!anchor || nav.parentElement === anchor) return;
+    anchor.insertBefore(nav, anchor.firstChild);
+    // the gap to the next button should come from navBack's own margin only, not
+    // from whether this particular row happens to be written on one html line or
+    // several -- strip whatever whitespace text node insertBefore left after it.
+    var next = nav.nextSibling;
+    if (next && next.nodeType === 3 && !next.textContent.trim()) anchor.removeChild(next);
   }
 
   $('btnBack').addEventListener('click', function () {
@@ -169,6 +175,7 @@
         saveDegraded = true;
         $('saveNote').textContent = 'this browser ran out of storage, so the saved copy no longer '
           + 'holds the raw bytes — download the report before you close the tab.';
+        $('saveNote').hidden = false;
       }
     } catch (e2) {
       // a half-written session is worse than none: it would restore as truth
