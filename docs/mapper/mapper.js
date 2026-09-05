@@ -32,11 +32,20 @@
   var midi = null, sysexOK = false;
   var inputs = [], outputs = [], selIn = null, selOut = null;
   var sink = null, t0 = 0;
+  var current = 's-intro';
+  // set once there is something a refresh would cost. drives the unload warning.
+  var dirty = false;
+  // names of the ports a restored session was using, so the selects can be put back
+  // by name — port ids are not stable across a reload.
+  var restorePorts = null;
 
   // ── helpers ────────────────────────────────────────────────────────────────
   function $(id) { return document.getElementById(id); }
   function show(id) {
+    current = id;
     SCREENS.forEach(function (s) { var e = $(s); if (e) e.hidden = (s !== id); });
+    renderBack();
+    save();
     window.scrollTo(0, 0);
   }
   function hex(b) {
@@ -71,28 +80,213 @@
   function startSink(fn) { t0 = performance.now(); sink = fn; }
   function stopSink() { sink = null; }
 
+  // ── back navigation ────────────────────────────────────────────────────────
+  // one button, in the same place above every screen. inside the wizard it steps
+  // back through the capture list rather than out of it, so a mis-skip or a fader
+  // that did not actually move can be redone.
+  function backTarget() {
+    if (current === 's-identity') {
+      return { hint: 'back to the start', go: function () { show('s-intro'); } };
+    }
+    if (current === 's-setup') {
+      return { hint: 'back to what\'s connected', go: function () { show('s-identity'); } };
+    }
+    if (current === 's-wizard') {
+      if (idx > 0) {
+        return {
+          hint: 'back to step ' + steps[idx - 1].number + ' of ' + steps.length,
+          go: function () { idx--; renderStep(); }
+        };
+      }
+      return { hint: 'back to your device details', go: function () { show('s-setup'); } };
+    }
+    if (current === 's-send') {
+      if (!steps.length) return { hint: 'back to your device details', go: function () { show('s-setup'); } };
+      return {
+        hint: 'back to step ' + steps.length + ' of ' + steps.length,
+        go: function () { idx = steps.length - 1; show('s-wizard'); renderStep(); }
+      };
+    }
+    if (current === 's-done') {
+      return { hint: 'back to the send tests', go: function () { show('s-send'); } };
+    }
+    return null;  // the intro has nowhere behind it, and unsupported is a dead end
+  }
+
+  function renderBack() {
+    var t = backTarget();
+    $('navBack').hidden = !t;
+    $('backHint').textContent = t ? t.hint : '';
+  }
+
+  $('btnBack').addEventListener('click', function () {
+    var t = backTarget();
+    if (t) t.go();
+  });
+
+  // ── session persistence ────────────────────────────────────────────────────
+  // the report is deliberately never uploaded, which used to mean a refresh or a
+  // closed tab cost the whole ten-minute session. localStorage is same-origin and
+  // never transmitted, so autosaving here keeps that promise intact.
+  var SESSION_KEY = 'op1lfohero.mapper.session.v1';
+  var saveDegraded = false;
+
+  function storage() {
+    // private-mode browsers throw on the property access itself, not on get/set
+    try { return window.localStorage || null; } catch (e) { return null; }
+  }
+
+  function slim(r) {
+    var copy = JSON.parse(JSON.stringify(r));
+    copy.captures.forEach(function (c) { c.raw = []; c.rawDropped = true; });
+    return copy;
+  }
+
+  function save() {
+    if (!dirty) return;
+    var s = storage();
+    if (!s) return;
+    var state = {
+      savedAt: new Date().toISOString(),
+      schemaVersion: report.schemaVersion,
+      screen: current, idx: idx, wizardStarted: wizardStarted,
+      report: report
+    };
+    try { s.setItem(SESSION_KEY, JSON.stringify(state)); return; } catch (e) { /* quota */ }
+    // out of room. the raw byte log dwarfs everything else, so drop it from the saved
+    // copy only — the in-memory report keeps every byte, and so does the download.
+    try {
+      state.report = slim(report);
+      state.rawDropped = true;
+      s.setItem(SESSION_KEY, JSON.stringify(state));
+      if (!saveDegraded) {
+        saveDegraded = true;
+        $('saveNote').textContent = 'this browser ran out of storage, so the saved copy no longer '
+          + 'holds the raw bytes — download the report before you close the tab.';
+      }
+    } catch (e2) {
+      // a half-written session is worse than none: it would restore as truth
+      try { s.removeItem(SESSION_KEY); } catch (e3) { /* nothing left to try */ }
+    }
+  }
+
+  function loadSession() {
+    var s = storage();
+    if (!s) return null;
+    var raw, st;
+    try { raw = s.getItem(SESSION_KEY); } catch (e) { return null; }
+    if (!raw) return null;
+    try { st = JSON.parse(raw); } catch (e) { return null; }
+    // a session written by a different report shape is not safely half-restorable
+    if (!st || !st.report || st.schemaVersion !== report.schemaVersion) return null;
+    if (SCREENS.indexOf(st.screen) === -1) return null;
+    return st;
+  }
+
+  function clearSession() {
+    var s = storage();
+    if (!s) return;
+    try { s.removeItem(SESSION_KEY); } catch (e) { /* nothing to do */ }
+  }
+
+  function restoreState(st) {
+    var r = st.report;
+    Object.keys(report).forEach(function (k) { if (k in r) report[k] = r[k]; });
+    // port ids are not stable across a reload, so remember the names instead
+    restorePorts = {
+      input: r.device && r.device.selectedInput ? r.device.selectedInput.name : null,
+      output: r.device && r.device.selectedOutput ? r.device.selectedOutput.name : null
+    };
+    $('devName').value = report.device.userProvidedName || '';
+    $('devFirmware').value = report.device.firmware || '';
+    $('devTracks').value = report.device.trackCount;
+    $('qSetup').value = report.freeform.deviceSettingsChangedToMakeThisWork || '';
+    $('qWeird').value = report.freeform.anythingWeird || '';
+    if (report.passiveListen) $('btnToSetup').disabled = false;
+    steps = expandSteps(report.device.trackCount);
+    wizardStarted = !!st.wizardStarted;
+    idx = Math.max(0, Math.min(steps.length - 1, st.idx || 0));
+    dirty = true;
+    $('resumeBanner').hidden = true;
+  }
+
+  function renderResumeBanner() {
+    var st = loadSession();
+    if (!st) return;
+    var tracks = (st.report.device && st.report.device.trackCount) || 4;
+    var total = expandSteps(tracks).length;
+    var answered = (st.report.captures || []).filter(function (c) { return !c.skipped; }).length;
+    var when = new Date(st.savedAt);
+    var ago = isNaN(when.getTime()) ? '' : ' from ' + when.toLocaleString().toLowerCase();
+    $('resumeSummary').textContent = answered + ' of ' + total + ' steps captured' + ago
+      + '. resume where you left off, or start again from scratch.';
+    $('resumeBanner').hidden = false;
+  }
+
+  $('btnResume').addEventListener('click', function () {
+    var st = loadSession();
+    if (!st) { $('resumeBanner').hidden = true; return; }
+    restoreState(st);
+    // web midi access does not survive a reload — it has to be asked for again
+    connect(function (ok) {
+      if (ok) {
+        show(st.screen);
+        if (st.screen === 's-wizard') renderStep();
+        return;
+      }
+      // losing midi must not also lose the report: land on the screen that can
+      // still download and copy it.
+      show('s-done');
+      $('downloadNote').textContent = 'could not reconnect to midi, but your saved report is '
+        + 'intact — download or copy it below.';
+    });
+  });
+
+  $('btnStartOver').addEventListener('click', function () {
+    clearSession();
+    dirty = false;   // don't warn about state we were just told to discard
+    window.location.reload();
+  });
+
+  // a refresh no longer costs the session, but it still costs the midi connection
+  // and the place in the list, so it is worth one confirm.
+  window.addEventListener('beforeunload', function (e) {
+    if (!dirty) return undefined;
+    e.preventDefault();
+    e.returnValue = '';   // chrome and safari still require this
+    return '';
+  });
+
   // ── connect ────────────────────────────────────────────────────────────────
   function unsupported(detail) {
     $('unsupportedDetail').textContent = detail || '';
     show('s-unsupported');
   }
 
-  $('btnConnect').addEventListener('click', function () {
+  // `done` lets a resumed session reuse this path and then choose its own screen;
+  // without it the caller gets the normal "on to the identity screen" behaviour.
+  function connect(done) {
     if (!navigator.requestMIDIAccess) {
       unsupported('this browser does not provide navigator.requestMIDIAccess.');
+      if (done) done(false);
       return;
     }
     navigator.requestMIDIAccess({ sysex: true })
-      .then(function (a) { sysexOK = true; onAccess(a); })
+      .then(function (a) { sysexOK = true; onAccess(a, done); })
       .catch(function () {
         // sysex refused or unavailable — still worth continuing without it
         navigator.requestMIDIAccess()
-          .then(function (a) { sysexOK = false; onAccess(a); })
-          .catch(function (e) { unsupported('midi access was refused: ' + (e && e.message ? e.message : e)); });
+          .then(function (a) { sysexOK = false; onAccess(a, done); })
+          .catch(function (e) {
+            unsupported('midi access was refused: ' + (e && e.message ? e.message : e));
+            if (done) done(false);
+          });
       });
-  });
+  }
 
-  function onAccess(access) {
+  $('btnConnect').addEventListener('click', function () { connect(null); });
+
+  function onAccess(access, done) {
     midi = access;
     report.device.sysexPermitted = sysexOK;
     access.onstatechange = refreshPorts;
@@ -101,6 +295,7 @@
       ? 'sysex permission granted — the identity check below will work.'
       : 'sysex permission was not granted, so the identity check is unavailable. everything else still works.';
     $('btnIdentify').disabled = !sysexOK;
+    if (done) { done(true); return; }
     show('s-identity');
   }
 
@@ -121,8 +316,10 @@
     midi.outputs.forEach(function (p) { outputs.push(p); });
     report.device.ports = { inputs: inputs.map(portInfo), outputs: outputs.map(portInfo) };
     renderPortTable();
-    fillSelect($('inputSelect'), inputs);
-    fillSelect($('outputSelect'), outputs);
+    fillSelect($('inputSelect'), inputs, restorePorts && restorePorts.input);
+    fillSelect($('outputSelect'), outputs, restorePorts && restorePorts.output);
+    // one shot only — after this a replug must not override a manual choice
+    restorePorts = null;
     bindInput();
     bindOutput();
   }
@@ -145,7 +342,7 @@
     }
   }
 
-  function fillSelect(sel, ports) {
+  function fillSelect(sel, ports, wantName) {
     var prev = sel.selectedIndex;
     sel.innerHTML = '';
     ports.forEach(function (p) {
@@ -153,6 +350,11 @@
       o.textContent = (p.name || '(unnamed)') + (p.manufacturer ? '  —  ' + p.manufacturer : '');
       sel.appendChild(o);
     });
+    if (wantName) {
+      var byName = -1;
+      ports.forEach(function (p, i) { if (byName === -1 && (p.name || '') === wantName) byName = i; });
+      if (byName !== -1) { sel.selectedIndex = byName; return; }
+    }
     if (prev >= 0 && prev < ports.length) { sel.selectedIndex = prev; return; }
     // default to the first port that isn't an obvious virtual/software port
     var guess = ports.findIndex(function (p) { return !looksVirtual(p); });
@@ -261,27 +463,69 @@
       }
       $('listenResult').innerHTML = h;
       $('btnToSetup').disabled = false;
+      dirty = true;   // twenty seconds of listening is now worth not losing
+      save();
     }
   });
 
   $('btnToSetup').addEventListener('click', function () { show('s-setup'); });
 
   // ── setup ──────────────────────────────────────────────────────────────────
-  $('btnToWizard').addEventListener('click', function () {
+  // also the way back *into* the wizard, so it resumes at the current step rather
+  // than restarting from the top.
+  function goToWizard() {
+    var prevTracks = report.device.trackCount;
     report.device.userProvidedName = $('devName').value.trim();
     report.device.firmware = $('devFirmware').value.trim();
-    report.device.trackCount = Math.max(1, Math.min(8, parseInt($('devTracks').value, 10) || 4));
-    startWizard();
-  });
-
-  // ── wizard ─────────────────────────────────────────────────────────────────
-  var steps = [], idx = 0;
-
-  function startWizard() {
-    steps = expandSteps(report.device.trackCount);
-    idx = 0;
+    var n = Math.max(1, Math.min(8, parseInt($('devTracks').value, 10) || 4));
+    report.device.trackCount = n;
+    if (n !== prevTracks) {
+      // a track that no longer exists must not leave captures behind: a 4-track
+      // report claiming a volume.5 would be read as a 5-track device.
+      report.captures = report.captures.filter(function (c) { return !c.track || c.track <= n; });
+    }
+    steps = expandSteps(n);
+    if (!wizardStarted) { idx = 0; wizardStarted = true; }
+    if (idx > steps.length - 1) idx = steps.length - 1;
+    dirty = true;
     show('s-wizard');
     renderStep();
+  }
+  $('btnToWizard').addEventListener('click', goToWizard);
+
+  // ── wizard ─────────────────────────────────────────────────────────────────
+  var steps = [], idx = 0, wizardStarted = false;
+
+  // the last answer recorded for a step, or -1. back makes revisiting possible, so
+  // every write has to find an existing entry instead of blindly appending.
+  //
+  // stepId alone is NOT enough: every track of a per-track step shares one id, so
+  // matching on it would show track 1's answer on track 2 and then overwrite it.
+  function captureIndexFor(s) {
+    for (var i = report.captures.length - 1; i >= 0; i--) {
+      var c = report.captures[i];
+      if (c.stepId === s.id && (c.track || 0) === (s.track || 0)) return i;
+    }
+    return -1;
+  }
+
+  function storeCapture(cap) {
+    var s = steps[idx];
+    var i = captureIndexFor(s);
+    if (s.repeat) {
+      // a repeat step holds one entry per control the contributor recorded. a
+      // "skipped" placeholder makes way for the first real one and is not re-added.
+      var hasReal = report.captures.some(function (c) { return c.stepId === s.id && !c.skipped; });
+      if (cap.skipped && hasReal) { dirty = true; save(); return; }
+      if (!cap.skipped && i !== -1 && report.captures[i].skipped) report.captures.splice(i, 1);
+      report.captures.push(cap);
+    } else if (i !== -1) {
+      report.captures[i] = cap;
+    } else {
+      report.captures.push(cap);
+    }
+    dirty = true;
+    save();
   }
 
   function renderStep() {
@@ -295,11 +539,32 @@
     $('recLive').innerHTML = '';
     $('recResult').innerHTML = '';
     $('btnRecord').disabled = false;
+    $('btnDoneRec').hidden = true;
     $('btnRedo').hidden = true;
     $('btnAgain').hidden = true;
     $('btnNext').hidden = true;
     $('btnSkipNo').hidden = false;
     $('btnSkipCant').hidden = false;
+
+    // a step reached by going back shows the answer it already holds, so it can be
+    // reviewed, recorded over, or simply moved past again.
+    var i = captureIndexFor(s);
+    if (i !== -1) {
+      var c = report.captures[i];
+      $('btnNext').hidden = false;
+      if (c.skipped) {
+        $('recResult').innerHTML = '<div class="warn note"><p style="margin:0">skipped — '
+          + esc(c.skipReason) + '. record it now to replace that.</p></div>';
+      } else {
+        $('wizLabel').value = c.userLabel || '';
+        $('recResult').innerHTML = describe(c.analysis);
+        $('btnRedo').hidden = false;
+        $('btnAgain').hidden = !s.repeat;
+      }
+    }
+
+    renderBack();
+    save();
   }
 
   function advance() {
@@ -310,25 +575,29 @@
 
   function recordSkip(reason) {
     var s = steps[idx];
-    report.captures.push({
+    storeCapture({
       stepId: s.id, key: s.key, track: s.track, label: s.prompt,
       skipped: true, skipReason: reason, raw: [], analysis: null
     });
-    advance();
   }
-  $('btnSkipNo').addEventListener('click', function () { recordSkip('no such control on this device'); });
-  $('btnSkipCant').addEventListener('click', function () { recordSkip('could not find it'); });
+  $('btnSkipNo').addEventListener('click', function () {
+    recordSkip('no such control on this device'); advance();
+  });
+  $('btnSkipCant').addEventListener('click', function () {
+    recordSkip('could not find it'); advance();
+  });
+
+  // set while a recording is running so the one "done recording" handler can end it.
+  // binding inside doRecord would stack a fresh listener on every step.
+  var stopEarly = null;
+  $('btnDoneRec').addEventListener('click', function () { if (stopEarly) stopEarly(); });
 
   $('btnRecord').addEventListener('click', function () { doRecord(); });
   $('btnRedo').addEventListener('click', function () {
-    // drop the capture just taken for this step and try again. matched on stepId
-    // rather than key, because repeat steps get a numeric suffix on their key.
-    for (var i = report.captures.length - 1; i >= 0; i--) {
-      if (report.captures[i].stepId === steps[idx].stepId
-          || report.captures[i].stepId === steps[idx].id) {
-        report.captures.splice(i, 1); break;
-      }
-    }
+    // drop the answer this step currently holds and offer it again. matched on
+    // stepId rather than key, because repeat steps get a numeric suffix on theirs.
+    var i = captureIndexFor(steps[idx]);
+    if (i !== -1) report.captures.splice(i, 1);
     renderStep();
   });
   $('btnAgain').addEventListener('click', function () { renderStep(); });
@@ -336,10 +605,17 @@
 
   function doRecord() {
     var s = steps[idx];
-    var raw = [], ignored = 0, seen = {};
+    var raw = [], ignored = 0, seen = {}, done = false;
     $('btnRecord').disabled = true;
+    $('btnDoneRec').hidden = false;
     $('btnSkipNo').hidden = true;
     $('btnSkipCant').hidden = true;
+    // re-recording a step the contributor came back to: clear the old answer off the
+    // screen, and take away the ways forward until this take has finished
+    $('recResult').innerHTML = '';
+    $('btnRedo').hidden = true;
+    $('btnAgain').hidden = true;
+    $('btnNext').hidden = true;
     startSink(function (m) {
       if (RAW_IGNORE.indexOf(m.bytes[0]) !== -1) { ignored++; return; }
       raw.push(m);
@@ -348,12 +624,15 @@
       renderLive(seen, raw.length);
     });
     var left = RECORD_MS / 1000;
-    $('recStatus').textContent = 'recording… ' + left + 's — go';
+    $('recStatus').textContent = 'recording… ' + left + 's — go (or press done recording)';
     var iv = setInterval(function () {
       left--;
       $('recStatus').textContent = left > 0 ? 'recording… ' + left + 's' : 'done.';
       if (left <= 0) { clearInterval(iv); finish(); }
     }, 1000);
+    // once the control has been moved there is nothing to gain from the rest of the
+    // countdown, and 24 steps of dead waiting is most of why this takes ten minutes.
+    stopEarly = function () { clearInterval(iv); finish(); };
 
     function renderLive(t, n) {
       var keys = Object.keys(t).sort(function (a, b) { return t[b] - t[a]; }).slice(0, 6);
@@ -362,11 +641,20 @@
     }
 
     function finish() {
+      if (done) return;   // the timer and the button both land here; only one may win
+      done = true;
+      stopEarly = null;
+      $('btnDoneRec').hidden = true;
+      $('recStatus').textContent = 'done.';
       stopSink();
       var analysis = analyze(raw);
       var key = s.key;
       if (s.repeat) {
-        var n = report.captures.filter(function (c) { return c.stepId === s.id; }).length + 1;
+        // count only real answers: a skip placeholder is about to be dropped, and
+        // numbering off it would leave a gap.
+        var n = report.captures.filter(function (c) {
+          return c.stepId === s.id && !c.skipped;
+        }).length + 1;
         key = s.key + '.' + n;
       }
       var cap = {
@@ -376,7 +664,7 @@
         ignoredMessages: ignored,
         raw: raw, analysis: analysis
       };
-      report.captures.push(cap);
+      storeCapture(cap);
       $('recResult').innerHTML = describe(analysis);
       $('btnRedo').hidden = false;
       $('btnNext').hidden = false;
@@ -499,6 +787,9 @@
   }
 
   function describe(a) {
+    // a restored session can carry a capture this build no longer understands;
+    // showing nothing beats taking the whole page down with it
+    if (!a) return '';
     if (a.status === 'nothing') {
       return '<div class="warn"><strong>nothing came through.</strong> if the control definitely '
         + 'moved, the device may not transmit it — that is worth knowing, so use '
@@ -594,6 +885,7 @@
     sendBytes([0xFC]);
 
     st('done. three questions:');
+    save();
     renderSendQuestions(cands);
   });
 
@@ -621,7 +913,7 @@
 
     $('sendQuestions').addEventListener('change', function (e) {
       var k = e.target.getAttribute('data-q');
-      if (k) report.sendTests[k] = e.target.value || null;
+      if (k) { report.sendTests[k] = e.target.value || null; save(); }
     });
     $('btnSendDone').addEventListener('click', function () { show('s-done'); });
   }
@@ -675,7 +967,11 @@
   }
 
   ['qSetup', 'qWeird'].forEach(function (id) {
-    $(id).addEventListener('input', function () { finalise(); $('summary').textContent = summarise(); });
+    $(id).addEventListener('input', function () {
+      finalise();
+      $('summary').textContent = summarise();
+      save();
+    });
   });
 
   $('btnDownload').addEventListener('click', function () {
@@ -722,7 +1018,21 @@
     if (!$('s-done').hidden) { finalise(); $('summary').textContent = summarise(); }
   }).observe($('s-done'), { attributes: true, attributeFilter: ['hidden'] });
 
+  // an unfinished session from a previous visit is offered before anything else
+  renderResumeBanner();
+  renderBack();
+
   // expose for the browser-side self-test in tests/
   window.__mapper = { analyze: analyze, inferEncoding: inferEncoding, classify: classify,
-    candidateCCs: candidateCCs, summarise: summarise, report: report };
+    candidateCCs: candidateCCs, summarise: summarise, report: report,
+    back: function () { var t = backTarget(); if (t) t.go(); },
+    backHint: function () { var t = backTarget(); return t ? t.hint : null; },
+    state: function () {
+      return { screen: current, idx: idx, steps: steps.length, dirty: dirty };
+    },
+    show: show, goToWizard: goToWizard, advance: advance, renderStep: renderStep,
+    recordSkip: recordSkip, storeCapture: storeCapture, captureIndexFor: captureIndexFor,
+    saveSession: save, loadSession: loadSession, clearSession: clearSession,
+    restoreState: restoreState, slim: slim,
+    setDirty: function (v) { dirty = v; } };
 })();

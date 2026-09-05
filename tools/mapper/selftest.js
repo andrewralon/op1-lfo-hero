@@ -24,6 +24,19 @@ function stubEl() {
   return el;
 }
 const els = {};
+// in-memory stand-in for localStorage, with a settable byte budget so the
+// out-of-quota path can be exercised the way a real browser would trigger it
+const store = {
+  data: {}, limit: Infinity,
+  getItem(k) { return Object.prototype.hasOwnProperty.call(this.data, k) ? this.data[k] : null; },
+  setItem(k, v) {
+    if (String(v).length > this.limit) {
+      const e = new Error('quota'); e.name = 'QuotaExceededError'; throw e;
+    }
+    this.data[k] = String(v);
+  },
+  removeItem(k) { delete this.data[k]; }
+};
 const sandbox = {
   console,
   document: {
@@ -34,6 +47,10 @@ const sandbox = {
   navigator: { userAgent: 'selftest', requestMIDIAccess: undefined },
   performance: { now: () => Date.now() },
   window: {},
+  addEventListener() {},
+  scrollTo() {},
+  location: { reload() {} },
+  localStorage: store,
   setTimeout, clearTimeout, setInterval, clearInterval,
   MutationObserver: class { observe() {} },
   Blob: class {}, URL: { createObjectURL: () => '', revokeObjectURL() {} },
@@ -396,6 +413,144 @@ console.log('\nsending results back:');
   for (const [name, src] of [['guided mapper', html], ['manual page', manual]]) {
     check(`${name} names the op-forums route`, src.includes('op-forums.com/new-message?username=andrewralon'), true);
   }
+}
+
+
+// ── 10. going back, and surviving a refresh ────────────────────────────────
+// back makes revisiting a step possible for the first time, so every write into
+// report.captures has to be idempotent. and the session now autosaves, because
+// the report is never uploaded and a stray refresh used to cost all ten minutes.
+console.log('\nnavigation and persistence:');
+{
+  const m = sandbox.window.__mapper;
+  const js = fs.readFileSync(path.join(ROOT, 'docs/mapper/mapper.js'), 'utf8');
+  const html = fs.readFileSync(path.join(ROOT, 'docs/mapper/index.html'), 'utf8');
+  // the stub cache fills lazily, and these inputs are only read inside handlers
+  const el = (id) => sandbox.document.getElementById(id);
+
+  // a 2-track device keeps the step list short enough to walk in a test
+  el('devName').value = 'test device';
+  el('devFirmware').value = '';
+  el('devTracks').value = '2';
+  m.goToWizard();
+  const total = m.state().steps;
+  check('setup leads into the wizard', m.state().screen, 's-wizard');
+  check('wizard starts at the first step', m.state().idx, 0);
+
+  // back out of step 1 and in again: the position is kept, not reset
+  m.back();
+  check('back from step 1 lands on setup', m.state().screen, 's-setup');
+  m.goToWizard();
+  m.advance(); m.advance();
+  check('advanced to step 3', m.state().idx, 2);
+  m.back();
+  check('back steps within the wizard', m.state().idx, 1);
+  m.back(); m.back();
+  check('back past step 1 leaves the wizard', m.state().screen, 's-setup');
+  m.goToWizard();
+  check('re-entering the wizard resumes, not restarts', m.state().idx, 0);
+
+  // re-answering a revisited step must replace its entry, never append a second
+  m.recordSkip('no such control on this device');
+  m.advance();
+  m.back();
+  const before = m.report.captures.length;
+  m.recordSkip('could not find it');
+  check('re-answering replaces, does not append', m.report.captures.length, before);
+  check('the replacement is the one kept', m.report.captures[0].skipReason, 'could not find it');
+
+  while (m.state().screen === 's-wizard') m.advance();
+  check('walking every step reaches the send screen', m.state().screen, 's-send');
+  m.back();
+  check('back from send returns to the last step', m.state().idx, total - 1);
+
+  // ...but the last step is `repeat`, and those are one entry per control: a skip
+  // placeholder makes way for the first real answer, then answers accumulate.
+  const repeatStep = expandSteps(2)[total - 1];
+  check('the last step is the repeatable one', repeatStep.id, 'freeform');
+  const beforeRepeat = m.report.captures.length;
+  m.recordSkip('could not find it');
+  check('a repeat step can be skipped', m.report.captures.length, beforeRepeat + 1);
+  const answer = (key) => ({ stepId: 'freeform', key, skipped: false, raw: [], analysis: null });
+  m.storeCapture(answer('freeform.1'));
+  check('the first real answer replaces the placeholder', m.report.captures.length, beforeRepeat + 1);
+  m.storeCapture(answer('freeform.2'));
+  check('further answers accumulate', m.report.captures.length, beforeRepeat + 2);
+  m.recordSkip('could not find it');
+  check('a skip is dropped once real answers exist', m.report.captures.length, beforeRepeat + 2);
+
+  // the send and done screens are reachable in both directions
+  m.show('s-done');
+  m.back();
+  check('back from done returns to the send tests', m.state().screen, 's-send');
+
+  // ── autosave ──
+  m.setDirty(true);
+  m.saveSession();
+  const saved = m.loadSession();
+  check('a session is written', !!saved, true);
+  check('saved captures match the live ones', saved.report.captures.length, m.report.captures.length);
+  check('the screen is remembered', saved.screen, 's-send');
+
+  // a report written by a different shape must be ignored, not half-restored
+  store.data['op1lfohero.mapper.session.v1'] =
+    JSON.stringify({ schemaVersion: 99, screen: 's-done', report: { captures: [] } });
+  check('a foreign schemaVersion is refused', m.loadSession(), null);
+
+  // out of quota: the raw byte log goes, the derived analysis stays
+  const slimmed = m.slim(m.report);
+  check('slim drops the raw bytes', slimmed.captures.every((c) => c.raw.length === 0), true);
+  check('slim marks what it dropped', slimmed.captures[0].rawDropped, true);
+  store.data = {};
+  store.limit = 200;   // small enough that even the slim copy will not fit
+  m.saveSession();
+  check('an unwritable session leaves nothing behind', store.getItem('op1lfohero.mapper.session.v1'), null);
+  store.limit = Infinity;
+
+  // restore has to rebuild the step list, not just the report
+  m.clearSession();
+  m.saveSession();
+  const round = m.loadSession();
+  m.restoreState(round);
+  check('restore rebuilds the step list', m.state().steps, total);
+  check('restore keeps the captures', m.report.captures.length, round.report.captures.length);
+
+  // every track of a per-track step shares one stepId. matching an answer on that
+  // alone would show track 1's capture on track 2 and then overwrite it, silently
+  // losing a measurement that cost someone a fader sweep.
+  // park on a known step and start from an empty report, wherever the block above left off
+  m.show('s-wizard');
+  while (m.state().idx > 0) m.back();
+  m.report.captures.length = 0;
+
+  const twoTrack = expandSteps(2);
+  check('step 1 and step 2 are one control on two tracks',
+    twoTrack[0].id + '/' + twoTrack[1].id, 'volume/volume');
+  m.storeCapture({ stepId: 'volume', key: 'volume.1', track: 1, skipped: false, raw: [], analysis: null });
+  m.advance();                       // now on volume.2: same stepId, different track
+  check('track 2 has no answer of its own yet', m.captureIndexFor(twoTrack[1]), -1);
+  m.storeCapture({ stepId: 'volume', key: 'volume.2', track: 2, skipped: false, raw: [], analysis: null });
+  check('track 2 does not overwrite track 1', m.report.captures.length, 2);
+  const t1 = m.report.captures.filter((c) => c.stepId === 'volume' && c.track === 1);
+  check('track 1 keeps exactly one answer', t1.length, 1);
+  check('and it is still track 1\'s', t1[0].key, 'volume.1');
+
+  // a 6-second wait times 24 steps is most of why this takes ten minutes, so the
+  // countdown can be cut short once the control has actually been moved
+  check('an early-stop button exists', html.includes('id="btnDoneRec"'), true);
+  check('it starts hidden', /id="btnDoneRec" hidden/.test(html), true);
+  check('it is bound once, outside doRecord', js.includes("$('btnDoneRec').addEventListener"), true);
+  check('recording only ever finishes once', js.includes('if (done) return;'), true);
+
+  // the unload warning is the half that stops the mistake happening at all
+  check('a beforeunload guard is registered', js.includes("'beforeunload'"), true);
+  check('the guard is armed by a dirty flag', /if \(!dirty\) return undefined;/.test(js), true);
+
+  // an unanswered step still records why it was passed over, and that wording must
+  // not read as "no such control" — report_to_profile.py turns that into a false
+  // capability, which is a claim about hardware nobody made.
+  check('skip reasons stay distinguishable',
+    js.includes("recordSkip('could not find it')"), true);
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

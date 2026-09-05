@@ -14,11 +14,30 @@
   <h1><img src="../icon.png" class="app-icon" alt=""><a href="../index.html">op1 lfo hero</a></h1>
   <p class="meta">device report &nbsp;·&nbsp; guided mapper &nbsp;·&nbsp; ~10 minutes</p>
 
+  <!-- back sits above the screens, so it is in the same place on every one of them -->
+  <p id="navBack" hidden>
+    <button id="btnBack">← back</button>
+    <span class="meta" id="backHint"></span>
+    <span class="meta" id="saveNote"></span>
+  </p>
+
   <!-- ───────────────────────── intro ───────────────────────── -->
   <div id="s-intro">
+    <!-- shown only when an unfinished session is found in this browser -->
+    <div class="warn ok" id="resumeBanner" hidden>
+      <p style="margin:0 0 8px 0">
+        <strong>you have an unfinished report.</strong> <span id="resumeSummary"></span>
+      </p>
+      <p style="margin:0">
+        <button class="primary" id="btnResume">resume</button>
+        <button id="btnStartOver">start over</button>
+      </p>
+    </div>
+
     <div class="warn ok">
       <strong>nothing is uploaded.</strong> everything happens in your browser. the only thing that
-      leaves this page is a file you download and choose to send.
+      leaves this page is a file you download and choose to send. your progress is saved in this
+      browser as you go, so a refresh or a closed tab doesn't cost you the session.
     </div>
 
     <h2>what this does</h2>
@@ -125,6 +144,7 @@
     </div>
     <p>
       <button class="primary" id="btnRecord">record 6 seconds</button>
+      <button id="btnDoneRec" hidden>done recording</button>
       <button id="btnSkipNo">skip — no such control</button>
       <button id="btnSkipCant">skip — can't find it</button>
     </p>

@@ -40,3 +40,11 @@ button {
 button:hover:not(:disabled) { border-color: #4ec94e; color: #ffffff; }
 button:disabled { opacity: 0.4; cursor: default; }
 button.primary { border-color: #4ec94e; color: #4ec94e; }
+/* the back row sits above every screen; the hint names where back would land */
+#navBack { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+/* an id selector outranks the browser's [hidden]{display:none}, so say it again here
+   or the back row shows up on the intro screen, where there is nothing behind it */
+#navBack[hidden] { display: none; }
+#navBack .meta { margin: 0; }
+#saveNote { color: #ff6a00; }
+#resumeBanner .meta { margin: 6px 0 10px 0; }

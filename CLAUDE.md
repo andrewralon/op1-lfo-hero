@@ -170,6 +170,18 @@ Rules when touching this:
 - **Pages builds from `main`.** The mapper is unreachable from a branch. Test locally with
   `python3 -m http.server` from `docs/` — `localhost` is a secure context, so Web MIDI and the
   SysEx prompt both work there.
+- **A step can be revisited, so nothing may append blindly.** The back button makes every earlier
+  step reachable. Route every write into `report.captures` through `storeCapture()`, which finds an
+  existing answer via `captureIndexFor()` and replaces it. Match on `stepId` **and** `track` — every
+  track of a per-track step shares one `stepId`, so matching on that alone shows track 1's capture
+  on track 2 and then overwrites it. `repeat` steps (freeform) are the one exception and accumulate.
+- **The session autosaves to `localStorage`** (`op1lfohero.mapper.session.v1`) and is offered back
+  on the next visit. It is same-origin and never transmitted, so "nothing is uploaded" still holds
+  — keep it that way. On quota exhaustion the saved copy drops `raw` and keeps `analysis`; the
+  in-memory report and the download always keep every byte.
+- **`#navBack` needs its own `[hidden]` rule.** An id selector outranks the browser's
+  `[hidden]{display:none}`, so any id-selector `display:` here must be paired with
+  `#thing[hidden] { display: none }` or the element ignores `hidden` entirely.
 - `analysis.primary` in a report is a *guess*. Honour `confidence: "low"` and `ambiguous: true`
   rather than writing a profile straight from it.
 - `report_to_profile.py` emits a **draft**. It exits non-zero with a `BLOCKERS` block when a device
