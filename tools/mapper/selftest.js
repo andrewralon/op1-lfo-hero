@@ -410,7 +410,7 @@ console.log('\nsending results back:');
   check('clipboard has a non-secure-context fallback', js.includes('execCommand'), true);
 
   // both pages must name the same destination
-  for (const [name, src] of [['guided mapper', html], ['manual page', manual]]) {
+  for (const [name, src] of [['midi mapper', html], ['manual page', manual]]) {
     check(`${name} names the op-forums route`, src.includes('op-forums.com/new-message?username=andrewralon'), true);
   }
 }

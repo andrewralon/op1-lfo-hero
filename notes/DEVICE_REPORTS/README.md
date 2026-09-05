@@ -2,7 +2,7 @@
 
 Raw captures submitted by people who own hardware we don't. One file per report:
 
-- `<device>-<date>.json` — from the [guided mapper](../../docs/mapper/index.html)
+- `<device>-<date>.json` — from the [midi mapper](../../docs/mapper/index.html)
 - `<device>-<date>.log` — a raw monitor export from the [manual path](../../docs/mapper/manual.html),
   kept alongside a hand-written `.json` in the same shape once decoded
 

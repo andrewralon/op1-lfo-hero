@@ -11,7 +11,7 @@ body:
         often enough that we don't trust them.
 
         haven't captured anything yet? start here:
-        **[guided mapper](https://andrewralon.github.io/op1-lfo-hero/mapper/)** (chrome / edge /
+        **[midi mapper](https://andrewralon.github.io/op1-lfo-hero/mapper/)** (chrome / edge /
         firefox on a computer) or
         **[manual instructions](https://andrewralon.github.io/op1-lfo-hero/mapper/manual.html)**
         (any midi monitor, including on safari).
@@ -38,7 +38,7 @@ body:
     attributes:
       label: how did you capture this?
       options:
-        - guided mapper (json report)
+        - midi mapper (json report)
         - manual, with a midi monitor (raw log)
     validations:
       required: true
