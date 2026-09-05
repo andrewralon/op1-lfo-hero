@@ -162,6 +162,44 @@ was clipping digits because it was derived from the column instead of the space 
 
 When a task originates from one of these files, check the box (`- [ ]` → `- [x]`) and move the item under `## Done` as part of the same change — don't leave completed items unchecked.
 
+## Device reports (`docs/probe/`, `notes/DEVICE_REPORTS/`)
+
+Adding a device needs measurements from hardware, and we only own three of them. `docs/probe/` is
+a crowdsourcing page published on GitHub Pages
+(`https://andrewralon.github.io/op1-lfo-hero/probe/`) that walks a stranger through recording what
+their device sends, and produces a JSON report shaped to map onto a `DeviceProfile` literal.
+
+| File | Role |
+|---|---|
+| `docs/probe/steps.js` | **canonical capture step list** — the single source of truth |
+| `docs/probe/index.html` + `probe.js` | guided wizard: identity → guided capture → opt-in send tests → JSON download |
+| `docs/probe/manual.html` | same steps as instructions for an off-the-shelf MIDI monitor |
+| `.github/ISSUE_TEMPLATE/device-report.yml` | where reports land |
+| `notes/DEVICE_REPORTS/` | submitted reports, kept verbatim |
+| `scripts/report_to_profile.py` | turns a report into a **draft** `DeviceProfile` literal |
+| `tools/probe/selftest.js` | `node tools/probe/selftest.js` — no browser or hardware needed |
+
+Rules when touching this:
+
+- **Both pages render `steps.js`.** Never add a step to one page only — they must stay in lockstep
+  or one decoding effort can't cover both submission paths.
+- **Safari has never shipped Web MIDI**, on macOS or iOS, so the probe cannot be universal.
+  `manual.html` is not optional polish; it is the only path for Safari users, and the probe's
+  no-Web-MIDI screen links to it.
+- **The send tests can damage a stranger's device.** They are opt-in behind a checkbox, only ever
+  replay CCs the device itself just transmitted, never send CC 14 (record arm), never send CC 120
+  unless that device's own mute used it, and send exactly one `0xFC` (a second stop rewinds a
+  TP-7). `selftest.js` asserts all of this — keep it passing.
+- **Pages builds from `main`.** The probe is unreachable until a branch merges. Test locally with
+  `python3 -m http.server` from `docs/` — `localhost` is a secure context, so Web MIDI and the
+  SysEx prompt both work.
+- `analysis.primary` in a report is a *guess*. Honour `confidence: "low"` and `ambiguous: true`
+  rather than writing a profile straight from it.
+- `report_to_profile.py` emits a **draft**, never a finished profile. It exits non-zero and prints
+  a `BLOCKERS` block when the device is inexpressible; it never guesses transport ops, because the
+  TP-7's play button once sent CC 14 (record arm). Resolve every `UNVERIFIED` comment before
+  pasting into `DeviceProfiles.swift`.
+
 ## Known iOS crash: List inside sheet on iPad
 
 Never use `List` inside a `NavigationStack` inside a `.sheet` (or `.fullScreenCover`). On iPad, the UIKit focus system recursively traverses `UITableView` focus containers and hits an assertion, crashing the app (and sometimes Springboard). This has bitten us twice.
