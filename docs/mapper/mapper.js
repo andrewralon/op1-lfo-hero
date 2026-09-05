@@ -208,7 +208,6 @@
     $('devTracks').value = report.device.trackCount;
     $('qSetup').value = report.freeform.deviceSettingsChangedToMakeThisWork || '';
     $('qWeird').value = report.freeform.anythingWeird || '';
-    if (report.passiveListen) $('btnToSetup').disabled = false;
     steps = expandSteps(report.device.trackCount);
     wizardStarted = !!st.wizardStarted;
     idx = Math.max(0, Math.min(steps.length - 1, st.idx || 0));
@@ -468,7 +467,6 @@
         h += '</div>';
       }
       $('listenResult').innerHTML = h;
-      $('btnToSetup').disabled = false;
       dirty = true;   // twenty seconds of listening is now worth not losing
       save();
     }
