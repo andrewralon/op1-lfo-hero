@@ -1,0 +1,54 @@
+/* additions for the device-report pages. the shared site stylesheet is untouched. */
+.warn {
+  border: 1px solid #ff6a00;
+  border-left-width: 3px;
+  background: #1a1a1a;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+.ok { border-color: #4ec94e; }
+.note { border-color: #454545; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; font-size: 12px; }
+th, td { border: 1px solid #2a2a2a; padding: 6px 8px; text-align: left; vertical-align: top; }
+th { color: #ffffff; background: #1a1a1a; }
+ol.steps { padding-left: 0; list-style: none; counter-reset: step; }
+ol.steps li {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-left: 3px solid #454545;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  counter-increment: step;
+}
+ol.steps li::before {
+  content: counter(step) ". ";
+  color: #ff6a00;
+  font-weight: bold;
+}
+ol.steps li .why { display: block; color: #848c94; font-size: 11px; margin-top: 3px; }
+ol.steps li.newgroup { margin-top: 16px; }
+label { display: block; margin-bottom: 10px; }
+input[type=number], input[type=text], select {
+  background: #1a1a1a; color: #d8d8d8; border: 1px solid #454545;
+  border-radius: 3px; padding: 4px 8px; font-family: inherit; font-size: 13px;
+}
+button {
+  background: #2a2a2a; color: #d8d8d8; border: 1px solid #454545;
+  border-radius: 3px; padding: 6px 14px; font-family: inherit; font-size: 13px;
+  cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: #4ec94e; color: #ffffff; }
+button:disabled { opacity: 0.4; cursor: default; }
+button.primary { border-color: #4ec94e; color: #4ec94e; }
+/* mapper.js reparents this into the first slot of whichever bottom action row is
+   currently live, so it always sits to the left of that screen's next / skip buttons.
+   margin-right matches the ~8px gap the other buttons in that row get for free from
+   the whitespace between them in the html source -- insertBefore() adds no such text
+   node, so without this back would butt up right against the next button. */
+#navBack { display: inline-flex; align-items: center; gap: 10px; margin-right: 8px; }
+/* an id selector outranks the browser's [hidden]{display:none}, so say it again here
+   or the back row shows up regardless of the hidden attribute */
+#navBack[hidden] { display: none; }
+#navBack .meta { margin: 0; }
+#saveNote { color: #ff6a00; }
+#resumeBanner .meta { margin: 6px 0 10px 0; }

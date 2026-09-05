@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>op1 lfo hero — device report</title>
+  <link rel="stylesheet" href="../style.css">
+  <link rel="stylesheet" href="mapper.css">
+</head>
+
+<body>
+
+  <h1><img src="../icon.png" class="app-icon" alt=""><a href="../index.html">op1 lfo hero</a></h1>
+  <p class="meta">device report &nbsp;·&nbsp; midi mapper &nbsp;·&nbsp; ~10 minutes</p>
+
+  <!-- relocated by mapper.js to sit at the start of whichever bottom action row is
+       currently live, so back always shows up to the left of that screen's next / skip
+       controls rather than as a banner of its own. parked here until the first render. -->
+  <span id="navBack" hidden>
+    <button id="btnBack">← back</button>
+    <span class="meta" id="saveNote" hidden></span>
+  </span>
+
+  <!-- ───────────────────────── intro ───────────────────────── -->
+  <div id="s-intro">
+    <!-- shown only when an unfinished session is found in this browser -->
+    <div class="warn ok" id="resumeBanner" hidden>
+      <p style="margin:0 0 8px 0">
+        <strong>you have an unfinished report.</strong> <span id="resumeSummary"></span>
+      </p>
+      <p style="margin:0">
+        <button class="primary" id="btnResume">resume</button>
+        <button id="btnStartOver">start over</button>
+      </p>
+    </div>
+
+    <div class="warn ok">
+      <strong>nothing is uploaded.</strong> everything happens in your browser. the only thing that
+      leaves this page is a file you download and choose to send. your progress is saved in this
+      browser as you go, so a refresh or a closed tab doesn't cost you the session.
+    </div>
+
+    <h2>what this does</h2>
+    <p>
+      lfo hero drives the <strong>op-1 field</strong>, with <strong>tx-6</strong> and
+      <strong>tp-7</strong> support in testing. each was mapped by measuring real hardware, because
+      the published midi references turned out to be wrong in at least six places.
+    </p>
+    <p>
+      to support any other teenage engineering device — <strong>op-1 (original)</strong>, op-z,
+      ep-133, ob-4, po series — someone who owns one has to record what it actually sends. this page
+      walks you through it. <strong>you don't need to know anything about midi.</strong>
+    </p>
+    <p>
+      it only listens, unless you explicitly opt in to the optional send tests near the end.
+    </p>
+    <p>plug your device in over usb, then:</p>
+    <p><button class="primary" id="btnConnect">connect to midi</button></p>
+    <p class="meta">
+      your browser will ask permission, possibly twice (once for midi, once for sysex). both are
+      needed. prefer a monitor you already trust? <a href="manual.html">manual instructions</a>.
+    </p>
+  </div>
+
+  <!-- ───────────────────────── unsupported ───────────────────────── -->
+  <div id="s-unsupported" hidden>
+    <h2>this browser can't do it</h2>
+    <div class="warn">
+      <p style="margin:0">
+        this page needs the <strong>web midi api</strong>, which needs
+        <strong>chrome, edge or firefox on a computer</strong>. safari has never supported it, on
+        mac or on iphone/ipad — so there is no version of this page that would work here.
+      </p>
+    </div>
+    <p><strong>you can still help</strong>, using a midi monitor instead:</p>
+    <p><a href="manual.html" class="primary">→ manual instructions</a></p>
+    <p class="meta" id="unsupportedDetail"></p>
+    <footer>
+      <a href="https://andrewralon.github.io">&copy;2026 andrew ralon</a><span class="sep">·</span><a href="../index.html">home</a><span class="sep">·</span><a href="https://apps.apple.com/us/app/op1-lfo-hero/id6781054996">app store</a><span class="sep">·</span><span class="here" aria-current="page">midi mapper</span>
+    </footer>
+  </div>
+
+  <!-- ───────────────────────── tier 0 ───────────────────────── -->
+  <div id="s-identity" hidden>
+    <h2>1 — what's connected</h2>
+    <div id="portTable"></div>
+
+    <label>
+      which of these is the device you're reporting on?
+      <select id="inputSelect"></select>
+    </label>
+    <label>
+      and its output port (used for the identity check, and the optional send tests later)
+      <select id="outputSelect"></select>
+    </label>
+
+    <p class="meta" id="sysexNote"></p>
+
+    <p>
+      <button id="btnIdentify">ask the device to identify itself</button>
+      <span class="meta">one standard midi identity question — safe on any device</span>
+    </p>
+    <div id="identityResult"></div>
+
+    <h2>2 — listen while you do nothing</h2>
+    <p>
+      some devices talk constantly, some say nothing until you touch them. both are useful to know.
+      <strong>don't touch the device</strong> for the next 20 seconds.
+    </p>
+    <p>
+      <button class="primary" id="btnListen">start 20 second listen</button>
+      <span id="listenStatus" class="meta"></span>
+    </p>
+    <div id="listenResult"></div>
+    <p><button id="btnToSetup">next →</button></p>
+  </div>
+
+  <!-- ───────────────────────── setup ───────────────────────── -->
+  <div id="s-setup" hidden>
+    <h2>3 — about your device</h2>
+    <label>
+      what is it?
+      <input type="text" id="devName" placeholder="op-1 (original, not field)" size="36">
+    </label>
+    <label>
+      firmware version, if you know it
+      <input type="text" id="devFirmware" placeholder="unknown" size="20">
+    </label>
+    <label>
+      how many tracks / channels does its mixer have?
+      <input type="number" id="devTracks" min="1" max="8" value="4">
+    </label>
+    <p class="meta">if it has no per-track mixer at all, set this to 1.</p>
+    <p><button class="primary" id="btnToWizard">start capturing →</button></p>
+  </div>
+
+  <!-- ───────────────────────── wizard ───────────────────────── -->
+  <div id="s-wizard" hidden>
+    <h2 id="wizHeading">4 — capture</h2>
+    <p class="meta" id="wizProgress"></p>
+    <div class="warn note">
+      <p style="margin:0 0 6px 0"><strong id="wizPrompt"></strong></p>
+      <p class="meta" id="wizWhy" style="margin:0"></p>
+    </div>
+    <p>
+      <button class="primary" id="btnRecord">record 6 seconds</button>
+      <button id="btnDoneRec" hidden>done recording</button>
+      <button id="btnSkipNo" title="no such control on this device">skip — n/a</button>
+      <button id="btnSkipCant">skip — can't find it</button>
+    </p>
+    <p id="wizLabelWrap" hidden>
+      <label>what control was that? <input type="text" id="wizLabel" placeholder="e.g. filter cutoff" size="28"></label>
+    </p>
+    <p class="meta" id="recStatus"></p>
+    <div id="recLive"></div>
+    <div id="recResult"></div>
+    <p>
+      <button id="btnRedo" hidden>redo this step</button>
+      <button id="btnAgain" hidden>record another control</button>
+      <button class="primary" id="btnNext" hidden>next step →</button>
+    </p>
+  </div>
+
+  <!-- ───────────────────────── send tests ───────────────────────── -->
+  <div id="s-send" hidden>
+    <h2>5 — send tests <span class="meta">(optional)</span></h2>
+    <p>
+      everything so far only listened. these tests <strong>send midi to your device</strong> to find
+      out whether it responds to what it transmits — which decides whether the app can control it at
+      all. it's the single most valuable optional thing you can do.
+    </p>
+    <div class="warn">
+      <p style="margin:0 0 6px 0"><strong>but it does change things on your device.</strong></p>
+      <ul style="margin:0">
+        <li>save or stop anything you're working on first</li>
+        <li>we only replay controls your device itself just sent, never unknown ones</li>
+        <li>we never send record-arm, and never <code>cc 120</code> unless your own mute used it</li>
+        <li>faders and knobs may move; the transport may start and stop</li>
+      </ul>
+    </div>
+    <label>
+      <input type="checkbox" id="sendConsent">
+      i understand this sends midi to my device and may change its settings
+    </label>
+    <p>
+      <button class="primary" id="btnSendTests" disabled>run send tests</button>
+      <button id="btnSkipSend">skip these →</button>
+    </p>
+    <p class="meta" id="sendStatus"></p>
+    <div id="sendQuestions"></div>
+  </div>
+
+  <!-- ───────────────────────── finish ───────────────────────── -->
+  <div id="s-done" hidden>
+    <h2>6 — last questions</h2>
+    <label>
+      <strong>did you have to change any setting on the device to make it send midi?</strong><br>
+      <span class="meta">this matters more than it sounds — the tx-6 transmits nothing until you set
+        <code>midi control = in</code> and <code>clock src = usb</code>, and that was only ever found
+        by someone hitting it.</span><br>
+      <textarea id="qSetup" rows="3" style="width:100%;background:#1a1a1a;color:#d8d8d8;border:1px solid #454545;border-radius:3px;padding:6px;font-family:inherit;font-size:13px" placeholder="e.g. had to set midi > out = on"></textarea>
+    </label>
+    <label>
+      anything that seemed weird?<br>
+      <textarea id="qWeird" rows="3" style="width:100%;background:#1a1a1a;color:#d8d8d8;border:1px solid #454545;border-radius:3px;padding:6px;font-family:inherit;font-size:13px" placeholder="things that only worked sometimes, surprises, controls that did nothing"></textarea>
+    </label>
+
+    <h2>7 — send it</h2>
+    <p>
+      message <strong>andrewralon</strong> on op-forums.com:
+      <a href="https://op-forums.com/new-message?username=andrewralon&amp;title=device%20report" target="_blank">open a message on op-forums</a>
+    </p>
+    <p>
+      <button class="primary" id="btnCopy">copy summary</button>
+      <button id="btnDownload">download full report (.txt)</button>
+      <span class="meta" id="downloadNote"></span>
+    </p>
+    <p class="meta">
+      <strong>the summary is enough</strong> — it's short, and pasting it straight into the message
+      needs no file attachment at all, which matters if your forum account is new. attach the full
+      report too if you can; it holds every raw byte, so a reading can be checked later rather than
+      taken on trust.
+    </p>
+    <p class="meta">
+      would rather use github? <a href="https://github.com/andrewralon/op1-lfo-hero/issues/new?template=device-report.yml" target="_blank">open an issue</a> and attach it there
+      instead.
+    </p>
+    <p>thank you — genuinely. this is the only way devices we don't own ever get supported.</p>
+
+    <h2>what's in the file</h2>
+    <p class="meta">nothing but what you see here. have a look before you send it.</p>
+    <pre id="summary" style="background:#1a1a1a;border:1px solid #2a2a2a;padding:12px;overflow-x:auto;font-size:11px;white-space:pre-wrap"></pre>
+  </div>
+
+  <footer id="mainFooter">
+      <a href="https://andrewralon.github.io">&copy;2026 andrew ralon</a><span class="sep">·</span><a href="../index.html">home</a><span class="sep">·</span><a href="https://apps.apple.com/us/app/op1-lfo-hero/id6781054996">app store</a><span class="sep">·</span><span class="here" aria-current="page">midi mapper</span><span class="sep">·</span><a href="../privacy.html">privacy</a>
+    </footer>
+
+  <script src="steps.js"></script>
+  <script src="mapper.js"></script>
+
+</body>
+
+</html>
