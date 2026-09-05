@@ -174,6 +174,24 @@ Still to verify on hardware:
 - [ ] Does play-reverses feel right, or should it reverse at the current speed rather than 1x?
 - [ ] Does the scrub ramp feel right — 1x to 8x over 3s, or too slow/fast?
 
+### 🌍 Devices we don't own
+
+- [x] **A way for other people to measure their hardware for us.** `docs/mapper/` — the midi
+      mapper, a guided browser page plus a manual instruction path for anyone Web MIDI can't
+      reach (Safari has never shipped it, on macOS or iOS). Both walk the same numbered steps
+      from `steps.js`. Reports come back as an op-forums message and collect in
+      `notes/DEVICE_REPORTS/`. Shipped on main and live at
+      `https://andrewralon.github.io/op1-lfo-hero/mapper/`
+- [ ] **Get an OP-1 OG report.** The whole point — it is the device people most often ask about
+      and the one we cannot test. Outreach copy is ready in `notes/OUTREACH.md`
+- [ ] **Watch for a device that varies CC per track rather than channel.** `ParamBinding.cc` takes
+      a fixed `cc` and a per-track `ChannelRule`, so that shape is currently inexpressible. A
+      single-MIDI-channel device is a plausible shape for the OP-1 OG. The fix is a `CCRule`
+      mirroring `ChannelRule`; `binding(_:track:)` and `channel(_:track:)` are the only
+      resolution points, and the reverse `inbound` map is built from the same `params` array so
+      it follows automatically. `scripts/report_to_profile.py` already refuses to guess here and
+      emits a BLOCKERS block instead
+
 ### 🟡 Low — features and polish
 
 - [ ] **Wire up double-stop to rewind.** `ClockEngine.rewindToStart()` exists and is tested but
@@ -193,7 +211,9 @@ Still to verify on hardware:
       rocker pitch bend). Same caveat: `ctrl` blocks all output
 - [ ] **Detection fallback on manufacturer/model.** CoreMIDI exposes `teenage engineering` and
       the model name; currently only the endpoint display name is matched, which fails for hubs
-      that rename ports
+      that rename ports. **Blocked on data, not on code** — the midi mapper (`docs/mapper/`)
+      records every port's `name` / `manufacturer` / `version` verbatim, so the first few reports
+      will show whether the fallback is worth building and what strings to match on
 - [ ] **TP-7: grey out input gain on tracks 4-6** rather than hiding it, now that gain is known
       to address jacks rather than tracks
 - [ ] Document the TX-6 fader-fight behaviour in help — grabbing a fader while an LFO runs on
