@@ -81,47 +81,53 @@
   function stopSink() { sink = null; }
 
   // ── back navigation ────────────────────────────────────────────────────────
-  // one button, in the same place above every screen. inside the wizard it steps
-  // back through the capture list rather than out of it, so a mis-skip or a fader
-  // that did not actually move can be redone.
+  // one button, reparented to sit at the front of whichever bottom row is live.
+  // inside the wizard it steps back through the capture list rather than out of
+  // it, so a mis-skip or a fader that did not actually move can be redone.
   function backTarget() {
-    if (current === 's-identity') {
-      return { hint: 'back to the start', go: function () { show('s-intro'); } };
-    }
-    if (current === 's-setup') {
-      return { hint: 'back to what\'s connected', go: function () { show('s-identity'); } };
-    }
+    if (current === 's-identity') return function () { show('s-intro'); };
+    if (current === 's-setup') return function () { show('s-identity'); };
     if (current === 's-wizard') {
-      if (idx > 0) {
-        return {
-          hint: 'back to step ' + steps[idx - 1].number + ' of ' + steps.length,
-          go: function () { idx--; renderStep(); }
-        };
-      }
-      return { hint: 'back to your device details', go: function () { show('s-setup'); } };
+      if (idx > 0) return function () { idx--; renderStep(); };
+      return function () { show('s-setup'); };
     }
     if (current === 's-send') {
-      if (!steps.length) return { hint: 'back to your device details', go: function () { show('s-setup'); } };
-      return {
-        hint: 'back to step ' + steps.length + ' of ' + steps.length,
-        go: function () { idx = steps.length - 1; show('s-wizard'); renderStep(); }
-      };
+      return function () { if (steps.length) idx = steps.length - 1; show('s-wizard'); renderStep(); };
     }
-    if (current === 's-done') {
-      return { hint: 'back to the send tests', go: function () { show('s-send'); } };
-    }
+    if (current === 's-done') return function () { show('s-send'); };
     return null;  // the intro has nowhere behind it, and unsupported is a dead end
+  }
+
+  // whichever bottom row is actually live for the current wizard step: the
+  // record/skip row before an answer exists, the redo/again/next row once it does.
+  function wizardActionAnchor() {
+    var answered = !$('btnRedo').hidden || !$('btnAgain').hidden || !$('btnNext').hidden;
+    return answered ? $('btnRedo').parentElement : $('btnRecord').parentElement;
+  }
+
+  // the row back gets planted in front of, per screen — always a screen's own
+  // bottom action buttons, never a banner of its own above the content.
+  function backAnchor() {
+    if (current === 's-identity') return $('btnToSetup').parentElement;
+    if (current === 's-setup') return $('btnToWizard').parentElement;
+    if (current === 's-wizard') return wizardActionAnchor();
+    if (current === 's-send') return $('btnSendTests').parentElement;
+    if (current === 's-done') return $('btnCopy').parentElement;
+    return null;
   }
 
   function renderBack() {
     var t = backTarget();
-    $('navBack').hidden = !t;
-    $('backHint').textContent = t ? t.hint : '';
+    var nav = $('navBack');
+    nav.hidden = !t;
+    if (!t) return;
+    var anchor = backAnchor();
+    if (anchor && nav.parentElement !== anchor) anchor.insertBefore(nav, anchor.firstChild);
   }
 
   $('btnBack').addEventListener('click', function () {
     var t = backTarget();
-    if (t) t.go();
+    if (t) t();
   });
 
   // ── session persistence ────────────────────────────────────────────────────
@@ -670,6 +676,7 @@
       $('btnNext').hidden = false;
       $('btnAgain').hidden = !s.repeat;
       $('recLive').innerHTML = '';
+      renderBack();   // the live row just flipped from record/skip to redo/again/next
     }
   }
 
@@ -1025,8 +1032,7 @@
   // expose for the browser-side self-test in tests/
   window.__mapper = { analyze: analyze, inferEncoding: inferEncoding, classify: classify,
     candidateCCs: candidateCCs, summarise: summarise, report: report,
-    back: function () { var t = backTarget(); if (t) t.go(); },
-    backHint: function () { var t = backTarget(); return t ? t.hint : null; },
+    back: function () { var t = backTarget(); if (t) t(); },
     state: function () {
       return { screen: current, idx: idx, steps: steps.length, dirty: dirty };
     },

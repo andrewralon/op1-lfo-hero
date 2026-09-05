@@ -14,12 +14,13 @@
   <h1><img src="../icon.png" class="app-icon" alt=""><a href="../index.html">op1 lfo hero</a></h1>
   <p class="meta">device report &nbsp;·&nbsp; guided mapper &nbsp;·&nbsp; ~10 minutes</p>
 
-  <!-- back sits above the screens, so it is in the same place on every one of them -->
-  <p id="navBack" hidden>
+  <!-- relocated by mapper.js to sit at the start of whichever bottom action row is
+       currently live, so back always shows up to the left of that screen's next / skip
+       controls rather than as a banner of its own. parked here until the first render. -->
+  <span id="navBack" hidden>
     <button id="btnBack">← back</button>
-    <span class="meta" id="backHint"></span>
     <span class="meta" id="saveNote"></span>
-  </p>
+  </span>
 
   <!-- ───────────────────────── intro ───────────────────────── -->
   <div id="s-intro">

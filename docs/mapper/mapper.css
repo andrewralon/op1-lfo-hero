@@ -40,10 +40,11 @@ button {
 button:hover:not(:disabled) { border-color: #4ec94e; color: #ffffff; }
 button:disabled { opacity: 0.4; cursor: default; }
 button.primary { border-color: #4ec94e; color: #4ec94e; }
-/* the back row sits above every screen; the hint names where back would land */
-#navBack { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+/* mapper.js reparents this into the first slot of whichever bottom action row is
+   currently live, so it always sits to the left of that screen's next / skip buttons */
+#navBack { display: inline-flex; align-items: center; gap: 10px; margin-right: 14px; }
 /* an id selector outranks the browser's [hidden]{display:none}, so say it again here
-   or the back row shows up on the intro screen, where there is nothing behind it */
+   or the back row shows up regardless of the hidden attribute */
 #navBack[hidden] { display: none; }
 #navBack .meta { margin: 0; }
 #saveNote { color: #ff6a00; }
