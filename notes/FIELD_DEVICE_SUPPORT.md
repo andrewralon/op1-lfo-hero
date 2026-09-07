@@ -204,7 +204,16 @@ Found by hardware testing — **all five would have shipped**:
         mechanistic explanation rather than a retraction. `cc18map.swift`'s hardcoded `44.0`
         reference should eventually become a per-session measured baseline. Full writeup:
         [RESEARCH.md](RESEARCH.md)
-  - [ ] Test 11 — SPD × bend (needs the physical reel, not `cc18map`)
+  - [x] **Test 11 — SPD × bend. CONFIRMED 2026-09-07: multiplicative, and the bend curve is a
+        portable device constant.** Fresh baseline R0=48.022 ticks/s, SPD engaged →
+        R_spd=57.891 (x1.2055). Bend sweep normalized to R_spd matched the earlier bend-curve
+        test (different memo, different tempo, no SPD) almost exactly — x0.501/0.687/0.999/
+        1.437/1.998 vs. the earlier x0.48/0.66/0.96/1.39/1.93. `total speed = SPD × bend_curve`,
+        and the bend curve itself doesn't depend on tempo or SPD state. SPD display confirmed
+        never moves, even through a full speed sweep and reverse. This also properly resolves
+        (not just works around) the `cc18map.swift` hardcoded-`44.0` concern: the bend curve in
+        x-units is a device constant, so any correctly-measured local baseline normalizes
+        correctly. Full writeup: [RESEARCH.md](RESEARCH.md)
   - [ ] **Follow-up** — confirm the library-mode baseline difference is the same tempo-metadata
         mechanism and not an independent mode effect (needs matching content across modes)
   - [ ] **Report upstream** what only we have: MIDI clock in `sync`, real-time transport, working

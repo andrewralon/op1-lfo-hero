@@ -548,6 +548,53 @@ Neither `lucidyan/tp7-midi` nor the TE manual say anything about tempo/BPM in co
 outgoing clock at all (checked `MIDI_SPEC.md`, `app.js`, the manual, the changelog — zero hits).
 This entire mechanism is new to both projects.
 
+### SPD varispeed × pitch bend: multiplicative, and the bend curve is a portable device constant
+
+**CONFIRMED 2026-09-07.** With the tempo-readout mechanism established above, one prediction
+follows immediately: any genuine physical speed change (bend, CC 18, or the physical `SPD`
+varispeed control) should scale the tick rate multiplicatively relative to *whatever the current
+baseline already is* — because `ticks/s = (native tempo) × (physical speed multiplier)`
+regardless of what's driving that multiplier. This was tested directly.
+
+Fresh baseline on the loaded memo, no SPD, no bend: **R0 = 48.022 ticks/s** (≈120.06 BPM, matches
+this memo's own tempo). Engaged `SPD` to a non-1x position on the physical gauge ("a little right
+of centre" — the gauge has no numeric readout, just a dial either side of a centre mark) — no
+bend yet: **R_spd = 57.891 ticks/s**, i.e. **x1.2055** relative to R0.
+
+With SPD still engaged at that same position, ran the same five-point bend sweep as the earlier
+bend curve test, and normalized against R_spd (not the historical 44.0):
+
+| bend | raw ticks/s | normalized to R_spd | earlier bend curve (different memo, tempo, no SPD) |
+|---|---|---|---|
+| full negative | 28.98 | **x0.501** | x0.48 |
+| -4096 | 39.74 | **x0.687** | x0.66 |
+| centre | 57.85 | **x0.999** | x0.96 |
+| +4096 | 83.20 | **x1.437** | x1.39 |
+| full positive | 115.68 | **x1.998** | x1.93 |
+
+**These match almost exactly** — a different memo, a different native tempo, and a physical SPD
+control actively engaged, and the normalized bend curve still lands within a few percent of the
+original measurement taken under none of those conditions. That is not plausible as coincidence.
+
+**Conclusion: SPD and bend compose multiplicatively** — `total speed = SPD × bend_curve(value)`
+— and **the bend curve itself, expressed in x-units relative to whatever the current baseline is,
+is a portable, fixed property of the device.** It is not tied to a specific file's tempo, and not
+tied to whatever the SPD control happens to be doing. It is still clearly *our* curve shape, not
+`lucidyan/tp7-midi`'s — full negative sits at x0.50, nowhere near their formula's x0.25.
+
+**The `SPD` display was confirmed to never move**, even while bend swept the actual audible
+speed from roughly half to double normal and into reverse (via `CC 18 = 56` engaged alongside
+it) — the gauge stayed exactly where it was set, the entire time. This extends the earlier
+"bend leaves `SPD` unchanged" finding (measured with SPD at rest) to also hold with SPD actively
+engaged and under simultaneous CC 18 / direction changes.
+
+**This resolves the `cc18map.swift` hardcoded-`44.0` concern properly, not just as a workaround.**
+The fix was never "measure a fresh baseline every session and use that instead" — it's that **the
+bend curve in x-units is a device constant**, so normalizing against *any* correctly-measured
+local baseline (whatever tempo, whatever SPD setting) reproduces the same portable curve. The
+44.0 constant was simply the wrong denominator for absolute ticks/s claims; the underlying x-unit
+relationship it was trying to express was right all along.
+
 ### It never reports its state
 
 Per TE's docs: *"TP-7 never reports its state via MIDI. You cannot query transport, loop, or

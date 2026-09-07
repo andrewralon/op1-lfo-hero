@@ -118,7 +118,7 @@ list.
 | E | **Only tracks 1-3 reach USB audio**; all 6 mix internally | `MIDI_SPEC.md:246-249` | Not a MIDI fact, but worth knowing before someone reports "tracks 4-6 do nothing" |
 | F | ✅ TESTED 2026-09-06 — CC 18 extremes: `0` = -16x, `127` = +15.75x | `app.js:243` comment | **Both wrong, by the same ~order of magnitude.** Measured x248.5 (127, 10s hold) and x278.9 (0, 10s hold) — roughly 15x higher than either prediction. See test 9 below; likely a distinct fast-wind regime neither project had measured |
 | G | Pitch bend negative branch: `1 + (p/8192) × 0.75` → **x0.25** at -8192 | `MIDI_SPEC.md:161-172` | We measured **x0.54**. Direct numeric disagreement — see D4 |
-| H | No MIDI access to the on-screen `SPD` varispeed | `MIDI_SPEC.md:136-139` | Confirms bend and `SPD` are separate; we should check whether they multiply |
+| H | ✅ CONFIRMED 2026-09-07 — No MIDI access to the on-screen `SPD` varispeed, and it **multiplies** with bend | `MIDI_SPEC.md:136-139` | See test 11. `total speed = SPD × bend_curve(value)`, and the bend curve is a portable device constant, not a per-session artifact |
 | I | Firmware pinned at **1.1.11**; 1.1.10 added *"enable reel, rocker and reverse playback in mixdown mode"* | `docs/FIRMWARE_CHANGELOG.md:22-27` | Rocker behaviour changed in a recent firmware. If our unit is older, some disagreements are firmware differences, not errors |
 
 ---
@@ -437,10 +437,36 @@ was this test's own memo/mode's tempo setting, staying exactly where a static re
 stay. See [RESEARCH.md](RESEARCH.md) for the full mechanism. Code change
 (flip the flag, decide `tp7.tempo`'s fate) deliberately not made yet — flagged for a decision.
 
-### 11. 🟡 SPD varispeed × pitch bend
-Decides H. Set the on-screen `SPD` to a non-1x value with the reel, then sweep bend and count
-ticks. Multiplicative (their model) or additive-in-velocity (ours)? Also confirms bend still
-leaves `SPD` unchanged on the display.
+### 11. ✅ CONFIRMED 2026-09-07 — SPD varispeed × pitch bend: multiplicative, and a bonus
+### confirmation that the bend curve is a portable device constant
+Decided H. Fresh baseline on the loaded memo (R0 = 48.022 ticks/s), SPD engaged to "a little
+right of centre" on the gauge (R_spd = 57.891 ticks/s, x1.2055 vs. R0), then `cc18map TP-7 bend`
+run with SPD still engaged:
+
+| bend | raw ticks/s | normalized to R_spd | test 4's original (different memo, no SPD) |
+|---|---|---|---|
+| full negative | 28.98 | x0.501 | x0.48 |
+| -4096 | 39.74 | x0.687 | x0.66 |
+| centre | 57.85 | x0.999 | x0.96 |
+| +4096 | 83.20 | x1.437 | x1.39 |
+| full positive | 115.68 | x1.998 | x1.93 |
+
+**The normalized curve matches test 4's original almost exactly — different memo, different
+tempo, no SPD engaged there at all.** Not a coincidence at this precision. **SPD and bend
+compose multiplicatively** (`total = SPD × bend_curve(value)`), and the bend curve itself is a
+**portable, fixed property of the device** — independent of the loaded file's tempo and
+independent of the SPD setting. Still clearly *our* curve shape, not theirs (full negative sits
+at x0.50, nowhere near their x0.25).
+
+**SPD display confirmed to never move**, even while bend swept the actual audible speed from
+roughly half to double normal and into reverse (via CC 18 = 56) — the gauge stayed at "a little
+right of centre" throughout. Matches the earlier "bend leaves SPD unchanged" finding, now
+confirmed with SPD actively engaged rather than at rest.
+
+This also resolves the `cc18map.swift` hardcoded-`44.0` concern for good: the fix isn't
+"measure a fresh baseline every session," it's that **the bend curve in x-units is a device
+constant**, so any fresh local baseline normalizes correctly. Full writeup:
+[RESEARCH.md](RESEARCH.md).
 
 ---
 
