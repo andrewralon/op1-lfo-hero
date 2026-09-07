@@ -26,8 +26,9 @@ struct SwitchEncoding: Hashable {
     var offValue = 0
     /// Incoming values >= this read as "on".
     var threshold = 64
-    /// true → the MIDI "on" state means *unmuted* rather than muted. Verified false on the
-    /// TX-6 (CC 120 = 127 mutes, 0 unmutes, absolute not toggle); unverified on the TP-7.
+    /// true → the MIDI "on" state means *unmuted* rather than muted. Verified false on both
+    /// the TX-6 and the TP-7 (CC 120 = 127 mutes, 0 unmutes, absolute not toggle — repeated
+    /// sends of 127 stay muted, and rapid alternation tracks cleanly with no lag).
     /// See notes/RESEARCH.md.
     var inverted = false
 }

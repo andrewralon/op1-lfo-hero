@@ -68,20 +68,29 @@ print("listening to '\(str(src, kMIDIPropertyDisplayName))' for \(seconds)s — 
 print("44 ticks/s = 1x.  (idle = tape stopped, or not in `sync` mode)")
 fflush(stdout)
 
-var total = 0.0, samples = 0
+// Accumulate raw ticks and raw elapsed time separately, and divide ONCE at the end. Averaging
+// N per-second rates (each already its own ticks/elapsed division) is not the same computation
+// as total ticks / total elapsed — per-window rounding and Thread.sleep's own scheduling jitter
+// compound differently in a mean-of-ratios versus a ratio-of-sums, and the two can disagree by
+// more than either alone would suggest. This is the ratio-of-sums version.
+var totalTicks = 0, includedSeconds = 0
+var totalElapsed = 0.0
 for s in 1...seconds {
     let t0 = Date()
     Thread.sleep(forTimeInterval: 1.0)
-    let rate = Double(c.drain()) / Date().timeIntervalSince(t0)
-    if rate > 1 { total += rate; samples += 1 }
-    print(String(format: "%3ds  %6.2f ticks/s  x%.2f  %@",
-                 s, rate, rate / 44.0,
+    let elapsed = Date().timeIntervalSince(t0)
+    let n = c.drain()
+    let rate = Double(n) / elapsed
+    if rate > 1 { totalTicks += n; totalElapsed += elapsed; includedSeconds += 1 }
+    print(String(format: "%3ds  %6.2f ticks/s  %7.1f ticks/min  x%.2f  %@",
+                 s, rate, rate * 60, rate / 44.0,
                  rate < 1 ? "(idle)" : String(repeating: "#", count: min(60, Int(rate / 2)))))
     fflush(stdout)
 }
 
-if samples > 0 {
-    let avg = total / Double(samples)
+if includedSeconds > 0 {
+    let avg = Double(totalTicks) / totalElapsed
     print("")
-    print(String(format: "average over %d rolling seconds: %.2f ticks/s  = x%.3f", samples, avg, avg / 44.0))
+    print(String(format: "average over %d rolling seconds: %d ticks / %.3fs = %.3f ticks/s (%.1f ticks/min)  = x%.4f",
+                 includedSeconds, totalTicks, totalElapsed, avg, avg * 60, avg / 44.0))
 }

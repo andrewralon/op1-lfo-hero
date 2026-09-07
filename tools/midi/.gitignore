@@ -1,7 +1,11 @@
 # compiled probes
 *.o
 anymidi
+cc18map
+looptest
 clockrate
+clocksuppress
 mididiag
 playpress
 revsync
+wheel

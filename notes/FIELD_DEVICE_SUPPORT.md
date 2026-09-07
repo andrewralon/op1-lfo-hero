@@ -120,6 +120,96 @@ Found by hardware testing — **all five would have shipped**:
 - [ ] **Run the remaining TX-6 parameters through the app.** The mixer, FX buses and tempo have
       now been driven from the UI over BLE, but the 13 per-channel params below still have not.
       Needs `midi control = in` on the device
+- [ ] **Reconcile the TP-7 against `lucidyan/tp7-midi`.** Full cross-reference in
+      [TP7_VS_TP7MIDI.md](TP7_VS_TP7MIDI.md), with an 11-test hardware plan and a new probe,
+      `tools/midi/cc18map`. Firmware is confirmed **1.1.11 on both sides** — no disagreement below
+      is a version skew. Two of the three disagreements are ones where **our own measurements
+      side with them**:
+  - [x] **Test 1a — control group.** `./cc18map TP-7 control` measured what `ClockEngine.swift`
+        sends today, from a parked tape, before any code changes. All three values (76/72/124)
+        read 0.00 ticks/s on the clock instrument, but the tape audibly and visibly moved at real
+        speed — the clock is blind to CC-18-driven motion from a stop (see test 1)
+  - [x] **Test 1 — `deadZone` from a stopped tape. CONFIRMED 2026-09-06 (fw 1.1.11): no dead
+        zone.** `CC 18 = 68` held 10.0s from parked moved the position counter x1.04-1.05 (their
+        1x prediction), not our predicted ~0.06x stall. `deadZone: 4` is a playing-only constant;
+        `ClockEngine.swift:503-515` applies it unconditionally today, so **every prev/next/scrub
+        from a parked tape currently runs one whole 1x too fast.** Not yet fixed — touches
+        `ClockEngine.swift:503-515`, `DeviceProfiles.swift:263-268`, and the golden byte tests at
+        `NewDeviceProfileTests.swift:471-518`. Full measurement: [RESEARCH.md](RESEARCH.md)
+  - [x] **Test 2 — the `+708` stop point. CONFIRMED 2026-09-06: our published correction of their
+        finding was wrong, now retracted.** `CC 18 = 61` measured forward (x0.20); `CC 18 = 60`
+        measured **reverse** (x0.06) — direction flip watched directly on the reel, not inferred;
+        `CC 18 = 60` + bend `8900` measured 0.00 (stopped). The null genuinely sits between 60 and
+        61 while playing, exactly as `lucidyan/tp7-midi` found; our additive model derives their
+        `+708` independently. No code change needed here — this was a documentation-only error.
+        Full measurement: [RESEARCH.md](RESEARCH.md)
+  - [ ] **Test 5 — does a cue or loop track change reset mixer levels and mutes?** Their gotcha
+        #11. Never tested here, and it would silently fight an LFO on `tp7.vol`. Needs a scratch
+        track
+  - [ ] **Test 6 — cue markers with the precondition we missed.** TE's manual says to *hold the
+        physical record button* while sending notes, with MIDI-CUE enabled. Our "cue subsystem is
+        inert" result probably just missed that step. Needs a scratch track
+  - [x] **Test 3 — the "engage" model. CONFIRMED 2026-09-06: retired, it was over-modelling.**
+        `CC 18 = 64` simply adds zero velocity; there is no engage/disengage state. Baseline 42.5
+        → `64`x3 → 42.3 → `70` → 102.1 (~2.4x, confirmed by reel/audio/counter agreeing) → `64` →
+        42.4 — clean returns to baseline both times, no stop transition. Documentation-only fix,
+        `RESEARCH.md`'s engage/release framing now marked retired
+  - [x] **Test 4 — pitch-bend curve. CONFIRMED 2026-09-06, resolved in OUR favor** (the one
+        disagreement that went our way). Measured negative branch x0.48 sits close to our x0.54,
+        far from their x0.25. Also fixed our own internal inconsistency at full positive bend
+        (x1.93 measured confirms "+40 ticks/s," retires the x2.14 figure). Reverse sense-flip
+        reproduced numerically and confirmed by the operator narrating the sequence blind to the
+        numbers — matched exactly, including the flip
+  - [x] **Test 9 — CC 18 extremes. CONFIRMED 2026-09-06: both models wrong by ~15-19x, a distinct
+        fast-wind regime neither project had measured.** Both predict ~x16 at CC 18 = 0/127. A
+        10-second hold each way measured **x248.5 forward, x278.9 reverse** — corrected for a
+        visible ~2s ramp-to-speed the operator watched directly, closer to ~x276 / ~x310 steady
+        state. `lucidyan/tp7-midi` has no mention of ramping anywhere (checked `MIDI_SPEC.md`,
+        `app.js`, the manual, the changelog) — their model applies the same fixed speed instantly
+        regardless of hold duration. Doesn't affect `maxScrubSpeed = 14.0` (a feel choice, not a
+        capability claim), but reveals a large, currently unmapped speed range above where the
+        affine model applies. Full measurement: [RESEARCH.md](RESEARCH.md)
+  - [x] **Test 7 — loop immutability. CONFIRMED 2026-09-06: they were right, plus a new
+        precondition.** `tools/midi/looptest.swift`. First attempt (main playback screen)
+        produced zero effect from CC 17 at all; entering the device's **LOOP screen** (hold
+        record) made the identical bytes work immediately — same shape as the cue-marker/
+        record-hold gap (item B). Once looping, resending `1`/`2` did nothing; only `0` released
+        it. Matches `lucidyan/tp7-midi` exactly. Full writeup: [RESEARCH.md](RESEARCH.md)
+  - [x] **Test 8 — mute polarity. CONFIRMED 2026-09-06.** `CC 120 = 127` mutes, repeated `127`
+        stays muted (absolute, not a toggle), `0` unmutes, rapid mute/unmute cycles track cleanly.
+        `DeviceProfile.swift:29-31`'s "unverified" comment updated. Also surfaced a real gotcha:
+        the device can silently hang and stop responding to any CC with no visible symptom — a
+        reboot fixed it mid-test. Logged in `tools/midi/README.md` and `RESEARCH.md`
+  - [x] **Test 10 — `followsClock`. CONFIRMED WRONG 2026-09-06.** Streamed clock at 90, 130, and
+        60 BPM in `sync` mode, tape playing — the device's own tape-speed-derived outgoing clock
+        never moved from its natural rate at any of the three, including two unambiguous targets
+        (90, 60). `followsClock` should be `false`; `tp7.tempo` (`.virtualTempo`) likely does
+        nothing audible on hardware today. Confirmed working: the device keeps transmitting while
+        slaved (not suppressed), so `deviceIsRolling` stays safe. **Code change deliberately not
+        made** — flipping the flag and deciding `tp7.tempo`'s fate (remove vs. document as
+        non-functional) needs a decision, not just a measurement. Full writeup:
+        [RESEARCH.md](RESEARCH.md)
+  - [x] **MAJOR CORRECTION 2026-09-07 — the outgoing clock rate is a TEMPO readout, not a
+        tape-speed readout, and that tempo is genuine per-file metadata.** "44 ticks/s = 1x,"
+        used as the calibration anchor for the entire CC 18/bend affine model, was never a
+        device constant — it was one memo's tempo setting. MIDI clock counts beats; confirmed
+        blind on two separate memos (106 BPM and 120 BPM, both matched to within 0.03 BPM).
+        **Resolved:** changing the device's current tempo setting to 90 BPM had zero effect on
+        an already-recorded (metronome-off) memo's clock output, which stayed at exactly 120 —
+        the tempo is fixed per-file at record time, not a live global dial. The earlier
+        library-vs-recordings baseline difference is now suspected to be the same mechanism, not
+        an independent mode effect (not yet directly confirmed — needs the same content's tempo
+        measured in two modes). Test 9's numbers are unaffected (position-counter based, not
+        clock-based); test 4's exact values carry a small (~3.6%) systematic bias; test 10 gets a
+        mechanistic explanation rather than a retraction. `cc18map.swift`'s hardcoded `44.0`
+        reference should eventually become a per-session measured baseline. Full writeup:
+        [RESEARCH.md](RESEARCH.md)
+  - [ ] Test 11 — SPD × bend (needs the physical reel, not `cc18map`)
+  - [ ] **Follow-up** — confirm the library-mode baseline difference is the same tempo-metadata
+        mechanism and not an independent mode effect (needs matching content across modes)
+  - [ ] **Report upstream** what only we have: MIDI clock in `sync`, real-time transport, working
+        MIDI recording (refutes their "recording via MIDI is useless"), double-stop rewind, CC 28,
+        the CC 18 extremes ramp/fast-wind regime, and the clock-is-a-tempo-readout mechanism
 
 
 ### 🟠 Medium — verifying things currently taken on trust
