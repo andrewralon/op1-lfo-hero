@@ -157,7 +157,11 @@ final class AppState: ObservableObject {
     }
 
     struct Settings: Codable {
-        var version: Int = 1
+        static let currentVersion = 2
+        /// The hardcoded volume default before it became 99 — see the v1→v2 migration below.
+        private static let legacyDefaultVolume: Double = 90
+
+        var version: Int = currentVersion
         var deviceId: String = "op1"
         var perDevice: [String: DeviceState] = [:]
 
@@ -177,6 +181,18 @@ final class AppState: ObservableObject {
                 // same container is the entire migration.
                 perDevice["op1"] = (try? DeviceState(from: d)) ?? DeviceState()
                 version = 1
+            }
+            if version == 1 {
+                // Volume defaulted to 90 before it was bumped to 99. Any track still sitting
+                // exactly on the old default was never touched, so drop it and let
+                // `applyDeviceState`'s `st.volumes[$0] ?? newProfile.defaultVolume` fall
+                // through to the new default instead of reading it as a deliberate choice.
+                for key in perDevice.keys {
+                    var device = perDevice[key]!
+                    device.volumes = device.volumes.filter { $0.value != Self.legacyDefaultVolume }
+                    perDevice[key] = device
+                }
+                version = 2
             }
         }
     }
@@ -308,7 +324,7 @@ final class AppState: ObservableObject {
            let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
             s = decoded   // preserve other devices' buckets
         }
-        s.version  = 1
+        s.version  = Settings.currentVersion
         s.deviceId = profile.id
         s.perDevice[profile.id] = currentDeviceState()
         if let data = try? JSONEncoder().encode(s) {

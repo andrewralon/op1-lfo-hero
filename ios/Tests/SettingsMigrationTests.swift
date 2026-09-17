@@ -43,7 +43,7 @@ final class SettingsMigrationTests: XCTestCase {
 
     func testV0BlobMigratesIntoTheOP1Bucket() throws {
         let s = try decodeSettings(v0Blob)
-        XCTAssertEqual(s.version, 1)
+        XCTAssertEqual(s.version, AppState.Settings.currentVersion)
         XCTAssertEqual(s.deviceId, "op1")
         let st = try XCTUnwrap(s.perDevice["op1"], "v0 state must land in the op1 bucket")
 
@@ -115,7 +115,7 @@ final class SettingsMigrationTests: XCTestCase {
         let data = try JSONEncoder().encode(s)
         let back = try JSONDecoder().decode(AppState.Settings.self, from: data)
 
-        XCTAssertEqual(back.version, 1)
+        XCTAssertEqual(back.version, AppState.Settings.currentVersion)
         let r = try XCTUnwrap(back.perDevice["op1"])
         XCTAssertEqual(r.lfoParamId, "env D")
         XCTAssertEqual(r.lfoWave, .saw)
@@ -126,6 +126,47 @@ final class SettingsMigrationTests: XCTestCase {
         XCTAssertEqual(r.activeLfos[0].paramId, "fx 4")
         XCTAssertEqual(r.activeLfos[0].track, 3)
         XCTAssertTrue(r.activeLfos[0].inverted)
+    }
+
+    // MARK: - v1 → v2 (volume default 90 → 99)
+
+    /// A track sitting exactly on the old hardcoded default (90) was never touched, so the
+    /// migration must drop it and let `applyDeviceState` fall through to the new default (99).
+    /// Otherwise raising `defaultVolume` in a `DeviceProfile` only affects brand-new saves, and
+    /// every device that had ever run an older build stays pinned at 90 forever.
+    func testV1MigrationDropsTracksStillAtTheOldDefault() throws {
+        let v1Blob = """
+        {
+          "version": 1,
+          "deviceId": "tx6",
+          "perDevice": {
+            "tx6": {"volumes": {"1": 90, "2": 90, "3": 45, "4": 99}}
+          }
+        }
+        """
+        let s = try decodeSettings(v1Blob)
+        XCTAssertEqual(s.version, AppState.Settings.currentVersion)
+        let volumes = try XCTUnwrap(s.perDevice["tx6"]).volumes
+        XCTAssertNil(volumes[1], "still at the old default -- must be dropped so defaultVolume applies")
+        XCTAssertNil(volumes[2], "still at the old default -- must be dropped so defaultVolume applies")
+        XCTAssertEqual(volumes[3], 45, "a deliberately-chosen value must survive the migration")
+        XCTAssertEqual(volumes[4], 99, "already at the new default -- untouched either way")
+    }
+
+    /// Saving must persist `currentVersion`, not silently downgrade it -- otherwise the v1→v2
+    /// migration reapplies on every future launch and wipes out a genuine later choice to set a
+    /// track's volume back to 90.
+    func testSavedVersionIsNotDowngraded() throws {
+        var s = AppState.Settings()
+        s.version = AppState.Settings.currentVersion
+        var st = AppState.DeviceState()
+        st.volumes = [1: 90]
+        s.perDevice["op1"] = st
+
+        let back = try JSONDecoder().decode(AppState.Settings.self, from: JSONEncoder().encode(s))
+        XCTAssertEqual(back.version, AppState.Settings.currentVersion)
+        XCTAssertEqual(back.perDevice["op1"]?.volumes[1], 90,
+                       "a value saved at the current version is a deliberate choice, not a stale default")
     }
 
     /// Multiple devices coexist; saving one must not disturb another's bucket.
