@@ -115,8 +115,8 @@ struct ParamSpec: Identifiable, Hashable {
     ///
     /// nil means "leave the centre where the user had it", which is right for most parameters —
     /// a filter or an EQ has no privileged value. Set it only where the parameter has a genuine
-    /// neutral point that is not the global default of 90, such as pitch bend, where 90 would
-    /// start the tape at roughly 1.9x speed.
+    /// neutral point that is not the global default of 99, such as pitch bend, where 99 would
+    /// start the tape at roughly 2.14x speed (the top of the range).
     var defaultCenter: Double? = nil
     /// false → hidden from the LFO parameter picker (relative encoders).
     var lfoTargetable = true

@@ -61,7 +61,7 @@ final class AppState: ObservableObject {
     }
     @Published var lfoRate   = 3           // 1-8
     @Published var lfoDepth  = 10.0        // display units (0-99)
-    @Published var lfoCenter = 90.0        // display units (0-99)
+    @Published var lfoCenter = 99.0        // display units (0-99)
     @Published var trackOn   = [1: 1, 2: 0, 3: 0, 4: 0]  // 0=off 1=on 2=inv
     @Published var masterOn  = 0                            // 0=off 1=on 2=inv
     @Published var activeLfos: [LfoClip] = []
@@ -92,7 +92,7 @@ final class AppState: ObservableObject {
         var lfoParamId: String = "volume"
         var lfoRate: Int = 3
         var lfoDepth: Double = 10.0
-        var lfoCenter: Double = 90.0
+        var lfoCenter: Double = 99.0
         var trackOn: [Int: Int] = [1: 1]
         var masterOn: Int = 0
         var isClockMaster: Bool = true
@@ -121,7 +121,7 @@ final class AppState: ObservableObject {
                       ?? "volume"
             lfoRate   = v(.lfoRate, 3)
             lfoDepth  = v(.lfoDepth, 10.0)
-            lfoCenter = v(.lfoCenter, 90.0)
+            lfoCenter = v(.lfoCenter, 99.0)
             trackOn   = v(.trackOn, [1: 1])
             masterOn  = v(.masterOn, 0)
             isClockMaster = v(.isClockMaster, true)
