@@ -25,7 +25,7 @@ extension DeviceProfile {
         masterChannel: 0,
         params: op1Params,
         defaultParamId: "volume",
-        defaultVolume: 90,
+        defaultVolume: 99,
         transport: TransportMap(
             play: [.midiStartOrContinue],
             stop: [.midiStop],
@@ -148,7 +148,7 @@ extension DeviceProfile {
         masterChannel: 6,
         params: tx6Params,
         defaultParamId: "tx6.vol",
-        defaultVolume: 90,
+        defaultVolume: 99,
         transport: TransportMap(
             // CC 46 is a single stateless toggle, so each op only fires in the matching state.
             play: [.toggleCC(ch: 6, cc: 46, value: 127, whenPlaying: false), .midiStartOrContinue],
@@ -249,7 +249,7 @@ extension DeviceProfile {
         masterChannel: 0,
         params: tp7Params,
         defaultParamId: "tp7.vol",
-        defaultVolume: 90,
+        defaultVolume: 99,
         transport: TransportMap(
             // Real-time transport only. CC 14 is the TP-7's RECORD control, not play — sending
             // it here would arm recording every time the user pressed play, over a take.

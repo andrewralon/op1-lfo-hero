@@ -39,7 +39,7 @@ final class AppState: ObservableObject {
     @Published var slaveTicksReceived: Int = 0  // diagnostic: counts ticks from OP-1
 
     // MARK: - Track state  (volume: 0-99 display, pan: -63..+63)
-    @Published var volumes: [Int: Double] = [1: 90, 2: 90, 3: 90, 4: 90]
+    @Published var volumes: [Int: Double] = [1: 99, 2: 99, 3: 99, 4: 99]
     @Published var pans:    [Int: Int]    = [1: 0,  2: 0,  3: 0,  4: 0]
     @Published var mutes:   [Int: Bool]   = [1: false, 2: false, 3: false, 4: false]
 
