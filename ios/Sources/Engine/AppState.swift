@@ -199,6 +199,21 @@ final class AppState: ObservableObject {
 
     private let settingsKey = "AppSettings"
 
+    /// Read the saved settings blob from the Keychain, migrating a legacy `UserDefaults` copy in
+    /// on the first run after this switch. `UserDefaults` is sandboxed to the app container and
+    /// is wiped by an ordinary delete+reinstall; the Keychain is not, so this is a one-way move.
+    private func loadSettingsData() -> Data? {
+        if let data = KeychainStore.load(account: settingsKey) { return data }
+        guard let legacy = UserDefaults.standard.data(forKey: settingsKey) else { return nil }
+        KeychainStore.save(legacy, account: settingsKey)
+        UserDefaults.standard.removeObject(forKey: settingsKey)
+        return legacy
+    }
+
+    private func writeSettingsData(_ data: Data) {
+        KeychainStore.save(data, account: settingsKey)
+    }
+
     /// Old `ParamSpec.id` → current id, so renaming one does not orphan saved clips.
     ///
     /// The OP-1's ids are the old `Parameter` raw values, so nothing was needed for the
@@ -216,6 +231,7 @@ final class AppState: ObservableObject {
 
     private func loadSettings() {
         if CommandLine.arguments.contains("--uitest-reset") {
+            KeychainStore.delete(account: settingsKey)
             UserDefaults.standard.removeObject(forKey: settingsKey)
             UserDefaults.standard.removeObject(forKey: Self.profileOverrideKey)
             UserDefaults.standard.removeObject(forKey: "deviceOverrideLabel")
@@ -231,9 +247,10 @@ final class AppState: ObservableObject {
                                       forKey: "deviceOverrideLabel")
         }
         var s = Settings()
-        if let data = UserDefaults.standard.data(forKey: settingsKey),
-           let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
-            s = decoded
+        if let data = loadSettingsData() {
+            if let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
+                s = decoded
+            }
         }
         // Re-read the override here: a launch argument may have just written it, after the
         // published property took its initial value.
@@ -320,7 +337,7 @@ final class AppState: ObservableObject {
 
     private func saveSettings() {
         var s = Settings()
-        if let data = UserDefaults.standard.data(forKey: settingsKey),
+        if let data = loadSettingsData(),
            let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
             s = decoded   // preserve other devices' buckets
         }
@@ -328,7 +345,7 @@ final class AppState: ObservableObject {
         s.deviceId = profile.id
         s.perDevice[profile.id] = currentDeviceState()
         if let data = try? JSONEncoder().encode(s) {
-            UserDefaults.standard.set(data, forKey: settingsKey)
+            writeSettingsData(data)
         }
     }
 
@@ -384,15 +401,15 @@ final class AppState: ObservableObject {
         activeLfos.removeAll()
 
         var s = Settings()
-        if let data = UserDefaults.standard.data(forKey: settingsKey),
+        if let data = loadSettingsData(),
            let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
             s = decoded
         }
         s.perDevice[profile.id] = currentDeviceState()   // bank the outgoing device
-        s.version  = 1
+        s.version  = Settings.currentVersion
         s.deviceId = newProfile.id
         if let data = try? JSONEncoder().encode(s) {
-            UserDefaults.standard.set(data, forKey: settingsKey)
+            writeSettingsData(data)
         }
 
         applyDeviceState(s.perDevice[newProfile.id] ?? DeviceState(), for: newProfile)

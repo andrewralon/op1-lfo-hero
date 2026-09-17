@@ -30,6 +30,7 @@
 		F303F7E12FDE4BC80060AA2D /* USBMidi.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7E02FDE4BC80060AA2D /* USBMidi.swift */; };
 		F303F7E32FDE4BC80060AA2D /* MidiRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7E22FDE4BC80060AA2D /* MidiRouter.swift */; };
 		F303F7E52FDE4BC80060AA2D /* CoreMIDI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F303F7E42FDE4BC80060AA2D /* CoreMIDI.framework */; };
+		F3D100212FF0000000000021 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100202FF0000000000020 /* KeychainStore.swift */; };
 		F33102832FE07989008CF623 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F33102822FE07989008CF623 /* Assets.xcassets */; };
 		F350020E2FE371CE00C6E1AF /* SnapshotHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = F350020D2FE371CE00C6E1AF /* SnapshotHelper.swift */; };
 		F35002102FE371D800C6E1AF /* ScreenshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F350020F2FE371D800C6E1AF /* ScreenshotTests.swift */; };
@@ -39,6 +40,7 @@
 		F3D100152FF0000000000015 /* DeviceProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100142FF0000000000014 /* DeviceProfileTests.swift */; };
 		F3D100192FF0000000000019 /* NewDeviceProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100182FF0000000000018 /* NewDeviceProfileTests.swift */; };
 		F3D100172FF0000000000017 /* SettingsMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100162FF0000000000016 /* SettingsMigrationTests.swift */; };
+		F3D100232FF0000000000023 /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100222FF0000000000022 /* KeychainStoreTests.swift */; };
 		F3D100172FF000000000BE01 /* BleMidiParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100162FF000000000BE02 /* BleMidiParserTests.swift */; };
 		F3D1000D2FF000000000000D /* GoldenMidiTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D1000C2FF000000000000C /* GoldenMidiTests.swift */; };
 /* End PBXBuildFile section */
@@ -74,6 +76,7 @@
 		F303F7BB2FDE4BC80060AA2D /* ClockEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockEngine.swift; sourceTree = "<group>"; };
 		F303F7BC2FDE4BC80060AA2D /* Controller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Controller.swift; sourceTree = "<group>"; };
 		F303F7BD2FDE4BC80060AA2D /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		F3D100202FF0000000000020 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		F303F7BF2FDE4BC80060AA2D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		F303F7C02FDE4BC80060AA2D /* LFOPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFOPanelView.swift; sourceTree = "<group>"; };
 		F303F7C12FDE4BC80060AA2D /* PanKnobView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanKnobView.swift; sourceTree = "<group>"; };
@@ -97,6 +100,7 @@
 		F3D100142FF0000000000014 /* DeviceProfileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeviceProfileTests.swift; path = Tests/DeviceProfileTests.swift; sourceTree = "<group>"; };
 		F3D100182FF0000000000018 /* NewDeviceProfileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NewDeviceProfileTests.swift; path = Tests/NewDeviceProfileTests.swift; sourceTree = "<group>"; };
 		F3D100162FF0000000000016 /* SettingsMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsMigrationTests.swift; path = Tests/SettingsMigrationTests.swift; sourceTree = "<group>"; };
+		F3D100222FF0000000000022 /* KeychainStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = KeychainStoreTests.swift; path = Tests/KeychainStoreTests.swift; sourceTree = "<group>"; };
 		F3D100162FF000000000BE02 /* BleMidiParserTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BleMidiParserTests.swift; path = Tests/BleMidiParserTests.swift; sourceTree = "<group>"; };
 		F3D1000C2FF000000000000C /* GoldenMidiTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GoldenMidiTests.swift; path = Tests/GoldenMidiTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -139,6 +143,7 @@
 				F3D1000C2FF000000000000C /* GoldenMidiTests.swift */,
 				F3D100142FF0000000000014 /* DeviceProfileTests.swift */,
 				F3D100162FF0000000000016 /* SettingsMigrationTests.swift */,
+				F3D100222FF0000000000022 /* KeychainStoreTests.swift */,
 				F3D100162FF000000000BE02 /* BleMidiParserTests.swift */,
 				F3D100182FF0000000000018 /* NewDeviceProfileTests.swift */,
 			);
@@ -190,6 +195,7 @@
 				F303F7E22FDE4BC80060AA2D /* MidiRouter.swift */,
 				F303F7BD2FDE4BC80060AA2D /* Models.swift */,
 				F303F7E02FDE4BC80060AA2D /* USBMidi.swift */,
+				F3D100202FF0000000000020 /* KeychainStore.swift */,
 			);
 			path = Engine;
 			sourceTree = "<group>";
@@ -384,6 +390,7 @@
 				F303F7D82FDE4BC80060AA2D /* Models.swift in Sources */,
 				F303F7E12FDE4BC80060AA2D /* USBMidi.swift in Sources */,
 				CB702C2BCF38D9ECF9C48486 /* SplashScreenView.swift in Sources */,
+				F3D100212FF0000000000021 /* KeychainStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -394,6 +401,7 @@
 				F3D1000D2FF000000000000D /* GoldenMidiTests.swift in Sources */,
 				F3D100152FF0000000000015 /* DeviceProfileTests.swift in Sources */,
 				F3D100172FF0000000000017 /* SettingsMigrationTests.swift in Sources */,
+				F3D100232FF0000000000023 /* KeychainStoreTests.swift in Sources */,
 				F3D100172FF000000000BE01 /* BleMidiParserTests.swift in Sources */,
 				F3D100192FF0000000000019 /* NewDeviceProfileTests.swift in Sources */,
 			);
