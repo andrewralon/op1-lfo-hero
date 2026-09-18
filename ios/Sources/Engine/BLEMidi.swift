@@ -38,6 +38,13 @@ final class BLEMidi: NSObject, ObservableObject {
     var onStop:     (() -> Void)?
     var onCC:       ((Int, Int, Int) -> Void)?   // channel, cc, value
 
+    /// Launch/foreground scan: a single visible window, long enough for someone to walk over,
+    /// power on a TE device and put it into BLE mode. If nothing is found by then, scanning
+    /// stops and the UI shows "not found" rather than retrying forever unseen in the background.
+    private static let launchScanTimeout: TimeInterval = 60.0
+    /// Per-attempt connect handshake timeout — unrelated to how long scanning itself runs.
+    private static let connectHandshakeTimeout: TimeInterval = 5.0
+
     private var central: CBCentralManager!
     private var midiChar: CBCharacteristic?
     private var peripheral: CBPeripheral?
@@ -45,6 +52,9 @@ final class BLEMidi: NSObject, ObservableObject {
     private var scanTimeout: DispatchWorkItem?
     private var connectTimeout: DispatchWorkItem?
     private var discoveredIds = Set<UUID>()   // guarded by `queue`
+    /// True while the connection menu is open: scanning restarts on its own timeout forever
+    /// and never surfaces `.notFound`, instead of giving up after the launch window.
+    private var continuousScan = false
 
     override init() {
         super.init()
@@ -53,22 +63,38 @@ final class BLEMidi: NSObject, ObservableObject {
 
     // MARK: - Public API
 
-    func startScan() {
+    /// Starts (or restarts) scanning. `continuous: true` is for the open connection menu:
+    /// scanning keeps going with no visible "not found" flicker for as long as the caller keeps
+    /// it continuous. `continuous: false` (app launch/foreground) gives up after a single
+    /// `launchScanTimeout` window and shows "not found" instead of retrying silently forever.
+    func startScan(continuous: Bool = false) {
+        let isRestart = continuous && continuousScan
+        continuousScan = continuous
         scanTimeout?.cancel()
-        discoveredIds.removeAll()                              // sync on queue — cleared before scan starts
-        DispatchQueue.main.async { self.discovered.removeAll() }
+        if !isRestart {
+            // A fresh scan (not an internal continuous-mode restart) clears prior results.
+            // Restarting the window under continuous mode keeps `discovered` as-is so the
+            // picker's list doesn't flicker empty every cycle while the menu is open.
+            discoveredIds.removeAll()                          // sync on queue — cleared before scan starts
+            DispatchQueue.main.async { self.discovered.removeAll() }
+        }
         guard central.state == .poweredOn else { return }
         DispatchQueue.main.async { self.state = .scanning }
         central.scanForPeripherals(withServices: [bleMIDIServiceUUID])
         let timeout = DispatchWorkItem { [weak self] in
             guard let self else { return }
+            if self.continuousScan {
+                // Menu still open — restart the window instead of giving up or flickering.
+                self.startScan(continuous: true)
+                return
+            }
             self.central.stopScan()
             DispatchQueue.main.async {
                 if case .scanning = self.state { self.state = .notFound }
             }
         }
         scanTimeout = timeout
-        queue.asyncAfter(deadline: .now() + 10.0, execute: timeout)
+        queue.asyncAfter(deadline: .now() + BLEMidi.launchScanTimeout, execute: timeout)
     }
 
     func connect(_ p: CBPeripheral) {
@@ -83,10 +109,10 @@ final class BLEMidi: NSObject, ObservableObject {
         let timeout = DispatchWorkItem { [weak self] in
             guard let self else { return }
             if let p = self.peripheral { self.central.cancelPeripheralConnection(p) }
-            self.startScan()
+            self.startScan(continuous: self.continuousScan)
         }
         connectTimeout = timeout
-        queue.asyncAfter(deadline: .now() + 5.0, execute: timeout)
+        queue.asyncAfter(deadline: .now() + BLEMidi.connectHandshakeTimeout, execute: timeout)
     }
 
     func disconnect() {
@@ -211,29 +237,47 @@ extension BLEMidi: CBCentralManagerDelegate {
         DispatchQueue.main.async { self.discovered.append(p) }
         // Auto-connect to the first known TE device found. Everything discovered is still
         // listed in `discovered`, so an unrecognised peripheral can be picked by hand.
-        if let profile = DeviceRegistry.profile(forEndpointName: p.name ?? "") {
-            DispatchQueue.main.async { self.matchedProfileId = profile.id }
+        // `matchedProfileId` (and therefore app layout) is not set here — only a name match
+        // is known at this point, not an actual connection. It is set in `didConnect`.
+        if DeviceRegistry.profile(forEndpointName: p.name ?? "") != nil {
             connect(p)
         }
+    }
+
+    /// Removes a peripheral from the picker list — called on disconnect/failure so the
+    /// connection menu doesn't keep showing devices that are no longer reachable.
+    private func forgetDiscovered(_ p: CBPeripheral) {
+        discoveredIds.remove(p.identifier)
+        DispatchQueue.main.async { self.discovered.removeAll { $0.identifier == p.identifier } }
     }
 
     func centralManager(_ c: CBCentralManager, didConnect p: CBPeripheral) {
         connectTimeout?.cancel()
         p.delegate = self
         p.discoverServices([bleMIDIServiceUUID])
+        // The device is actually connected now — safe to commit the profile match, which
+        // drives the app's layout (track count, etc).
+        if let profile = DeviceRegistry.profile(forEndpointName: p.name ?? "") {
+            DispatchQueue.main.async { self.matchedProfileId = profile.id }
+        }
         DispatchQueue.main.async { self.state = .connected(p.name ?? "device") }
     }
 
     func centralManager(_ c: CBCentralManager, didDisconnectPeripheral p: CBPeripheral, error: Error?) {
         midiChar = nil
         peripheral = nil
-        DispatchQueue.main.async { self.state = .disconnected(p.name ?? "device") }
-        startScan()
+        forgetDiscovered(p)
+        DispatchQueue.main.async {
+            self.state = .disconnected(p.name ?? "device")
+            self.matchedProfileId = nil
+        }
+        startScan(continuous: continuousScan)
     }
 
     func centralManager(_ c: CBCentralManager, didFailToConnect p: CBPeripheral, error: Error?) {
+        forgetDiscovered(p)
         DispatchQueue.main.async { self.state = .scanning }
-        startScan()
+        startScan(continuous: continuousScan)
     }
 }
 

@@ -341,7 +341,7 @@ struct DevicePickerView: View {
                         ForEach(app.usb.discovered, id: \.self) { name in
                             Button {
                                 app.usb.connectTo(name)
-                                dismiss()
+                                app.router.setActiveTransport(.usb)
                             } label: {
                                 HStack {
                                     Image(systemName: "cable.connector").foregroundColor(C.text)
@@ -386,9 +386,8 @@ struct DevicePickerView: View {
                     } else {
                         ForEach(app.ble.discovered, id: \.identifier) { p in
                             Button {
-                                app.usb.disconnect()   // yield routing priority to BLE
                                 app.ble.connect(p)
-                                dismiss()
+                                app.router.setActiveTransport(.ble)
                             } label: {
                                 HStack {
                                     Image(systemName: "antenna.radiowaves.left.and.right").foregroundColor(C.text)
@@ -411,7 +410,6 @@ struct DevicePickerView: View {
                     Button("disconnect") {
                         app.ble.disconnect()
                         app.usb.disconnect()
-                        dismiss()
                     }
                     .foregroundColor(C.red)
                     .padding(.horizontal, 16)
@@ -430,8 +428,13 @@ struct DevicePickerView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             app.usb.rescan()
-            // Restart BLE scan if it timed out before the picker was opened
-            if case .notFound = app.ble.state { app.ble.startScan() }
+            // While the menu is open, scan continuously with no "not found" flicker —
+            // the user is actively looking for a device and may take a while to power it on.
+            app.ble.startScan(continuous: true)
+        }
+        .onDisappear {
+            // Back to the shorter, give-up-eventually launch scan once the menu is closed.
+            app.ble.startScan(continuous: false)
         }
     }
 }
@@ -564,12 +567,10 @@ struct SettingsView: View {
     @AppStorage("oneShotFinishAction")     private var oneShotFinishAction: String = "hold"
     @AppStorage("cleanupOneShots")         private var cleanupOneShots: Bool = false
 
-    @State private var quantumSync     = false
-    @State private var defiantJazzMode = false
-    @State private var yoloVelocity    = false
-    @State private var retrograde      = false
+    /// Shown for either joke toggle's forbidden action; nil = no message box on screen.
+    @State private var jokeMessage: String?
+    /// Always on — cowbell boost cannot be turned off.
     @State private var cowbell         = true
-    @State private var aiVibeCheck     = false
 
     var body: some View {
         NavigationStack {
@@ -622,35 +623,33 @@ struct SettingsView: View {
                         $cleanupOneShots
                     )
 
-                    settingRow(
-                        "quantum tempo sync",
-                        "no cap — aligns your bpm with the fabric of the universe. slay or get slayed.",
-                        $quantumSync
-                    )
+                    Button("reset to defaults") { resetToDefaults() }
+                        .font(.system(size: isPad ? 15 : 13, weight: .semibold))
+                        .foregroundColor(C.bg)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 5)
+                        .background(C.text)
+                        .clipShape(Capsule())
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, isPad ? 24 : 16)
+                        .padding(.vertical, isPad ? 16 : 12)
+
                     settingRow(
                         "defiant jazz mode",
                         "randomly replaces your notes with more sophisticated ones. ritualistic dancing is encouraged.",
-                        $defiantJazzMode
-                    )
-                    settingRow(
-                        "yolo velocity",
-                        "sends every midi message at velocity 127. the era of nuance is dead and buried.",
-                        $yoloVelocity
-                    )
-                    settingRow(
-                        "retrograde playback",
-                        "reverses tape direction in ways the op-1 doesn't actually support. understood the assignment.",
-                        $retrograde
+                        Binding(get: { false }, set: { on in
+                            if on { jokeMessage = "The Music Dance Experience is officially canceled." }
+                        }),
+                        joke: true
                     )
                     settingRow(
                         "cowbell boost",
                         "too much is never enough. periodt.",
-                        $cowbell
-                    )
-                    settingRow(
-                        "ai vibe check",
-                        "your aura is being evaluated rn. bestie is not impressed and your rizz is cooked.",
-                        $aiVibeCheck
+                        Binding(get: { true }, set: { on in
+                            if !on { jokeMessage = "I gotta have more cowbell, baby!" }
+                            cowbell = true
+                        }),
+                        joke: true
                     )
                     // Wave footer
                     ColorfulSplashWave(phase: wavePhase)
@@ -685,6 +684,32 @@ struct SettingsView: View {
             UserDefaults.standard.set(id, forKey: AppState.profileOverrideKey)
             app.resolveProfile()
         }
+        .overlay {
+            if let message = jokeMessage {
+                Color.black.opacity(0.6)
+                    .ignoresSafeArea()
+                    .onTapGesture { jokeMessage = nil }
+                    .overlay {
+                        Text(message)
+                            .font(.system(size: isPad ? 18 : 15, weight: .semibold))
+                            .foregroundColor(C.text)
+                            .multilineTextAlignment(.center)
+                            .padding(24)
+                            .frame(maxWidth: isPad ? 420 : 280)
+                            .background(C.bg)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(C.border, lineWidth: 0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .allowsHitTesting(false)
+                    }
+            }
+        }
+    }
+
+    private func resetToDefaults() {
+        deviceOverride = "auto"
+        chipPauseAction = "previous"
+        oneShotFinishAction = "hold"
+        cleanupOneShots = false
     }
 
     @ViewBuilder
@@ -712,15 +737,17 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func settingRow(_ title: String, _ desc: String, _ isOn: Binding<Bool>) -> some View {
+    private func settingRow(_ title: String, _ desc: String, _ isOn: Binding<Bool>, joke: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: isPad ? 6 : 4) {
-                    Text(title)
+                    Text(joke ? "🎲 \(title)" : title)
                         .font(.system(size: isPad ? 18 : 13, weight: .semibold))
+                        .italic(joke)
                         .foregroundColor(C.text)
                     Text(desc)
                         .font(.system(size: isPad ? 17 : 15))
+                        .italic(joke)
                         .foregroundColor(C.text)
                 }
                 Spacer()

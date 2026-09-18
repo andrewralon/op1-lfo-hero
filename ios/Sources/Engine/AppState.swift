@@ -454,21 +454,29 @@ final class AppState: ObservableObject {
     }
 
     private func wireCallbacks() {
-        // USB + BLE state → connection label (USB preferred when connected)
+        // USB + BLE state → connection label, following whichever transport is actively
+        // routing (router.activeTransport) rather than always preferring USB when both are
+        // present — a newly available transport must never silently steal the connection.
         Publishers.CombineLatest(router.ble.$state, router.usb.$state)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] bleState, usbState in
                 guard let self else { return }
-                if usbState.isConnected {
+                switch self.router.activeTransport {
+                case .usb:
                     self.connectionLabel = usbState.label
-                    self.isConnected = true
-                } else if case .found = usbState {
-                    // USB MIDI devices visible but no known device name matched — show what was found
-                    self.connectionLabel = usbState.label
-                    self.isConnected = false
-                } else {
+                    self.isConnected = usbState.isConnected
+                case .ble:
                     self.connectionLabel = bleState.label
                     self.isConnected = bleState.isConnected
+                case nil:
+                    if case .found = usbState {
+                        // USB MIDI devices visible but no known device name matched — show what was found
+                        self.connectionLabel = usbState.label
+                        self.isConnected = false
+                    } else {
+                        self.connectionLabel = bleState.label
+                        self.isConnected = bleState.isConnected
+                    }
                 }
                 // Whatever just connected may be a different device than last time.
                 self.resolveProfile()
