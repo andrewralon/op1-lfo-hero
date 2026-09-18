@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		4795F3EA185146A3B08825F25A220B31 /* AppPreviewUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3009F425A432421994D6531CF8F18855 /* AppPreviewUITests.swift */; };
 		F3D1001B2FF000000000001B /* MultiDeviceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D1001A2FF000000000001A /* MultiDeviceUITests.swift */; };
+		F3D100312FF0000000000031 /* MidiCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100302FF0000000000030 /* MidiCapture.swift */; };
+		F3D100332FF0000000000033 /* MidiHardwareUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100322FF0000000000032 /* MidiHardwareUITests.swift */; };
 		4B2D1C66F4F73C31243ED771 /* HelpSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */; };
 		71BEA300AD3743FA9B870E02 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D11E2853B035905A9EAF4CE6 /* Foundation.framework */; };
 		CB702C2BCF38D9ECF9C48486 /* SplashScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E24B5EECD649B0D8B5B840 /* SplashScreenView.swift */; };
@@ -68,6 +70,8 @@
 		D11E2853B035905A9EAF4CE6 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		3009F425A432421994D6531CF8F18855 /* AppPreviewUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppPreviewUITests.swift; path = UITests/AppPreviewUITests.swift; sourceTree = "<group>"; };
 		F3D1001A2FF000000000001A /* MultiDeviceUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MultiDeviceUITests.swift; path = UITests/MultiDeviceUITests.swift; sourceTree = "<group>"; };
+		F3D100302FF0000000000030 /* MidiCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MidiCapture.swift; path = UITests/MidiCapture.swift; sourceTree = "<group>"; };
+		F3D100322FF0000000000032 /* MidiHardwareUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MidiHardwareUITests.swift; path = UITests/MidiHardwareUITests.swift; sourceTree = "<group>"; };
 		D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HelpSettingsUITests.swift; path = UITests/HelpSettingsUITests.swift; sourceTree = "<group>"; };
 		F303F79E2FDE4A770060AA2D /* op1-lfo-hero.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "op1-lfo-hero.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F303F7B82FDE4BC80060AA2D /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -133,6 +137,8 @@
 				F3D1001A2FF000000000001A /* MultiDeviceUITests.swift */,
 				F350020D2FE371CE00C6E1AF /* SnapshotHelper.swift */,
 				F350020F2FE371D800C6E1AF /* ScreenshotTests.swift */,
+				F3D100302FF0000000000030 /* MidiCapture.swift */,
+				F3D100322FF0000000000032 /* MidiHardwareUITests.swift */,
 			);
 			name = UITests;
 			sourceTree = SOURCE_ROOT;
@@ -363,6 +369,8 @@
 				F3D1001B2FF000000000001B /* MultiDeviceUITests.swift in Sources */,
 				F350020E2FE371CE00C6E1AF /* SnapshotHelper.swift in Sources */,
 				F35002102FE371D800C6E1AF /* ScreenshotTests.swift in Sources */,
+				F3D100312FF0000000000031 /* MidiCapture.swift in Sources */,
+				F3D100332FF0000000000033 /* MidiHardwareUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

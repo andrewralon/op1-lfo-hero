@@ -243,6 +243,34 @@ For byte-level verification without hardware, use `RecordingDestination` in the 
 implements `MidiDestination` and records the exact wire bytes. That is how the OP-1 golden byte
 table works.
 
+### Hardware-verified UITest: `MidiHardwareUITests`
+
+`RecordingDestination` proves the app *would* produce correct bytes given a `MidiDestination` —
+it never touches real CoreMIDI plumbing. `ios/UITests/MidiHardwareUITests.swift` closes that gap:
+it drives a real UI action on a physical device and asserts on the actual MIDI bytes an attached
+OP-1 receives.
+
+The listener (`ios/UITests/MidiCapture.swift`) has to run **on the device itself**, as a second
+CoreMIDI client living inside the XCUITest runner process, not as a Mac-side `tools/midi/`-style
+tool — the OP-1 is plugged into the iPad's USB-C port (so the app can talk to it), not into the
+Mac, so a Mac-side listener would never see its traffic. CoreMIDI allows multiple simultaneous
+input-port connections to one source, so `MidiCapture`'s connection doesn't interfere with the
+app's own.
+
+Requires an OP-1 Field connected via USB-C to `iPad Pro Dawg`. Self-skips (`XCTSkipUnless`) when
+no matching source is found, so it's safe to include in a full test-target run against a
+simulator or a bare device.
+
+```bash
+xcrun xctrace list devices   # find the physical device UDID
+cd ios
+xcodebuild test \
+  -project op1-lfo-hero.xcodeproj \
+  -scheme op1-lfo-hero \
+  -destination 'id=<physical-device-udid>' \
+  -only-testing:op1-lfo-heroUITests/MidiHardwareUITests/testTrack1MuteSendsCorrectCCBytes
+```
+
 ## Screenshots and simulator testing
 
 All testing/Xcode/simulator screenshots go in `/tmp/claude-ss/`. Create the directory if it doesn't exist (`mkdir -p /tmp/claude-ss`) before writing. Use this path in `xcrun simctl io` commands, UITest screenshot saves, and any other screenshot output.

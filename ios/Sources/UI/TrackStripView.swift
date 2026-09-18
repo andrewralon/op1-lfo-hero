@@ -29,6 +29,7 @@ struct TrackStripView: View {
                     .foregroundColor(muted ? color : .black)
             }
             .buttonStyle(ImmediateButtonStyle())
+            .accessibilityIdentifier("muteButton\(track)")
 
             if isLandscape {
                 // ── Landscape: pan knob left of fader, tops aligned ──────────
