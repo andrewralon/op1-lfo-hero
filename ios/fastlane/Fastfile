@@ -56,11 +56,22 @@ platform :ios do
   desc "Build and upload to TestFlight"
   lane :beta do |options|
     match(type: "appstore", readonly: true)
-    increment_build_number(xcodeproj: "op1-lfo-hero.xcodeproj")
+
+    # Ask App Store Connect for the last uploaded build rather than trusting
+    # the local .pbxproj: increment_build_number(xcodeproj:) only mutates the
+    # file on disk, and nothing in this lane commits that change, so it
+    # silently drifts behind whatever actually shipped (see beta/19 vs the
+    # build 20 that went out without a matching commit or tag). An xcarg
+    # override touches no file, so there's nothing to fall out of sync.
+    next_build = latest_testflight_build_number(
+      version: get_version_number(xcodeproj: "op1-lfo-hero.xcodeproj")
+    ) + 1
+
     build_app(
       project: "op1-lfo-hero.xcodeproj",
       scheme: "op1-lfo-hero",
-      export_method: "app-store"
+      export_method: "app-store",
+      xcargs: "CURRENT_PROJECT_VERSION=#{next_build}"
     )
     commit_options = { merge_commit_filtering: "exclude_merges", pretty: "- %s" }
     commit_options[:between] = ["beta/#{options[:since]}", "HEAD"] if options[:since]
@@ -80,7 +91,7 @@ platform :ios do
       NOTES
     )
     add_git_tag(
-      tag: "beta/#{get_build_number(xcodeproj: "op1-lfo-hero.xcodeproj")}"
+      tag: "beta/#{next_build}"
     )
     push_git_tags
   end
@@ -112,11 +123,19 @@ platform :ios do
   desc "Full release: build + upload metadata + screenshots + submit for review"
   lane :release do
     match(type: "appstore", readonly: true)
-    increment_build_number(xcodeproj: "op1-lfo-hero.xcodeproj")
+
+    # See the note in the `beta` lane above — xcarg override, not
+    # increment_build_number(xcodeproj:), so the build number can't drift
+    # out of sync with what's actually on App Store Connect.
+    next_build = latest_testflight_build_number(
+      version: get_version_number(xcodeproj: "op1-lfo-hero.xcodeproj")
+    ) + 1
+
     build_app(
       project: "op1-lfo-hero.xcodeproj",
       scheme: "op1-lfo-hero",
-      export_method: "app-store"
+      export_method: "app-store",
+      xcargs: "CURRENT_PROJECT_VERSION=#{next_build}"
     )
     deliver(
       submit_for_review: true,

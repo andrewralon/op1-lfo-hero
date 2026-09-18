@@ -4,7 +4,7 @@ import SwiftUI
 import UIKit
 
 struct EditorSnapshot {
-    let param:    Parameter
+    let param:    ParamSpec
     let wave:     LfoWave
     let rate:     Int
     let center:   Double
@@ -24,6 +24,11 @@ final class AppState: ObservableObject {
     let automation  = AutomationEngine()
     let controller: Controller
 
+    // MARK: - Device
+    /// The device the app is currently driving. Every CC number, channel and track count comes
+    /// from here — see DeviceProfile.swift.
+    @Published private(set) var profile: DeviceProfile = .op1Field
+
     // MARK: - Connection
     @Published var connectionLabel = "scanning…"
     @Published var isConnected = false
@@ -34,13 +39,13 @@ final class AppState: ObservableObject {
     @Published var slaveTicksReceived: Int = 0  // diagnostic: counts ticks from OP-1
 
     // MARK: - Track state  (volume: 0-99 display, pan: -63..+63)
-    @Published var volumes: [Int: Double] = [1: 90, 2: 90, 3: 90, 4: 90]
+    @Published var volumes: [Int: Double] = [1: 99, 2: 99, 3: 99, 4: 99]
     @Published var pans:    [Int: Int]    = [1: 0,  2: 0,  3: 0,  4: 0]
     @Published var mutes:   [Int: Bool]   = [1: false, 2: false, 3: false, 4: false]
 
     // MARK: - LFO editor
     @Published var lfoWave  = LfoWave.sine
-    @Published var lfoParam = Parameter.volume {
+    @Published var lfoParam: ParamSpec = DeviceProfile.op1Field.params[0] {
         didSet {
             if lfoParam.isMasterOnly {
                 // Master-only param (tempo, etc) — master must be on; don't clobber an
@@ -73,57 +78,341 @@ final class AppState: ObservableObject {
 
     // MARK: - Persisted settings
 
-    private struct Settings: Codable {
+    /// Everything that is remembered about one device. Each profile gets its own bucket:
+    /// an LFO chip's depth/center are in that device's MIDI units and its parameter namespace,
+    /// so they are not translatable between devices — and wiping them on every unplug/replug
+    /// would cost a session's work.
+    ///
+    /// Every field decodes with `decodeIfPresent ?? default`. This is deliberate and load-bearing:
+    /// Swift's synthesized `Decodable` ignores property defaults, so a synthesized decoder makes
+    /// any future added field throw and silently reset the user's entire saved state.
+    // internal (not private) so migration can be unit-tested
+    struct DeviceState: Codable {
         var lfoWave: LfoWave = .sine
-        var lfoParam: Parameter = .volume
+        var lfoParamId: String = "volume"
         var lfoRate: Int = 3
         var lfoDepth: Double = 10.0
         var lfoCenter: Double = 90.0
-        var trackOn: [Int: Int] = [1: 1, 2: 0, 3: 0, 4: 0]
+        var trackOn: [Int: Int] = [1: 1]
         var masterOn: Int = 0
         var isClockMaster: Bool = true
         var bpm: Double = 100.0
+        var volumes: [Int: Double] = [:]
+        var pans: [Int: Int] = [:]
+        var mutes: [Int: Bool] = [:]
         var activeLfos: [LfoClip] = []
+
+        init() {}
+
+        enum CodingKeys: String, CodingKey {
+            case lfoWave, lfoParamId, lfoParam, lfoRate, lfoDepth, lfoCenter
+            case trackOn, masterOn, isClockMaster, bpm, volumes, pans, mutes, activeLfos
+        }
+
+        init(from d: Decoder) throws {
+            let c = try d.container(keyedBy: CodingKeys.self)
+            func v<T: Decodable>(_ k: CodingKeys, _ fallback: T) -> T {
+                ((try? c.decodeIfPresent(T.self, forKey: k)).flatMap { $0 }) ?? fallback
+            }
+            lfoWave   = v(.lfoWave, LfoWave.sine)
+            // `lfoParam` is the pre-multi-device key (a raw Parameter string).
+            lfoParamId = ((try? c.decodeIfPresent(String.self, forKey: .lfoParamId)).flatMap { $0 })
+                      ?? ((try? c.decodeIfPresent(String.self, forKey: .lfoParam)).flatMap { $0 })
+                      ?? "volume"
+            lfoRate   = v(.lfoRate, 3)
+            lfoDepth  = v(.lfoDepth, 10.0)
+            lfoCenter = v(.lfoCenter, 90.0)
+            trackOn   = v(.trackOn, [1: 1])
+            masterOn  = v(.masterOn, 0)
+            isClockMaster = v(.isClockMaster, true)
+            // A tempo saved from a bad clock reading must not survive a relaunch. 0 is the
+            // "slaved, no data yet" sentinel and is allowed through.
+            let savedBpm = v(.bpm, 100.0)
+            bpm = (savedBpm == 0 || (savedBpm >= AppState.minBpm && savedBpm <= AppState.maxBpm))
+                ? savedBpm : 100.0
+            volumes   = v(.volumes, [:])
+            pans      = v(.pans, [:])
+            mutes     = v(.mutes, [:])
+            activeLfos = v(.activeLfos, [])
+        }
+
+        /// Hand-written because `CodingKeys` carries the legacy `lfoParam` key, which has no
+        /// property to synthesize from. Only the current keys are written.
+        func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(lfoWave, forKey: .lfoWave)
+            try c.encode(lfoParamId, forKey: .lfoParamId)
+            try c.encode(lfoRate, forKey: .lfoRate)
+            try c.encode(lfoDepth, forKey: .lfoDepth)
+            try c.encode(lfoCenter, forKey: .lfoCenter)
+            try c.encode(trackOn, forKey: .trackOn)
+            try c.encode(masterOn, forKey: .masterOn)
+            try c.encode(isClockMaster, forKey: .isClockMaster)
+            try c.encode(bpm, forKey: .bpm)
+            try c.encode(volumes, forKey: .volumes)
+            try c.encode(pans, forKey: .pans)
+            try c.encode(mutes, forKey: .mutes)
+            try c.encode(activeLfos, forKey: .activeLfos)
+        }
+    }
+
+    struct Settings: Codable {
+        static let currentVersion = 2
+        /// The hardcoded volume default before it became 99 — see the v1→v2 migration below.
+        private static let legacyDefaultVolume: Double = 90
+
+        var version: Int = currentVersion
+        var deviceId: String = "op1"
+        var perDevice: [String: DeviceState] = [:]
+
+        init() {}
+
+        enum CodingKeys: String, CodingKey { case version, deviceId, perDevice }
+
+        init(from d: Decoder) throws {
+            let c = try d.container(keyedBy: CodingKeys.self)
+            version  = ((try? c.decodeIfPresent(Int.self, forKey: .version)).flatMap { $0 }) ?? 0
+            deviceId = ((try? c.decodeIfPresent(String.self, forKey: .deviceId)).flatMap { $0 }) ?? "op1"
+            perDevice = ((try? c.decodeIfPresent([String: DeviceState].self, forKey: .perDevice))
+                            .flatMap { $0 }) ?? [:]
+            if version == 0 {
+                // v0 had no envelope: the whole blob *was* one device's state, always the OP-1.
+                // `DeviceState`'s decoder reads the old key names directly, so re-decoding the
+                // same container is the entire migration.
+                perDevice["op1"] = (try? DeviceState(from: d)) ?? DeviceState()
+                version = 1
+            }
+            if version == 1 {
+                // Volume defaulted to 90 before it was bumped to 99. Any track still sitting
+                // exactly on the old default was never touched, so drop it and let
+                // `applyDeviceState`'s `st.volumes[$0] ?? newProfile.defaultVolume` fall
+                // through to the new default instead of reading it as a deliberate choice.
+                for key in perDevice.keys {
+                    var device = perDevice[key]!
+                    device.volumes = device.volumes.filter { $0.value != Self.legacyDefaultVolume }
+                    perDevice[key] = device
+                }
+                version = 2
+            }
+        }
     }
 
     private let settingsKey = "AppSettings"
 
+    /// Read the saved settings blob from the Keychain, migrating a legacy `UserDefaults` copy in
+    /// on the first run after this switch. `UserDefaults` is sandboxed to the app container and
+    /// is wiped by an ordinary delete+reinstall; the Keychain is not, so this is a one-way move.
+    private func loadSettingsData() -> Data? {
+        if let data = KeychainStore.load(account: settingsKey) { return data }
+        guard let legacy = UserDefaults.standard.data(forKey: settingsKey) else { return nil }
+        KeychainStore.save(legacy, account: settingsKey)
+        UserDefaults.standard.removeObject(forKey: settingsKey)
+        return legacy
+    }
+
+    private func writeSettingsData(_ data: Data) {
+        KeychainStore.save(data, account: settingsKey)
+    }
+
+    /// Old `ParamSpec.id` → current id, so renaming one does not orphan saved clips.
+    ///
+    /// The OP-1's ids are the old `Parameter` raw values, so nothing was needed for the
+    /// multi-device refactor. Entries here are renames made since.
+    private static let legacyParamIdMap: [String: String] = [
+        // Renamed once it was measured: bend is a signed velocity offset, and calling it
+        // "speed" implied a multiplier it never was.
+        "tp7.speed": "tp7.pitchbend",
+    ]
+
+    /// Resolve a saved parameter id to its current one. Must be applied everywhere a persisted
+    /// id is read — the selected parameter *and* every saved clip — or a rename fixes one and
+    /// silently drops the other.
+    static func migratedParamId(_ id: String) -> String { legacyParamIdMap[id] ?? id }
+
     private func loadSettings() {
         if CommandLine.arguments.contains("--uitest-reset") {
+            KeychainStore.delete(account: settingsKey)
             UserDefaults.standard.removeObject(forKey: settingsKey)
+            UserDefaults.standard.removeObject(forKey: Self.profileOverrideKey)
+            UserDefaults.standard.removeObject(forKey: "deviceOverrideLabel")
         }
-        let s: Settings
-        if let data = UserDefaults.standard.data(forKey: settingsKey),
-           let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
-            s = decoded
-        } else {
-            s = Settings()
+        // --uitest-profile <id> pins the device so tests can exercise a 6-track layout
+        // without the hardware attached.
+        if let i = CommandLine.arguments.firstIndex(of: "--uitest-profile"),
+           i + 1 < CommandLine.arguments.count {
+            let id = CommandLine.arguments[i + 1]
+            UserDefaults.standard.set(id, forKey: Self.profileOverrideKey)
+            // Keep the settings picker's label store in step, or it would read "auto".
+            UserDefaults.standard.set(DeviceRegistry.profile(id: id).displayName,
+                                      forKey: "deviceOverrideLabel")
         }
-        lfoWave   = s.lfoWave
-        lfoRate   = s.lfoRate
-        lfoDepth  = s.lfoDepth
-        lfoCenter = s.lfoCenter
-        trackOn   = s.trackOn
-        masterOn  = s.masterOn
-        bpm       = s.bpm
-        lfoParam  = s.lfoParam  // set last — didSet may adjust masterOn
-        if s.isClockMaster { enableClock() } else { disableClock() }
-        for lfo in s.activeLfos where lfo.loop {
+        var s = Settings()
+        if let data = loadSettingsData() {
+            if let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
+                s = decoded
+            }
+        }
+        // Re-read the override here: a launch argument may have just written it, after the
+        // published property took its initial value.
+        let override = UserDefaults.standard.string(forKey: Self.profileOverrideKey) ?? "auto"
+        let effectiveId = override == "auto" ? s.deviceId : override
+
+        applyDeviceState(s.perDevice[effectiveId] ?? DeviceState(),
+                         for: DeviceRegistry.profile(id: effectiveId))
+
+        if profileOverrideId != override { profileOverrideId = override }
+    }
+
+    /// Push one saved bucket into the published state, dropping anything the profile can't
+    /// express (a parameter it doesn't have, a track it doesn't have).
+    private func applyDeviceState(_ st: DeviceState, for newProfile: DeviceProfile) {
+        profile = newProfile
+        controller.setProfile(newProfile)
+        automation.setProfile(newProfile)
+        clock.transport = newProfile.transport
+        clock.playTogglesDirection = newProfile.caps.playReversesWhenPlaying
+
+        let tracks = newProfile.trackIndices
+        volumes = Dictionary(uniqueKeysWithValues: tracks.map { ($0, st.volumes[$0] ?? newProfile.defaultVolume) })
+        pans    = Dictionary(uniqueKeysWithValues: tracks.map { ($0, st.pans[$0] ?? 0) })
+        mutes   = Dictionary(uniqueKeysWithValues: tracks.map { ($0, st.mutes[$0] ?? false) })
+
+        lfoWave   = st.lfoWave
+        lfoRate   = st.lfoRate
+        lfoDepth  = st.lfoDepth
+        lfoCenter = st.lfoCenter
+        masterOn  = st.masterOn
+        bpm       = st.bpm
+
+        // Keep only tracks this device has; never end up with nothing selected, or
+        // "lowest non-zero track" in lfoStart/saveChipEdits would target a missing track.
+        var on = st.trackOn.filter { tracks.contains($0.key) }
+        if !on.values.contains(where: { $0 != 0 }) { on[1] = 1 }
+        trackOn = Dictionary(uniqueKeysWithValues: tracks.map { ($0, on[$0] ?? 0) })
+
+        let savedId = Self.migratedParamId(st.lfoParamId)
+        lfoParam = newProfile.param(savedId)
+                ?? newProfile.param(newProfile.defaultParamId)
+                ?? newProfile.params[0]   // set last — didSet may adjust masterOn
+
+        if st.isClockMaster || !newProfile.caps.canBeClockMaster { enableClock() } else { disableClock() }
+
+        for saved in st.activeLfos where saved.loop {
+            // Saved clips carry a paramId too, so a rename has to be applied here as well —
+            // otherwise the map fixes the selected parameter while every chip using it is
+            // silently dropped as unresolvable.
+            var lfo = saved
+            lfo.paramId = Self.migratedParamId(lfo.paramId)
+            guard lfo.deviceId == newProfile.id,
+                  newProfile.param(lfo.paramId) != nil,
+                  lfo.track == 0 || tracks.contains(lfo.track) else {
+                #if DEBUG
+                print("dropping unresolvable clip: device=\(lfo.deviceId) param=\(lfo.paramId) track=\(lfo.track)")
+                #endif
+                continue
+            }
             automation.add(lfo)
             if !lfo.isEnabled { automation.setEnabled(lfo.id, enabled: false) }
             activeLfos.append(lfo)
         }
     }
 
+    private func currentDeviceState() -> DeviceState {
+        var st = DeviceState()
+        st.lfoWave    = lfoWave
+        st.lfoParamId = lfoParam.id
+        st.lfoRate    = lfoRate
+        st.lfoDepth   = lfoDepth
+        st.lfoCenter  = lfoCenter
+        st.trackOn    = trackOn
+        st.masterOn   = masterOn
+        st.isClockMaster = isClockMaster
+        st.bpm        = bpm
+        st.volumes    = volumes
+        st.pans       = pans
+        st.mutes      = mutes
+        st.activeLfos = activeLfos.filter { $0.loop }
+        return st
+    }
+
     private func saveSettings() {
-        let s = Settings(lfoWave: lfoWave, lfoParam: lfoParam,
-                         lfoRate: lfoRate, lfoDepth: lfoDepth, lfoCenter: lfoCenter,
-                         trackOn: trackOn, masterOn: masterOn,
-                         isClockMaster: isClockMaster, bpm: bpm,
-                         activeLfos: activeLfos.filter { $0.loop })
-        if let data = try? JSONEncoder().encode(s) {
-            UserDefaults.standard.set(data, forKey: settingsKey)
+        var s = Settings()
+        if let data = loadSettingsData(),
+           let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
+            s = decoded   // preserve other devices' buckets
         }
+        s.version  = Settings.currentVersion
+        s.deviceId = profile.id
+        s.perDevice[profile.id] = currentDeviceState()
+        if let data = try? JSONEncoder().encode(s) {
+            writeSettingsData(data)
+        }
+    }
+
+    // MARK: - Device switching
+
+    /// "auto" (detect from the MIDI port name) or a specific profile id. Persisted separately
+    /// from per-device state because it is a global preference.
+    ///
+    /// Deliberately a plain `@Published` backed by UserDefaults rather than `@AppStorage`:
+    /// `@AppStorage` is a `DynamicProperty` meant for views and does not drive
+    /// `objectWillChange` from inside an `ObservableObject`.
+    static let profileOverrideKey = "deviceProfileOverride"
+
+    /// Mirrors the stored override for display. SettingsView writes UserDefaults directly
+    /// (via @AppStorage) and then calls `resolveProfile()`, so this is a read-side mirror
+    /// rather than the source of truth.
+    @Published private(set) var profileOverrideId: String = UserDefaults.standard
+        .string(forKey: AppState.profileOverrideKey) ?? "auto"
+
+    /// True when the profile in use was assumed rather than matched — something is connected
+    /// but its name matched no known device. Surfaced in the status bar.
+    @Published private(set) var profileIsAssumed = false
+
+    /// Pick the profile: an explicit override wins; otherwise the connected endpoint's name;
+    /// otherwise keep whatever is already loaded (never silently reset the user's device).
+    func resolveProfile() {
+        let stored = UserDefaults.standard.string(forKey: Self.profileOverrideKey) ?? "auto"
+        if profileOverrideId != stored { profileOverrideId = stored }
+
+        if stored != "auto" {
+            profileIsAssumed = false
+            switchProfile(to: DeviceRegistry.profile(id: stored))
+            return
+        }
+        if let id = usb.matchedProfileId ?? ble.matchedProfileId {
+            profileIsAssumed = false
+            switchProfile(to: DeviceRegistry.profile(id: id))
+        } else {
+            // Connected to something unrecognised — keep the last profile, but say so.
+            profileIsAssumed = isConnected
+        }
+    }
+
+    /// Swap the active device, banking the current one's state first so switching back and
+    /// forth is lossless.
+    func switchProfile(to newProfile: DeviceProfile) {
+        guard newProfile.id != profile.id else { return }
+
+        // Stop everything that is mid-flight before the parameter namespace changes.
+        automation.clearAll()
+        automation.clearPreview()
+        isPreview = false
+        activeLfos.removeAll()
+
+        var s = Settings()
+        if let data = loadSettingsData(),
+           let decoded = try? JSONDecoder().decode(Settings.self, from: data) {
+            s = decoded
+        }
+        s.perDevice[profile.id] = currentDeviceState()   // bank the outgoing device
+        s.version  = Settings.currentVersion
+        s.deviceId = newProfile.id
+        if let data = try? JSONEncoder().encode(s) {
+            writeSettingsData(data)
+        }
+
+        applyDeviceState(s.perDevice[newProfile.id] ?? DeviceState(), for: newProfile)
     }
 
     private func wireAutoSave() {
@@ -147,6 +436,16 @@ final class AppState: ObservableObject {
     init() {
         controller = Controller(router: router)
         automation.controller = controller
+        // `.transport` parameters need ClockEngine, which owns play state and song position.
+        controller.transportRunner = { [weak clock] ops in clock?.runOps(ops) }
+        // A tempo nudge from the transport buttons while the app is clock master: move the app's
+        // own tempo, which the device is following anyway. TX-6 only — see appTempoNudge.
+        clock.appTempoNudge = { [weak self] delta in
+            Task { @MainActor in
+                guard let self else { return }
+                self.setBpm(self.bpm + delta)
+            }
+        }
         clock.router = router
 
         wireCallbacks()
@@ -155,22 +454,32 @@ final class AppState: ObservableObject {
     }
 
     private func wireCallbacks() {
-        // USB + BLE state → connection label (USB preferred when connected)
+        // USB + BLE state → connection label, following whichever transport is actively
+        // routing (router.activeTransport) rather than always preferring USB when both are
+        // present — a newly available transport must never silently steal the connection.
         Publishers.CombineLatest(router.ble.$state, router.usb.$state)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] bleState, usbState in
                 guard let self else { return }
-                if usbState.isConnected {
+                switch self.router.activeTransport {
+                case .usb:
                     self.connectionLabel = usbState.label
-                    self.isConnected = true
-                } else if case .found = usbState {
-                    // USB MIDI devices visible but OP-1 name not matched — show what was found
-                    self.connectionLabel = usbState.label
-                    self.isConnected = false
-                } else {
+                    self.isConnected = usbState.isConnected
+                case .ble:
                     self.connectionLabel = bleState.label
                     self.isConnected = bleState.isConnected
+                case nil:
+                    if case .found = usbState {
+                        // USB MIDI devices visible but no known device name matched — show what was found
+                        self.connectionLabel = usbState.label
+                        self.isConnected = false
+                    } else {
+                        self.connectionLabel = bleState.label
+                        self.isConnected = bleState.isConnected
+                    }
                 }
+                // Whatever just connected may be a different device than last time.
+                self.resolveProfile()
             }
             .store(in: &cancellables)
 
@@ -193,6 +502,10 @@ final class AppState: ObservableObject {
 
         // BPM from clock engine
         clock.bpmCallback = { [weak self] newBpm in
+            // A measured tempo, so it can be nonsense if the incoming stream is. Ignore rather
+            // than clamp: a reading outside musical range is a transport artefact, and pinning
+            // it to 300 would show a plausible-looking number that was never real.
+            guard newBpm >= Self.minBpm, newBpm <= Self.maxBpm else { return }
             DispatchQueue.main.async { self?.bpm = newBpm }
         }
 
@@ -213,18 +526,18 @@ final class AppState: ObservableObject {
         automation.updateCallback = { [weak self] track, param, midiVal in
             guard let self else { return }
             DispatchQueue.main.async {
-                switch param {
+                switch param.role {
                 case .volume:
                     self.volumes[track] = midiToUI(midiVal)
                 case .pan:
                     self.pans[track] = Int(midiVal) - 64
                 case .mute:
-                    self.mutes[track] = midiVal >= 64
+                    self.mutes[track] = param.isOn(Int(midiVal))
                 case .tempo:
                     self.clock.updateMasterBpm(midiVal)
                     self.bpm = midiVal
-                default:
-                    break
+                case .generic:
+                    break   // not mirrored in the mixer UI
                 }
             }
         }
@@ -250,23 +563,31 @@ final class AppState: ObservableObject {
             }
         }
 
-        // CC from OP-1 → sync UI sliders/knobs (router forwards from whichever transport is active)
+        // CC from the device → sync UI faders/knobs (router forwards from whichever transport
+        // is active). The channel/CC pair is resolved through the same parameter table the
+        // outbound path uses, so the two directions cannot drift apart.
         router.onCC = { [weak self] channel, cc, value in
-            let track = channel + 1
-            guard (1...4).contains(track) else { return }
             DispatchQueue.main.async {
-                guard let self else { return }
-                switch cc {
-                case 7:
+                guard let self,
+                      // Devices whose transmit map differs from their receive map would be
+                      // misread here — the TX-6's "upper knob 1" is CC 7, which the receive
+                      // map calls "track 1 volume".
+                      self.profile.caps.mirrorsIncomingCC,
+                      let hit = self.profile.inboundTarget(channel: channel, cc: cc)
+                else { return }
+                let track = hit.track
+                switch hit.spec.role {
+                case .volume:
                     let v = midiToUI(Double(value))
                     if self.volumes[track] != v { self.volumes[track] = v }
-                case 9:
-                    let m = value >= 64
+                case .mute:
+                    let m = hit.spec.isOn(value)
                     if self.mutes[track] != m { self.mutes[track] = m }
-                case 10:
+                case .pan:
                     let p = value - 64
                     if self.pans[track] != p { self.pans[track] = p }
-                default: break
+                case .tempo, .generic:
+                    break   // not mirrored in the mixer UI
                 }
             }
         }
@@ -285,9 +606,23 @@ final class AppState: ObservableObject {
     func tapePrev() { clock.tapePrev() }
     func tapeNext() { clock.tapeNext() }
 
+    /// Press-and-hold scrubbing. On devices whose seek is a persistent speed state, the reel
+    /// moves only while held and accelerates the longer it is held.
+    func beginScrub(forward: Bool) { clock.beginScrub(forward: forward) }
+    func endScrub()                { clock.endScrub() }
+    var hasMomentaryScrub: Bool    { clock.hasMomentaryScrub }
+
+    /// Musical range for any tempo the app will accept or display. 0 is kept as a separate
+    /// sentinel meaning "slaved, no clock data yet", so it is deliberately outside this.
+    static let minBpm = 20.0
+    static let maxBpm = 300.0
+
     func enableClock() {
         isClockMaster = true
-        let startBpm = bpm > 1.0 ? bpm : 100.0  // handle sentinel (0) from OP-1 mode
+        // Anything outside musical range is treated as the sentinel: taking over as master with
+        // a junk tempo would drive the master timer with it. A bad slave reading used to survive
+        // the switch back to app-master this way.
+        let startBpm = (bpm >= Self.minBpm && bpm <= Self.maxBpm) ? bpm : 100.0
         bpm = startBpm
         clock.enableClock(bpm: startBpm)
     }
@@ -316,8 +651,10 @@ final class AppState: ObservableObject {
     }
 
     func toggleMute(track: Int) {
-        let now = controller.toggleMute(track: track)
+        // `mutes` is the single source of truth — Controller holds no mute state of its own.
+        let now = !(mutes[track] ?? false)
         mutes[track] = now
+        controller.setMute(track: track, on: now)
     }
 
     // MARK: - LFO actions
@@ -338,7 +675,7 @@ final class AppState: ObservableObject {
         } else {
             rt = RATE_TICKS[lfoRate] ?? (4 * PPQN)
         }
-        let isTempo = lfoParam == .tempo
+        let isTempo = lfoParam.role == .tempo
         let depthMidi  = isTempo ? lfoDepth  : Double(uiToMidi(lfoDepth))
         let centerMidi = isTempo ? lfoCenter : Double(uiToMidi(lfoCenter))
 
@@ -353,32 +690,33 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// Current value of a parameter in MIDI units, captured when a clip is created so disabling
+    /// the clip can put the parameter back. Only the roles the mixer tracks are knowable;
+    /// anything else falls back to the clip's own center.
+    private func capturedValue(of spec: ParamSpec, track: Int, fallback: Double) -> Double {
+        switch spec.role {
+        case .tempo:  return bpm
+        case .volume: return Double(uiToMidi(volumes[track] ?? profile.defaultVolume))
+        case .pan:    return Double((pans[track] ?? 0) + 64)
+        case .mute:   return (mutes[track] ?? false) ? 127.0 : 0.0
+        case .generic: return fallback
+        }
+    }
+
     private func addLfo(track: Int, rateTicks: Int, freeRatePeriod: Double?, depth: Double, center: Double,
                         inverted: Bool, loop: Bool) {
         // Dedup: paused/disabled chips also count — re-enable instead of adding a duplicate.
         if activeLfos.contains(where: {
-            $0.track == track && $0.parameter == lfoParam &&
+            $0.track == track && $0.paramId == lfoParam.id &&
             $0.wave == lfoWave && $0.rateTicks == rateTicks && $0.freeRatePeriod == freeRatePeriod &&
             $0.depth == depth && $0.centerValue == center && $0.inverted == inverted
         }) { return }
 
-        // Capture current parameter value (MIDI units) so disabling can restore it.
-        let originalValue: Double
-        if lfoParam == .tempo {
-            originalValue = bpm
-        } else {
-            switch lfoParam {
-            case .volume: originalValue = Double(uiToMidi(volumes[track] ?? 90))
-            case .pan:    originalValue = Double((pans[track] ?? 0) + 64)
-            case .mute:   originalValue = (mutes[track] ?? false) ? 127.0 : 0.0
-            default:      originalValue = center  // not tracked externally; center is best fallback
-            }
-        }
-
-        let lfo = LfoClip(track: track, parameter: lfoParam, wave: lfoWave,
+        let lfo = LfoClip(deviceId: profile.id, track: track, paramId: lfoParam.id, wave: lfoWave,
                           rateTicks: rateTicks, freeRatePeriod: freeRatePeriod,
                           depth: depth, centerValue: center,
-                          inverted: inverted, loop: loop, originalValue: originalValue)
+                          inverted: inverted, loop: loop,
+                          originalValue: capturedValue(of: lfoParam, track: track, fallback: center))
         automation.add(lfo)
         activeLfos.append(lfo)
         updatePreviewIfActive()
@@ -442,18 +780,18 @@ final class AppState: ObservableObject {
         } else {
             rt = RATE_TICKS[lfoRate] ?? (4 * PPQN)
         }
-        let isTempo = lfoParam == .tempo
+        let isTempo = lfoParam.role == .tempo
         let depthMidi  = isTempo ? lfoDepth  : Double(uiToMidi(lfoDepth))
         let centerMidi = isTempo ? lfoCenter : Double(uiToMidi(lfoCenter))
         var clips: [LfoClip] = []
         if lfoParam.isMasterCapable && masterOn != 0 {
-            clips.append(LfoClip(track: 0, parameter: lfoParam, wave: lfoWave,
+            clips.append(LfoClip(deviceId: profile.id, track: 0, paramId: lfoParam.id, wave: lfoWave,
                                  rateTicks: rt, freeRatePeriod: period,
                                  depth: depthMidi, centerValue: centerMidi,
                                  inverted: masterOn == 2, loop: true, originalValue: centerMidi))
         } else {
             for (t, state) in trackOn.sorted(by: { $0.key < $1.key }) where state != 0 {
-                clips.append(LfoClip(track: t, parameter: lfoParam, wave: lfoWave,
+                clips.append(LfoClip(deviceId: profile.id, track: t, paramId: lfoParam.id, wave: lfoWave,
                                      rateTicks: rt, freeRatePeriod: period,
                                      depth: depthMidi, centerValue: centerMidi,
                                      inverted: state == 2, loop: true, originalValue: centerMidi))
@@ -465,7 +803,7 @@ final class AppState: ObservableObject {
             !activeLfos.contains { active in
                 active.isEnabled &&
                 active.track       == preview.track &&
-                active.parameter   == preview.parameter &&
+                active.paramId     == preview.paramId &&
                 active.wave        == preview.wave &&
                 active.rateTicks   == preview.rateTicks &&
                 active.depth       == preview.depth &&
@@ -493,14 +831,15 @@ final class AppState: ObservableObject {
         }
         lfoWave   = lfo.wave
         lfoRate   = lfo.rateIndex
-        if lfo.parameter == .tempo {
+        let spec = profile.param(lfo.paramId) ?? lfoParam
+        if spec.role == .tempo {
             lfoDepth  = lfo.depth
             lfoCenter = lfo.centerValue
         } else {
             lfoDepth  = midiToUI(lfo.depth)
             lfoCenter = midiToUI(lfo.centerValue)
         }
-        lfoParam = lfo.parameter  // last — didSet may adjust masterOn
+        lfoParam = spec  // last — didSet may adjust masterOn
         updatePreviewIfActive()
     }
 
@@ -508,7 +847,8 @@ final class AppState: ObservableObject {
         guard let idx = activeLfos.firstIndex(where: { $0.id == id }) else { return }
         var lfo = activeLfos[idx]
 
-        lfo.parameter = lfoParam
+        lfo.deviceId  = profile.id
+        lfo.paramId   = lfoParam.id
         lfo.wave      = lfoWave
 
         if let secs = FREE_RATE_SECONDS[lfoRate] {
@@ -519,7 +859,7 @@ final class AppState: ObservableObject {
             lfo.rateTicks = RATE_TICKS[lfoRate] ?? (4 * PPQN)
         }
 
-        if lfoParam == .tempo {
+        if lfoParam.role == .tempo {
             lfo.depth       = lfoDepth
             lfo.centerValue = lfoCenter
         } else {
@@ -558,26 +898,21 @@ final class AppState: ObservableObject {
 
         for target in targets.dropFirst() {
             if activeLfos.contains(where: {
-                $0.track == target.track && $0.parameter == primary.parameter &&
+                $0.track == target.track && $0.paramId == primary.paramId &&
                 $0.wave == primary.wave && $0.rateTicks == primary.rateTicks &&
                 $0.freeRatePeriod == primary.freeRatePeriod &&
                 $0.depth == primary.depth && $0.centerValue == primary.centerValue &&
                 $0.inverted == target.inverted
             }) { continue }
 
-            let origVal: Double
-            switch primary.parameter {
-            case .volume: origVal = Double(uiToMidi(volumes[target.track] ?? 90))
-            case .pan:    origVal = Double((pans[target.track] ?? 0) + 64)
-            case .mute:   origVal = (mutes[target.track] ?? false) ? 127.0 : 0.0
-            default:      origVal = primary.centerValue
-            }
-            let clip = LfoClip(track: target.track, parameter: primary.parameter,
+            let spec = profile.param(primary.paramId) ?? lfoParam
+            let clip = LfoClip(deviceId: primary.deviceId, track: target.track, paramId: primary.paramId,
                                wave: primary.wave, rateTicks: primary.rateTicks,
                                freeRatePeriod: primary.freeRatePeriod,
                                depth: primary.depth, centerValue: primary.centerValue,
                                inverted: target.inverted, loop: primary.loop,
-                               originalValue: origVal)
+                               originalValue: capturedValue(of: spec, track: target.track,
+                                                            fallback: primary.centerValue))
             automation.add(clip)
             activeLfos.append(clip)
         }
@@ -592,7 +927,7 @@ final class AppState: ObservableObject {
         let dupes = activeLfos.filter {
             $0.id != id &&
             $0.track       == primary.track      &&
-            $0.parameter   == primary.parameter  &&
+            $0.paramId     == primary.paramId    &&
             $0.wave        == primary.wave        &&
             $0.rateTicks   == primary.rateTicks   &&
             $0.freeRatePeriod == primary.freeRatePeriod &&

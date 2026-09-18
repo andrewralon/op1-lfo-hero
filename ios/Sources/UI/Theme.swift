@@ -15,11 +15,16 @@ enum C {
     static let yellow  = Color(hex: "#FFE500")
     static let groove  = Color(hex: "#333333")
 
+    /// Tracks 1-4 are the fixed OP-1 palette, shared with the Python app — do not change them.
+    /// 5-6 exist only for the 6-channel devices (TX-6, TP-7) and are picked to stay clear of
+    /// green (active/centered), purple (preview) and red (fader fill).
     static let track: [Int: Color] = [
         1: Color(hex: "#4477bb"),
         2: Color(hex: "#bb9933"),
         3: Color(hex: "#848c94"),
         4: Color(hex: "#ff6a00"),
+        5: Color(hex: "#c25fa0"),
+        6: Color(hex: "#3fb0a8"),
     ]
 
     static func track(_ n: Int) -> Color { track[n] ?? .gray }

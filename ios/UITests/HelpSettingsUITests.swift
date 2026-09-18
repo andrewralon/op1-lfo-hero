@@ -79,14 +79,22 @@ final class HelpSettingsUITests: XCTestCase {
     @MainActor func testLandscapeLayout() throws {
         XCUIDevice.shared.orientation = .landscapeLeft
         let app = XCUIApplication()
+        // Set UITEST_PROFILE to pin the device, so a layout can be captured for a track count
+        // that is not whatever the simulator happens to have saved. Track strips are narrowest
+        // on the 6-track devices, which is where layout problems show up first.
+        let profile = ProcessInfo.processInfo.environment["UITEST_PROFILE"]
+        if let profile {
+            app.launchArguments = ["--uitest-reset", "--uitest-profile", profile]
+        }
         app.launch()
         let helpButton = app.buttons["helpButton"]
         XCTAssertTrue(helpButton.waitForExistence(timeout: 8))
         sleep(1)
         let raw = XCUIScreen.main.screenshot()
         let device = ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] ?? "device"
+        let suffix = profile.map { "_\($0)" } ?? ""
         let image = Snapshot.fixLandscapeOrientation(image: raw.image)
-        try image.pngData()?.write(to: URL(fileURLWithPath: "/tmp/claude-ss/landscape_\(device).png"))
+        try image.pngData()?.write(to: URL(fileURLWithPath: "/tmp/claude-ss/landscape_\(device)\(suffix).png"))
     }
 
     func testPortraitLayout() throws {

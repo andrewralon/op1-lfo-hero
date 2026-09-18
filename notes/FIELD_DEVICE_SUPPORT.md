@@ -1,0 +1,342 @@
+# Field device support — status and remaining work
+
+Tracks the multi-device feature (OP-1 Field / TX-6 / TP-7) on `feature/support-field-devices`.
+
+Protocol details and hardware measurements live in [RESEARCH.md](RESEARCH.md). This file is
+just what is done, what is not, and what is still only assumed.
+
+**Current state:** 156 unit tests, 20 UI tests. TP-7 and TX-6 both validated through the app over
+BLE. **The OP-1 has still never been run on hardware since its MIDI path was rewritten** — that is
+the largest remaining risk on this branch.
+
+---
+
+## Done
+
+### Architecture
+- [x] `DeviceProfile` abstraction — devices are data, not branches. Every CC number in the app
+      lives in `DeviceProfiles.swift` and nowhere else
+- [x] `ParamSpec` with separate track/master bindings, so a parameter can exist in both places
+      on different CCs, or only one
+- [x] `ChannelRule.pinned` for channels outside the track range (TX-6 master + FX buses)
+- [x] `ValueEncoding` — continuous / switching / relative / enumerated, so device quirks are
+      data rather than code paths
+- [x] `TransportMap` + `TransportOp` — per-device transport, including the TP-7's persistent
+      bipolar seek and the TX-6's stateless start/stop toggle
+- [x] `DeviceCapabilities` — hasPan, canBeClockMaster, followsClock, mirrorsIncomingCC
+- [x] Dynamic track count (4 or 6) throughout `LayoutMetrics` and the UI
+- [x] LFO target row wraps to two rows rather than overflowing the 44pt touch target
+- [x] Per-device saved state, keyed by profile id — switching devices banks state instead of
+      destroying it
+- [x] Settings schema v1 with hand-written non-destructive decoders
+- [x] Device auto-detection by endpoint name, with a manual override in settings
+- [x] `--uitest-profile <id>` launch argument so 6-track layouts can be tested without hardware
+
+### Profiles
+- [x] **OP-1 Field** — 4 tracks, 20 parameters, proven byte-identical to the pre-refactor app
+      by a golden byte table
+- [x] **TX-6** — 6 tracks, 33 parameters, master bus on ch 7, FX I/II on ch 8/9 folded into
+      the master (m) target
+- [x] **TP-7** — 6 tracks, mix volume/mute, three input-jack gains, record/cue/loop
+
+### Bugs fixed
+Found by refactoring:
+- [x] Any settings schema change silently wiped every saved chip — Swift's synthesized
+      `Decodable` ignores property defaults, so one added field made the whole decode throw
+- [x] `Controller` held its own mute state that could drift from `AppState.mutes`
+- [x] The parameter popover could not scroll in portrait, so long lists were unreachable
+
+Found by hardware testing — **all five would have shipped**:
+- [x] TP-7 play sent `CC 14`, which is **record** — pressing play would arm recording over a take
+- [x] TP-7 prev/next modelled `CC 18` as a nudge when it is a persistent state, so they started
+      the tape and never stopped it
+- [x] First play of a session sent Start (`0xFA`) instead of Continue, silently rewinding the tape
+- [x] Stop sent a redundant CC that the TP-7 reads as a double-stop, throwing away the position
+- [x] TP-7 input gain modelled as a track parameter when it addresses the three input jacks
+
+### Hardware validation — TX-6 (by script, over USB)
+- [x] Acts on incoming CC; channel mapping and CC numbers confirmed
+- [x] `midi control` modes are mutually exclusive: `in` receives, `out` transmits, `X` neither
+- [x] Requires `midi control = in` and `clock SRC = usb` — surfaced in the app's help
+- [x] Mute `CC 120` is absolute, 127 = muted
+- [x] FX bus on pinned channel 8 works; FX enable is global, per-channel send is separate
+- [x] Sends MIDI clock **only when configured to** — `clock SRC` internal plus clock `out`.
+      Measured 32.00 ticks/s against a device reading 80 BPM. An earlier 12-minute capture saw
+      zero ticks and concluded it never sends clock; that was the default configuration
+- [x] Follows the app's clock (68 → 101 BPM), so either side can be the tempo source
+- [x] Transmit and receive maps collide (knobs 1-3 transmit CC 7/8/9 = volume/pan/gain inbound)
+- [x] Physical faders fight an LFO rather than taking over — last writer wins
+
+### Hardware validation — TP-7 (by script, over USB)
+- [x] All four `midi` modes mapped; only `ctrl` blocks input, and it blocks *everything*
+- [x] **Sends MIDI clock** in `sync` mode — undocumented; `canBeClockMaster` is true
+- [x] `CC 18` is a persistent bipolar speed state that must engage before `64` means stop
+- [x] `CC 18` is **additive** and affine: it stacks on the device's own direction, and there is a
+      dead zone before motion starts. Offset 4 is the stall point (x0.06), not 1x — 1x falls at
+      offset ~7.5, so no integer reaches it and reverse trims the rest with pitch bend
+- [x] Play resumes (`0xFB`); a second stop rewinds — the device implements double-stop itself
+- [x] Mute `CC 120` absolute, 127 = muted
+- [x] Input gain linear in dB, 0 to +42 dB, addressing the three input jacks
+- [x] Loop is a state machine — `out` without `in` is discarded
+- [x] Record arms rather than records; arm + play does record; arm is absolute, not a toggle
+- [x] `ctrl` mode transmits the full control surface; found an undocumented `mode` button on CC 28
+- [x] Cue subsystem (CC 16 and note-triggered markers) has no observable effect in any mode
+
+### Hardware validation — over BLE, through the app
+- [x] **BLE is now the tested path.** Every TP-7 and TX-6 test on iPhone ran over Bluetooth, and
+      both devices auto-detect by peripheral name (`tx-6 (ble)` in the status bar) — closing the
+      "the names are guesses" risk
+- [x] Outgoing packets stamped every message with timestamp zero, so a TX-6 read the app's 24 PPQN
+      clock as **640000 BPM**
+- [x] The receive parser read timestamp bytes as clock/start/stop — timestamps span 0x80-0xFF,
+      which includes 0xF8/0xFA/0xFC, so knob traffic injected phantom transport
+- [x] TX-6 mixer, FX buses, tempo nudges and clock sync all driven from the UI
+
+### End-to-end
+- [x] **TP-7 driven by the app on iPhone over BLE** — auto-detect, 6 strips, no pan knobs,
+      profile transport symbols, faders reaching the device, and a working volume LFO. Play /
+      reverse / scrub and the parameter set were all exercised the same way
+
+### Documentation
+- [x] `RESEARCH.md` — full CC tables, hardware findings, and an at-a-glance table of the six
+      places the published references are wrong
+- [x] `CLAUDE.md` — device list, 6-colour palette, new accessibility ids, and the fact that
+      MIDI cannot be tested in the simulator at all
+- [x] In-app help shows per-device setup steps (`setupSteps`)
+
+---
+
+## Still to do
+
+### 🔴 High — untested paths that could be broken right now
+
+- [ ] **Run the OP-1 on hardware.** Its entire MIDI path was rewritten. The golden byte table
+      proves the model is self-consistent; it does not prove the OP-1 agrees. Check: volume /
+      pan / mute on all 4 tracks, master fx and compressor, tape prev/next, clock in both
+      directions, and an LFO running
+- [ ] **Decide whether play-resumes applies to the OP-1.** Play now sends Continue rather than
+      Start, so the first play no longer rewinds. Applied to all devices; not yet judged on the
+      OP-1. Reversible — move it into `TransportMap` if it should be per-device
+- [ ] **Run the remaining TX-6 parameters through the app.** The mixer, FX buses and tempo have
+      now been driven from the UI over BLE, but the 13 per-channel params below still have not.
+      Needs `midi control = in` on the device
+- [ ] **Reconcile the TP-7 against `lucidyan/tp7-midi`.** Full cross-reference in
+      [TP7_VS_TP7MIDI.md](TP7_VS_TP7MIDI.md), with an 11-test hardware plan and a new probe,
+      `tools/midi/cc18map`. Firmware is confirmed **1.1.11 on both sides** — no disagreement below
+      is a version skew. Two of the three disagreements are ones where **our own measurements
+      side with them**:
+  - [x] **Test 1a — control group.** `./cc18map TP-7 control` measured what `ClockEngine.swift`
+        sends today, from a parked tape, before any code changes. All three values (76/72/124)
+        read 0.00 ticks/s on the clock instrument, but the tape audibly and visibly moved at real
+        speed — the clock is blind to CC-18-driven motion from a stop (see test 1)
+  - [x] **Test 1 — `deadZone` from a stopped tape. CONFIRMED 2026-09-06 (fw 1.1.11): no dead
+        zone.** `CC 18 = 68` held 10.0s from parked moved the position counter x1.04-1.05 (their
+        1x prediction), not our predicted ~0.06x stall. `deadZone: 4` is a playing-only constant;
+        `ClockEngine.swift:503-515` applies it unconditionally today, so **every prev/next/scrub
+        from a parked tape currently runs one whole 1x too fast.** Not yet fixed — touches
+        `ClockEngine.swift:503-515`, `DeviceProfiles.swift:263-268`, and the golden byte tests at
+        `NewDeviceProfileTests.swift:471-518`. Full measurement: [RESEARCH.md](RESEARCH.md)
+  - [x] **Test 2 — the `+708` stop point. CONFIRMED 2026-09-06: our published correction of their
+        finding was wrong, now retracted.** `CC 18 = 61` measured forward (x0.20); `CC 18 = 60`
+        measured **reverse** (x0.06) — direction flip watched directly on the reel, not inferred;
+        `CC 18 = 60` + bend `8900` measured 0.00 (stopped). The null genuinely sits between 60 and
+        61 while playing, exactly as `lucidyan/tp7-midi` found; our additive model derives their
+        `+708` independently. No code change needed here — this was a documentation-only error.
+        Full measurement: [RESEARCH.md](RESEARCH.md)
+  - [ ] **Test 5 — does a cue or loop track change reset mixer levels and mutes?** Their gotcha
+        #11. Never tested here, and it would silently fight an LFO on `tp7.vol`. Needs a scratch
+        track
+  - [ ] **Test 6 — cue markers with the precondition we missed.** TE's manual says to *hold the
+        physical record button* while sending notes, with MIDI-CUE enabled. Our "cue subsystem is
+        inert" result probably just missed that step. Needs a scratch track
+  - [x] **Test 3 — the "engage" model. CONFIRMED 2026-09-06: retired, it was over-modelling.**
+        `CC 18 = 64` simply adds zero velocity; there is no engage/disengage state. Baseline 42.5
+        → `64`x3 → 42.3 → `70` → 102.1 (~2.4x, confirmed by reel/audio/counter agreeing) → `64` →
+        42.4 — clean returns to baseline both times, no stop transition. Documentation-only fix,
+        `RESEARCH.md`'s engage/release framing now marked retired
+  - [x] **Test 4 — pitch-bend curve. CONFIRMED 2026-09-06, resolved in OUR favor** (the one
+        disagreement that went our way). Measured negative branch x0.48 sits close to our x0.54,
+        far from their x0.25. Also fixed our own internal inconsistency at full positive bend
+        (x1.93 measured confirms "+40 ticks/s," retires the x2.14 figure). Reverse sense-flip
+        reproduced numerically and confirmed by the operator narrating the sequence blind to the
+        numbers — matched exactly, including the flip
+  - [x] **Test 9 — CC 18 extremes. CONFIRMED 2026-09-06: both models wrong by ~15-19x, a distinct
+        fast-wind regime neither project had measured.** Both predict ~x16 at CC 18 = 0/127. A
+        10-second hold each way measured **x248.5 forward, x278.9 reverse** — corrected for a
+        visible ~2s ramp-to-speed the operator watched directly, closer to ~x276 / ~x310 steady
+        state. `lucidyan/tp7-midi` has no mention of ramping anywhere (checked `MIDI_SPEC.md`,
+        `app.js`, the manual, the changelog) — their model applies the same fixed speed instantly
+        regardless of hold duration. Doesn't affect `maxScrubSpeed = 14.0` (a feel choice, not a
+        capability claim), but reveals a large, currently unmapped speed range above where the
+        affine model applies. Full measurement: [RESEARCH.md](RESEARCH.md)
+  - [x] **Test 7 — loop immutability. CONFIRMED 2026-09-06: they were right, plus a new
+        precondition.** `tools/midi/looptest.swift`. First attempt (main playback screen)
+        produced zero effect from CC 17 at all; entering the device's **LOOP screen** (hold
+        record) made the identical bytes work immediately — same shape as the cue-marker/
+        record-hold gap (item B). Once looping, resending `1`/`2` did nothing; only `0` released
+        it. Matches `lucidyan/tp7-midi` exactly. Full writeup: [RESEARCH.md](RESEARCH.md)
+  - [x] **Test 8 — mute polarity. CONFIRMED 2026-09-06.** `CC 120 = 127` mutes, repeated `127`
+        stays muted (absolute, not a toggle), `0` unmutes, rapid mute/unmute cycles track cleanly.
+        `DeviceProfile.swift:29-31`'s "unverified" comment updated. Also surfaced a real gotcha:
+        the device can silently hang and stop responding to any CC with no visible symptom — a
+        reboot fixed it mid-test. Logged in `tools/midi/README.md` and `RESEARCH.md`
+  - [x] **Test 10 — `followsClock`. CONFIRMED WRONG 2026-09-06.** Streamed clock at 90, 130, and
+        60 BPM in `sync` mode, tape playing — the device's own tape-speed-derived outgoing clock
+        never moved from its natural rate at any of the three, including two unambiguous targets
+        (90, 60). `followsClock` should be `false`; `tp7.tempo` (`.virtualTempo`) likely does
+        nothing audible on hardware today. Confirmed working: the device keeps transmitting while
+        slaved (not suppressed), so `deviceIsRolling` stays safe. **Code change deliberately not
+        made** — flipping the flag and deciding `tp7.tempo`'s fate (remove vs. document as
+        non-functional) needs a decision, not just a measurement. Full writeup:
+        [RESEARCH.md](RESEARCH.md)
+  - [x] **MAJOR CORRECTION 2026-09-07 — the outgoing clock rate is a TEMPO readout, not a
+        tape-speed readout, and that tempo is genuine per-file metadata.** "44 ticks/s = 1x,"
+        used as the calibration anchor for the entire CC 18/bend affine model, was never a
+        device constant — it was one memo's tempo setting. MIDI clock counts beats; confirmed
+        blind on two separate memos (106 BPM and 120 BPM, both matched to within 0.03 BPM).
+        **Resolved:** changing the device's current tempo setting to 90 BPM had zero effect on
+        an already-recorded (metronome-off) memo's clock output, which stayed at exactly 120 —
+        the tempo is fixed per-file at record time, not a live global dial. The earlier
+        library-vs-recordings baseline difference is now suspected to be the same mechanism, not
+        an independent mode effect (not yet directly confirmed — needs the same content's tempo
+        measured in two modes). Test 9's numbers are unaffected (position-counter based, not
+        clock-based); test 4's exact values carry a small (~3.6%) systematic bias; test 10 gets a
+        mechanistic explanation rather than a retraction. `cc18map.swift`'s hardcoded `44.0`
+        reference should eventually become a per-session measured baseline. Full writeup:
+        [RESEARCH.md](RESEARCH.md)
+  - [x] **Test 11 — SPD × bend. CONFIRMED 2026-09-07: multiplicative, and the bend curve is a
+        portable device constant.** Fresh baseline R0=48.022 ticks/s, SPD engaged →
+        R_spd=57.891 (x1.2055). Bend sweep normalized to R_spd matched the earlier bend-curve
+        test (different memo, different tempo, no SPD) almost exactly — x0.501/0.687/0.999/
+        1.437/1.998 vs. the earlier x0.48/0.66/0.96/1.39/1.93. `total speed = SPD × bend_curve`,
+        and the bend curve itself doesn't depend on tempo or SPD state. SPD display confirmed
+        never moves, even through a full speed sweep and reverse. This also properly resolves
+        (not just works around) the `cc18map.swift` hardcoded-`44.0` concern: the bend curve in
+        x-units is a device constant, so any correctly-measured local baseline normalizes
+        correctly. Full writeup: [RESEARCH.md](RESEARCH.md)
+  - [ ] **Follow-up** — confirm the library-mode baseline difference is the same tempo-metadata
+        mechanism and not an independent mode effect (needs matching content across modes)
+  - [ ] **Report upstream** what only we have: MIDI clock in `sync`, real-time transport, working
+        MIDI recording (refutes their "recording via MIDI is useless"), double-stop rewind, CC 28,
+        the CC 18 extremes ramp/fast-wind regime, and the clock-is-a-tempo-readout mechanism
+
+
+### 🟠 Medium — verifying things currently taken on trust
+
+- [ ] **TX-6: 13 per-channel parameters never sent** — filter, EQ high/mid/low, comp, synth
+      wave/freq/len/detune, fx1 send, aux send, aux2 send, seq pattern
+- [ ] **TX-6: master bus never sent** — main vol, aux vol, cue vol, local control
+- [ ] **TP-7: does recording overwrite or create a new take?** Observed non-destructive (new
+      track) in one test, but the guide's record menu is images-only and could not be read. If
+      an overwrite setting exists, the app must warn before arming record
+- [ ] **TP-7: transport in `cue` mode** — the last empty cell in the mode table
+- [ ] Verify the 6-track layout on iPad, both orientations. Only iPhone has been checked on
+      hardware; iPad has simulator screenshots only
+
+### 🎛️ Requested TP-7 parameters and transport behaviour — implemented, needs hardware testing
+
+All seven are built and unit-tested. **None have been tried on the device yet.**
+
+- [x] **1. Speed parameter** (`tp7.speed`) — pitch bend, 0-127 mapped across the full 14-bit
+      range so an LFO sweeps x0.25 to x2.0, with 64 at centre
+- [x] **2. Direction parameter** (`tp7.direction`) — two-state on `CC 18` like mute: above the
+      threshold 68 (forward 1x), below 60 (reverse 1x). Never emits an intermediate value
+- [x] **3. Tempo parameter** (`tp7.tempo`) — `.virtualTempo`, retunes the app's clock, which the
+      TP-7 follows in `sync` mode. `hasTempoParam` flipped to true
+- [x] **4. Play/stop parameter** (`tp7.play`) — new `ParamBinding.transport` case for real-time
+      messages. **Edge-triggered**, so a sustained LFO value does not re-fire every clock tick
+- [x] **5. Record sequence** (`tp7.recSeq`) — stop (only if playing), arm, play. Off stops and
+      disarms. ⚠️ Destructive, so kept out of the LFO picker
+- [x] **6. Play reverses when already playing** — `caps.playReversesWhenPlaying`, TP-7 only.
+      Reverses at 1x, since it is a playback change rather than a seek
+- [x] **7. Momentary scrub** — `ScrubBtn` / `ScrubColBtn` act while held, starting at 1x and
+      ramping to 8x over ~3s, returning `CC 18` to centre on release and restoring the user's
+      configured speed. Falls back to a single nudge on the OP-1
+
+- [x] **Reverse playback speed — measured and confirmed.** Was `reverseUnitOffset`, guessed by
+      ear across several deploys and never right. Resolved by measuring instead: in `sync` mode
+      the TP-7's MIDI clock is derived from tape speed, so ticks/s reads playback rate directly.
+      Findings: CC 18 is **affine** (dead zone below offset ~3.76, then linear), 1x falls at
+      offset **7.5** so no integer works, and pitch bend is a **signed velocity offset** rather
+      than the multiplier previously assumed. Reverse at 1x is now `CC 18 = 56` + bend `9700`
+      (43.95 vs a 44.0 target). Verified against the device's own reverse — 44.06 ticks/s over
+      30s, 0.25% away. Full write-up in notes/RESEARCH.md
+- Forward no longer needs measuring: it releases CC 18 and sends Continue, so the device plays
+  at its own normal rate rather than an approximation of it
+
+Still to verify on hardware:
+- [ ] Does the speed parameter actually sweep playback rate, and does an LFO on it sound musical?
+- [ ] Does direction switch cleanly, or does it click/glitch at the crossover?
+- [ ] Does tempo modulation actually move the TP-7 (needs `sync` mode)?
+- [ ] Does play/stop as an LFO target gate playback usefully, or is it too abrupt?
+- [ ] Does the record sequence reliably start a recording?
+- [ ] Does play-reverses feel right, or should it reverse at the current speed rather than 1x?
+- [ ] Does the scrub ramp feel right — 1x to 8x over 3s, or too slow/fast?
+
+### 🌍 Devices we don't own
+
+- [x] **A way for other people to measure their hardware for us.** `docs/mapper/` — the midi
+      mapper, a guided browser page plus a manual instruction path for anyone Web MIDI can't
+      reach (Safari has never shipped it, on macOS or iOS). Both walk the same numbered steps
+      from `steps.js`. Reports come back as an op-forums message and collect in
+      `notes/DEVICE_REPORTS/`. Shipped on main and live at
+      `https://andrewralon.github.io/op1-lfo-hero/mapper/`
+- [ ] **Get an OP-1 OG report.** The whole point — it is the device people most often ask about
+      and the one we cannot test. Outreach copy is ready in `notes/OUTREACH.md`
+- [ ] **Watch for a device that varies CC per track rather than channel.** `ParamBinding.cc` takes
+      a fixed `cc` and a per-track `ChannelRule`, so that shape is currently inexpressible. A
+      single-MIDI-channel device is a plausible shape for the OP-1 OG. The fix is a `CCRule`
+      mirroring `ChannelRule`; `binding(_:track:)` and `channel(_:track:)` are the only
+      resolution points, and the reverse `inbound` map is built from the same `params` array so
+      it follows automatically. `scripts/report_to_profile.py` already refuses to guess here and
+      emits a BLOCKERS block instead
+
+### 🟡 Low — features and polish
+
+- [ ] **Wire up double-stop to rewind.** `ClockEngine.rewindToStart()` exists and is tested but
+      nothing calls it. The OP-1 also needs `CC 84` in its transport map. Note the TP-7 already
+      does this itself, so only the OP-1 needs the app to implement it
+- [ ] **TP-7 pitch bend as a playback-speed parameter.** Verified as an independent x0.25-x2.0
+      multiplier. `ParamBinding.pitchBend` exists unused. Must return to centre (8192) on stop,
+      or a stray value silently pitch-shifts everything with no on-screen feedback
+- [ ] **TP-7 reverse playback as a real control.** Reachable via `CC 18` below centre and
+      verified working, but there is no explicit direction control in the UI
+- [ ] **Expose `ClockEngine.transportSpeed` in the UI** — how fast prev/next move the tape.
+      Currently fixed at 2x
+- [ ] **Read the TX-6's control surface as app input.** Its faders/knobs/buttons transmit a full
+      map on ch 1 in `out` mode. Would need a separate transmit table, since it collides with
+      the receive map — and `out` mode means the app cannot send while listening
+- [ ] **Read the TP-7's controller-mode CCs as app input** (cc 20-27, mode cc 28, wheel cc 30,
+      rocker pitch bend). Same caveat: `ctrl` blocks all output
+- [ ] **Detection fallback on manufacturer/model.** CoreMIDI exposes `teenage engineering` and
+      the model name; currently only the endpoint display name is matched, which fails for hubs
+      that rename ports. **Blocked on data, not on code** — the midi mapper (`docs/mapper/`)
+      records every port's `name` / `manufacturer` / `version` verbatim, so the first few reports
+      will show whether the fallback is worth building and what strings to match on
+- [ ] **TP-7: grey out input gain on tracks 4-6** rather than hiding it, now that gain is known
+      to address jacks rather than tracks
+- [ ] Document the TX-6 fader-fight behaviour in help — grabbing a fader while an LFO runs on
+      that channel produces stuttering, not takeover
+
+### ⚠️ Known hazards to keep in mind
+
+- [ ] **`CC 120` is standard MIDI "all sound off".** The TX-6 and TP-7 reuse it per channel for
+      mute, so sending it will also silence unrelated gear sharing a hub. Not currently guarded
+- [ ] **TX-6 `CC 46` is a stateless toggle.** The app gates it on its own `isPlaying`, which can
+      desync if the user starts the transport from the device panel
+- [ ] **TP-7 record is reachable over MIDI.** `CC 14` + play records. `tp7.rec` is marked
+      non-LFO-targetable, but the capability exists
+
+---
+
+## Deliberately excluded
+
+- [x] **`tp7.loop`** — a state machine; an LFO sweep would discard most values and drop loop
+      points at arbitrary moments
+- [x] **`tp7.cueRec`** — no observable effect, and unverifiable on a device that never reports
+      its state
+- [x] **`tp7.rec`** — automating a record arm has no musical use and can destroy a take
+- [x] **TX-6 `CC 47` (tempo relative)** — a relative encoder, so an LFO would drift the tempo in
+      one direction forever instead of oscillating. Reachable from the transport buttons only
+- [x] **Per-device display scale** — the app shows 0-99 on every device by design, so there is
+      deliberately no scale knob on `DeviceProfile` that could let them diverge
