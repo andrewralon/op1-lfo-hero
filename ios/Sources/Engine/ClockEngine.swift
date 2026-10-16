@@ -529,7 +529,15 @@ final class ClockEngine {
                 // Affine, not proportional: the dead zone has to be cleared before any speed
                 // registers, so a plain `unitSpeed * multiplier` lands far too slow (offset 4 is
                 // x0.06, not x1).
-                let offset = deadZone + Int((Double(unitSpeed) * transportSpeed).rounded())
+                //
+                // The dead zone belongs to the *playing* case only. It is the device's own +1x
+                // transport cancelling out against the CC 18 offset, not a motor threshold. With
+                // the tape parked there is none: speed = (value - 64) / 4, so offset 4 is 1x.
+                // Confirmed on a TP-7 2026-09-06 (notes/TP7_VS_TP7MIDI.md, test 1): CC 18 = 68
+                // held 10 s from a parked tape moved the counter 10.4 s. Applying the dead zone
+                // unconditionally made every scrub from a parked tape run one whole 1x too fast.
+                let rolling = isPlaying || deviceIsRolling
+                let offset = (rolling ? deadZone : 0) + Int((Double(unitSpeed) * transportSpeed).rounded())
                 sendCC(ch: ch, cc: cc, val: center + direction * max(1, offset))
                 transportDirection = direction
             case .toggleCC(let ch, let cc, let value, let whenPlaying):

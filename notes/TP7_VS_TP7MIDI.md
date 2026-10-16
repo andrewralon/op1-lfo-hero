@@ -279,6 +279,27 @@ too fast today.** Fix touches `ClockEngine.swift:503-515`, the `deadZone: 4` lit
 which currently assert the wrong (unconditional) values and must be re-derived, not patched to
 match. Full writeup: [RESEARCH.md](RESEARCH.md).
 
+**Fixed and re-verified 2026-10-16.** `ClockEngine` now applies `deadZone` only while the tape is
+rolling (`isPlaying || deviceIsRolling`) and uses 0 from a parked tape, so the offset is
+`unitSpeed * speed` there. The golden tests were re-derived from the formula and these
+measurements, not patched to match: the old values are kept as the *rolling* case. Measured from
+a Mac against a parked TP-7, one script each (CC 18 value held, then CC 18 = 64 to release the
+reel; no `0xFC`). The script's hold turned out to be **10.93 s**, not 10 (two sender processes
+at ~0.3 s start-up plus a 0.2 s pause each, around `sleep 10`), so every prediction below is
+`speed * 10.93`:
+
+| From a parked tape | CC 18 | Counter change | Model `(value - 64) / 4` |
+|---|---|---|---|
+| forward 2x (the app's default next) | 72 | 1:33 -> 1:55, **+22 s** | 2x * 10.93 = +21.9 |
+| reverse 1x | 60 | 1:55 -> 1:44, **-11 s** | -1x * 10.93 = -10.9 |
+| reverse 2x (the app's default prev) | 56 | 1:44 -> 1:22, **-22 s** | -2x * 10.93 = -21.9 |
+
+Forward 1x (CC 68) was measured on 2026-09-06 (+10.4 s in 10.0 s). Reverse from a parked tape had
+never been measured; it follows the same rule with no dead zone. Spin-up and spin-down net to
+about nothing over these holds: the measured multiples are 2.0x, 1.0x and 2.0x. Not re-measured:
+the rolling case (the dead zone of 4 is kept, from the earlier playing-forward table) and the
+app's scrub ramp (1x to 14x over 1.5 s) end to end.
+
 ### 2. ✅ CONFIRMED 2026-09-06 — The stop point during playback, our correction retracted
 Decided D2. `./cc18map TP-7 playing`, direction confirmed by watching the reel:
 

@@ -466,14 +466,40 @@ final class TP7TransportTests: XCTestCase {
     }
 
     /// CC 18 is a persistent bipolar speed control: below 64 reverse, 64 stop, above forward.
-    /// Default speed is 2x, so the offset is deadZone 4 + unitSpeed 4 * 2 = 12.
+    /// From a parked tape there is no dead zone, so at the default 2x the offset is 4 * 2 = 8.
     func testSeekIsBipolarAroundSixtyFour() {
         destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 76]], "forward = 64 + offset")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "forward = 64 + offset")
         destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 52]], "reverse = 64 - offset")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 56]], "reverse = 64 - offset")
+    }
+
+    /// While the tape is rolling the device's own +1x transport is inside every CC 18 reading, so
+    /// the dead zone of 4 applies: offset = 4 + 4 * speed. (From a parked tape it does not; that
+    /// was measured on 2026-09-06 and is the case above.)
+    func testSeekWhilePlayingKeepsTheDeadZone() {
+        clock.play()
+        destination.reset()
+        clock.tapeNext()
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 76]], "64 + 4 + 4*2 at 2x")
+        destination.reset()
+        clock.tapePrev()
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 52]], "64 - (4 + 4*2)")
+        clock.transportSpeed = 1.0
+        destination.reset()
+        clock.tapeNext()
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "64 + 4 + 4*1 at 1x")
+    }
+
+    /// A tape the device itself is rolling (sync mode, clock arriving) is rolling too, even though
+    /// the app never pressed play.
+    func testSeekWhileTheDeviceIsRollingKeepsTheDeadZone() {
+        clock.router?.onClock?()           // a tick arrives: the tape is moving
+        destination.reset()
+        clock.tapeNext()
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 76]])
     }
 
     /// Speed is a multiple of normal playback, not a raw CC offset, and the mapping is affine:
@@ -483,10 +509,10 @@ final class TP7TransportTests: XCTestCase {
         clock.transportSpeed = 1.0            // 1x
         destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "64 + 8 = forward at 1x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 68]], "64 + 4 = forward at 1x, parked")
         destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 56]], "64 - 8 = reverse at 1x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 60]], "64 - 4 = reverse at 1x, parked")
     }
 
     /// The default is 2x — a fast-forward, matching the "chipmunks" heard at CC 18 = 72.
@@ -494,14 +520,14 @@ final class TP7TransportTests: XCTestCase {
         XCTAssertEqual(clock.transportSpeed, 2.0)
         destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 76]], "64 + 4 + 8 = forward at 2x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "64 + 8 = forward at 2x, parked")
     }
 
     func testHalfSpeed() {
         clock.transportSpeed = 0.5
         destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 70]], "64 + 4 + 2 = forward at 0.5x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 66]], "64 + 2 = forward at 0.5x, parked")
     }
 
     /// Speed must never push CC 18 out of range, and never round down to zero — an offset of 0
@@ -517,7 +543,7 @@ final class TP7TransportTests: XCTestCase {
         XCTAssertEqual(clock.transportSpeed, 0.25, "clamped to 0.25x")
         destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 59]], "0.25x = deadZone 4 + 1, the slowest crawl")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 63]], "0.25x = offset 1, the slowest crawl")
     }
 
     /// But stopping a tape that IS seeking under CC 18 must recentre it — 0xFC alone will not
@@ -1001,20 +1027,29 @@ final class TP7ScrubAndReverseTests: XCTestCase {
         XCTAssertEqual(clock.scrubStartSpeed, 1.0)
         destination.reset()
         clock.beginScrub(forward: true)
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "64 + deadZone 4 + 4*1 = 1x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 68]], "64 + 4*1 = 1x from a parked tape")
         clock.endScrub()
     }
 
-    /// The top of the ramp must stay inside CC 18's range. At deadZone 4 + unitSpeed 4 the
-    /// offset saturates at 63 (about 14.75x), so a max above that would ramp into a wall.
+    /// The top of the ramp must stay inside CC 18's range. While rolling, deadZone 4 + unitSpeed 4
+    /// saturates the offset at 63 (about 14.75x), so a max above that would ramp into a wall.
+    /// This test is the rolling case, the tighter limit; parked tapes have 4 more of headroom.
     func testMaxScrubSpeedStaysWithinCC18Range() {
         XCTAssertLessThanOrEqual(clock.maxScrubSpeed, 14.75, "beyond this CC 18 saturates")
+        clock.play()
         clock.transportSpeed = clock.maxScrubSpeed
         destination.reset()
         clock.tapeNext()
         let value = destination.packets[0][2]
         XCTAssertLessThanOrEqual(value, 127)
         XCTAssertEqual(value, 124, "64 + 4 + 4*14 = 124, just inside the ceiling")
+    }
+
+    func testMaxScrubSpeedFromAParkedTapeHasMoreHeadroom() {
+        clock.transportSpeed = clock.maxScrubSpeed
+        destination.reset()
+        clock.tapeNext()
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 120]], "64 + 4*14 = 120, no dead zone")
     }
 
     /// Releasing must return CC 18 to centre, or the tape keeps rolling after the finger lifts.
