@@ -16,10 +16,26 @@ Needs `iPad Pro Dawg` with the device on USB-C. Record the commit, the date, and
 - [x] clock both ways: beat match (OP-1 master) and midi sync (app master); the BPM box drives the OP-1 live while dragging (2026-10-16, USB)
 - [x] an LFO running on a track parameter (2026-10-16, volume, master fx, compressor)
 - [x] play restarts every active LFO from the start of its cycle: pressed on the OP-1 (beat match; Start after a double stop, Continue after a single stop) and in the app (midi sync) (2026-10-16, USB)
-- [ ] upgrade install over an older build keeps settings (Keychain migration)
+- [x] upgrade install over the App Store 1.0 keeps settings: parameter, wave, rate, depth/center, all chips (paused and inverted too) and track states (2026-10-16; volumes were never saved in 1.0, by design). See "Testing the settings migration" below.
 - [ ] same checks over BLE
 
 ## Probing from a Mac (`tools/midi/`)
 Plug the device into the Mac, not the iPad. `./mididiag` first (stale endpoints look like a silent
 device), then `./anymidi <name> 5` to listen and `./cc18map <name> raw <b0> <b1> <b2>` (decimal) to
 send. 5 seconds is enough. Do a positive control before trusting any silence.
+
+## Testing the settings migration
+The Keychain is read **first**, and it survives deleting the app, so the legacy UserDefaults copy
+is only migrated when the Keychain item (`AppSettings`) is empty. Installing 1.0 over a device that
+has ever run a Keychain-era build tests nothing: the new build reads the stale Keychain item and
+ignores 1.0's save. And the app re-saves its settings ~0.5 s after every launch (every settings
+publisher fires once on subscribe), so `--uitest-reset` clears the item and the app writes a default
+one straight back.
+
+What worked: (1) delete the `AppSettings` Keychain item from a throwaway on-device unit test that
+waits ~2.5 s, deletes it, then `exit(0)`s the host so nothing re-saves; (2) with the real 1.0 save
+still in UserDefaults, launch the new build. Check `Library/Preferences/<bundle id>.plist`
+(`xcrun devicectl device copy from ... --domain-type appDataContainer`): the `AppSettings` key
+disappears once it has been migrated. The throwaway test deletes real data on the device: do not
+commit it.
+

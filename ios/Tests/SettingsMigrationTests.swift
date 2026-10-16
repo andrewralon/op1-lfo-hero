@@ -238,6 +238,44 @@ final class SettingsMigrationTests: XCTestCase {
             if let s { XCTAssertTrue(s.perDevice.isEmpty || s.perDevice["op1"] != nil) }
         }
     }
+
+    // MARK: - A real App Store 1.0 save
+
+    /// Captured byte-for-byte from the UserDefaults of an iPad running the shipped 1.0 build
+    /// (2026-10-16), after setting a parameter, wave, depth/center and three chips. Everything
+    /// else in this file is hand-written, so this is the one that proves the real thing loads.
+    private let realAppStore10Blob = #"""
+    {"activeLfos":[{"centerValue":15,"depth":13,"id":"00000000-0000-0000-0000-000000000001","inverted":false,"isEnabled":true,"loop":true,"originalValue":15,"parameter":"fx 2","rateTicks":96,"track":1,"wave":"triangle"},{"centerValue":15,"depth":13,"id":"00000000-0000-0000-0000-000000000002","inverted":false,"isEnabled":false,"loop":true,"originalValue":15,"parameter":"fx 2","rateTicks":12,"track":3,"wave":"triangle"},{"centerValue":15,"depth":13,"id":"00000000-0000-0000-0000-000000000003","inverted":true,"isEnabled":true,"loop":true,"originalValue":15,"parameter":"fx 2","rateTicks":12,"track":2,"wave":"triangle"}],"bpm":100,"isClockMaster":true,"lfoCenter":11,"lfoDepth":10,"lfoParam":"fx 2","lfoRate":3,"lfoWave":"triangle","masterOn":0,"trackOn":{"1":0,"2":2,"3":0,"4":0}}
+    """#
+
+    func testARealAppStore10SaveLoadsEverythingTheUserSet() throws {
+        let s = try decodeSettings(realAppStore10Blob)
+        XCTAssertEqual(s.version, AppState.Settings.currentVersion)
+        let op1: AppState.DeviceState = try XCTUnwrap(s.perDevice["op1"], "v0 state lands in op1")
+        XCTAssertEqual(op1.lfoParamId, "fx 2")
+        XCTAssertEqual(op1.lfoWave, LfoWave.triangle)
+        XCTAssertEqual(op1.lfoRate, 3)
+        XCTAssertEqual(op1.lfoDepth, 10)
+        XCTAssertEqual(op1.lfoCenter, 11)
+        XCTAssertEqual(op1.trackOn, [1: 0, 2: 2, 3: 0, 4: 0])
+        XCTAssertEqual(op1.activeLfos.count, 3, "no chip may be dropped")
+        let clips: [LfoClip] = op1.activeLfos
+        let params: [String] = clips.map { $0.paramId }
+        let tracks: [Int] = clips.map { $0.track }
+        let enabled: [Bool] = clips.map { $0.isEnabled }
+        let inverted: [Bool] = clips.map { $0.inverted }
+        let rates: [Int] = clips.map { $0.rateTicks }
+        XCTAssertEqual(params, ["fx 2", "fx 2", "fx 2"])
+        XCTAssertEqual(tracks, [1, 3, 2])
+        XCTAssertEqual(enabled, [true, false, true])
+        XCTAssertEqual(inverted, [false, false, true])
+        XCTAssertEqual(rates, [96, 12, 12])
+        for clip in op1.activeLfos {
+            XCTAssertEqual(clip.wave, LfoWave.triangle)
+            XCTAssertEqual(clip.depth, 13)
+            XCTAssertEqual(clip.centerValue, 15)
+        }
+    }
 }
 
 /// Renaming a `ParamSpec.id` orphans anything that saved the old one, so every rename needs a
