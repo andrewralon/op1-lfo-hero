@@ -1,1 +1,1 @@
-op-1 field custom midi lfos
+op-1, tx-6 & tp-7 midi lfos
