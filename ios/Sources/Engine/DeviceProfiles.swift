@@ -40,7 +40,10 @@ extension DeviceProfile {
             canBeClockMaster: true,
             followsClock: true,
             hasTempoParam: true,
-            clockLabel: "op1"
+            clockLabel: "op1",
+            // Measured on hardware: the OP-1 Field sends no CC when its controls move and does
+            // not echo CC it receives, so there is nothing to mirror (notes/RESEARCH.md).
+            mirrorsIncomingCC: false
         )
     )
 

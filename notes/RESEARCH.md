@@ -323,8 +323,9 @@ thing you would actually want to mirror is invisible, and the things you would n
 mirror are misread.
 
 Handled by `DeviceCapabilities.mirrorsIncomingCC` (false for the TX-6): incoming CC is ignored
-for UI mirroring rather than misinterpreted. The OP-1 echoes its mixer on the CCs it accepts,
-so it keeps mirroring enabled.
+for UI mirroring rather than misinterpreted. The OP-1 was once assumed to echo its
+mixer on the CCs it accepts; that was wrong — see "Hardware findings — OP-1 Field transmit
+behavior" below.
 
 ### Confirmed transmitting
 
@@ -1292,6 +1293,42 @@ First run of the actual app against real hardware. Everything below was verified
 
 **Control is one-way, app -> device.** The TP-7's mix values do not follow back into the app,
 which matches `mirrorsIncomingCC: false` and is the same behaviour as the OP-1.
+
+## Hardware findings — OP-1 Field transmit behavior (2026-10-16)
+
+Question: does the OP-1 Field send CC when its own controls move, or echo CC it receives? The
+app's mirroring code (`router.onCC`, `mirrorsIncomingCC`) and an earlier note here assumed yes.
+That claim traces to the 2026-06-13 Swift rewrite (`bef84db`), with no measurement recorded.
+
+Method: OP-1 Field attached to a Mac (not the iPad), listening with `tools/midi/anymidi` while
+sending with `tools/midi/cc18map OP-1 raw`. Two 5 s windows per mode:
+- **A, knob control:** turn the track 1 volume knob on the mixer page (the OP-1 screen showed the
+  change); listen for any CC.
+- **B, echo test:** send `B0 09 7F` (mute on), `B0 07 64` (volume 100), `B0 09 00` (mute off)
+  about 1 s apart; listen for anything coming back. The OP-1 reacted to all three every time
+  (track 1 muted, volume display went to 77 = `100 * 99 // 127`, then unmuted), so the silence is not
+  a failure to deliver.
+
+| Transport | Tempo mode | A: knob sends CC? | B: received CC echoed? |
+|---|---|---|---|
+| USB | beat match | no (clock only) | not tested |
+| USB | free | no (nothing at all) | no |
+| USB | midi sync | no (nothing at all) | no |
+| BLE | beat match | no (clock only) | no |
+| BLE | midi sync | no (nothing at all) | no |
+
+Conclusion: in every combination tested, the OP-1 Field neither reports its own knob moves as CC
+nor echoes received CC. Control is one-way, app -> device, as on the TX-6 and TP-7.
+`mirrorsIncomingCC` is therefore `false` for all three devices.
+
+Not tested: PO sync and 1/16 sync modes; USB echo in beat match; other controls (buttons, pan,
+FX knobs); the original OP-1 (not the Field). A different firmware or an untested mode could
+differ, so re-run this before relying on any mirroring.
+
+Consequence for testing: nothing can observe the bytes the app sends to a physical device, because
+a CoreMIDI client only sees what the device transmits. Delivery is confirmed only by watching the
+device react (`notes/HARDWARE_CHECKLIST.md`). The old on-device listener test
+(`MidiHardwareUITests`, which waited for an echo) could never pass and was removed.
 
 ## Open questions — answer on hardware
 

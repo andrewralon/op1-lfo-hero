@@ -224,10 +224,14 @@ struct DeviceCapabilities: Hashable {
 
     /// Whether what the device *transmits* uses the same CC map it *receives* on.
     ///
-    /// The OP-1 echoes its mixer on the same CCs it accepts (move its volume, get CC 7 back),
-    /// so the app can mirror the hardware in its UI. The TX-6 does not: in controller mode it
-    /// sends a separate map on channel 1 where CC 7 is "upper knob 1", which the receive map
-    /// reads as "track 1 volume". Verified on hardware — see notes/RESEARCH.md.
+    /// true only for a device that reports its own front-panel changes on the CCs it accepts,
+    /// so the app could mirror the hardware in its UI. None of the three devices does:
+    ///  - OP-1 Field: transmits no CC at all when its controls move, and does not echo CC it
+    ///    receives (USB and BLE; free / midi sync / beat match). Measured 2026-10-16.
+    ///  - TX-6: in controller mode it sends a separate map on channel 1 where CC 7 is
+    ///    "upper knob 1", which the receive map reads as "track 1 volume".
+    ///  - TP-7: never reports its state over MIDI.
+    /// See notes/RESEARCH.md.
     ///
     /// false → incoming CC is ignored for UI mirroring rather than being misread.
     var mirrorsIncomingCC = true

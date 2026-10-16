@@ -243,33 +243,17 @@ For byte-level verification without hardware, use `RecordingDestination` in the 
 implements `MidiDestination` and records the exact wire bytes. That is how the OP-1 golden byte
 table works.
 
-### Hardware-verified UITest: `MidiHardwareUITests`
+### Confirming delivery to real hardware
 
-`RecordingDestination` proves the app *would* produce correct bytes given a `MidiDestination` —
-it never touches real CoreMIDI plumbing. `ios/UITests/MidiHardwareUITests.swift` closes that gap:
-it drives a real UI action on a physical device and asserts on the actual MIDI bytes an attached
-OP-1 receives.
+Nothing can observe the bytes the app sends to a physical device: a CoreMIDI client only sees
+what the device *transmits*, and the OP-1 Field (USB and BLE, every mode tested) transmits no CC
+and echoes none of what it receives. An earlier on-device listener test assumed an echo and could
+never pass; it was removed (see "Hardware findings — OP-1 Field transmit behavior" in
+`notes/RESEARCH.md`).
 
-The listener (`ios/UITests/MidiCapture.swift`) has to run **on the device itself**, as a second
-CoreMIDI client living inside the XCUITest runner process, not as a Mac-side `tools/midi/`-style
-tool — the OP-1 is plugged into the iPad's USB-C port (so the app can talk to it), not into the
-Mac, so a Mac-side listener would never see its traffic. CoreMIDI allows multiple simultaneous
-input-port connections to one source, so `MidiCapture`'s connection doesn't interfere with the
-app's own.
-
-Requires an OP-1 Field connected via USB-C to `iPad Pro Dawg`. Self-skips (`XCTSkipUnless`) when
-no matching source is found, so it's safe to include in a full test-target run against a
-simulator or a bare device.
-
-```bash
-xcrun xctrace list devices   # find the physical device UDID
-cd ios
-xcodebuild test \
-  -project op1-lfo-hero.xcodeproj \
-  -scheme op1-lfo-hero \
-  -destination 'id=<physical-device-udid>' \
-  -only-testing:op1-lfo-heroUITests/MidiHardwareUITests/testTrack1MuteSendsCorrectCCBytes
-```
+So delivery is confirmed by watching the device react. Use `notes/HARDWARE_CHECKLIST.md` for the
+OP-1 pass and the `tools/midi/` probes (below) to send from a Mac. `mirrorsIncomingCC` is `false`
+for all three devices — do not assume any of them reports state back.
 
 ## Screenshots and simulator testing
 

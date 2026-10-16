@@ -344,9 +344,11 @@ final class TX6HardwareFindingsTests: XCTestCase {
         XCTAssertFalse(DeviceProfile.tx6.caps.mirrorsIncomingCC)
     }
 
-    /// The OP-1 does echo its mixer on the CCs it accepts, so mirroring stays on there.
-    func testOP1DoesMirrorIncomingCC() {
-        XCTAssertTrue(DeviceProfile.op1Field.caps.mirrorsIncomingCC)
+    /// Measured 2026-10-16: the OP-1 Field transmits no CC when its controls move and does not
+    /// echo CC it receives (USB and BLE), so there is nothing to mirror. This pins the flag to
+    /// that measurement; see notes/RESEARCH.md before changing it.
+    func testOP1DoesNotMirrorIncomingCC() {
+        XCTAssertFalse(DeviceProfile.op1Field.caps.mirrorsIncomingCC)
     }
 
     /// Documents the observed collision so it cannot be reintroduced by a table edit:
