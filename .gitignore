@@ -239,3 +239,9 @@ ios/fastlane/screenshots/
 
 # Custom Includes
 
+
+# App Store Connect review contact + demo credentials (downloaded by fastlane deliver) — never commit
+ios/fastlane/metadata/review_information/
+
+# local release checklist, not for the repo
+notes/RELEASE_READINESS.md
