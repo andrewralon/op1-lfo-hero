@@ -65,6 +65,9 @@ final class BLEMidi: NSObject, ObservableObject {
         central = CBCentralManager(delegate: self, queue: queue)
     }
 
+    /// A scan is pointless — and harmful, see `startScan` — while the link is up.
+    static func shouldScan(linkIsUp: Bool) -> Bool { !linkIsUp }
+
     // MARK: - Public API
 
     /// Starts (or restarts) scanning. `continuous: true` is for the open connection menu:
@@ -74,6 +77,10 @@ final class BLEMidi: NSObject, ObservableObject {
     func startScan(continuous: Bool = false) {
         let isRestart = continuous && continuousScan
         continuousScan = continuous
+        // Already linked: a scan would set the status to "scanning" and empty the device list,
+        // and a connected peripheral may not advertise again to put either back — so a working
+        // connection would look lost every time the device picker opens or closes.
+        guard BLEMidi.shouldScan(linkIsUp: peripheral?.state == .connected) else { return }
         scanTimeout?.cancel()
         if !isRestart {
             // A fresh scan (not an internal continuous-mode restart) clears prior results.

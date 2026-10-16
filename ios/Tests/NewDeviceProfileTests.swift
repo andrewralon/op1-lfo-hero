@@ -1387,3 +1387,13 @@ final class DevicePickerHighlightTests: XCTestCase {
         XCTAssertTrue(DevicePickerView.isConnectedRow("op-1", connectedName: "OP-1", transportIsActive: true))
     }
 }
+
+/// Opening the device picker must not make a working Bluetooth link look lost.
+final class BleScanGuardTests: XCTestCase {
+    func testNoScanWhileTheLinkIsUp() {
+        XCTAssertFalse(BLEMidi.shouldScan(linkIsUp: true))
+    }
+    func testScansWhenThereIsNoLink() {
+        XCTAssertTrue(BLEMidi.shouldScan(linkIsUp: false))
+    }
+}
