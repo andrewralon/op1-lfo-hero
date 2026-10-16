@@ -270,6 +270,7 @@ final class OP1TransportGoldenTests: XCTestCase {
 
     /// A rewind also zeroes the song position, so a later tape seek counts from the start.
     func testRewindResetsSongPosition() {
+        clock.transport = Self.seekTransport
         clock.tapeNext(); clock.tapeNext()      // move to bar 2
         clock.rewindToStart()
         destination.reset()
@@ -284,8 +285,61 @@ final class OP1TransportGoldenTests: XCTestCase {
         XCTAssertEqual(destination.packets, [[0xFC]])
     }
 
+    // MARK: - Tape nudge (what the OP-1's left/right buttons send)
+
+    /// Left/right nudge the tape *relative to where it actually is*: the CC alone. An SPP would
+    /// snap it to the app's own position counter, which ignores any other tape movement.
+    /// Measured on hardware 2026-10-16 (see notes/RESEARCH.md).
+    func testTapeNextIsTheCCAlone() {
+        destination.reset()
+        clock.tapeNext()
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127]])
+    }
+
+    func testTapePrevIsTheCCAlone() {
+        destination.reset()
+        clock.tapePrev()
+        XCTAssertEqual(destination.packets, [[0xB0, 82, 127]])
+    }
+
+    /// Presses are independent: no position accumulates in the app.
+    func testRepeatedNudgesNeverSendASongPosition() {
+        clock.tapeNext(); clock.tapeNext(); clock.tapeNext()
+        destination.reset()
+        clock.tapeNext()
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127]])
+    }
+
+    /// The nudge halts the OP-1's transport; the device's own buttons keep it rolling, so while
+    /// playing the app resumes it with a Continue (and no SPP).
+    func testNudgeWhilePlayingResumesWithContinue() {
+        clock.play()
+        destination.reset()
+        clock.tapeNext()
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127], [0xFB]])
+        destination.reset()
+        clock.tapePrev()
+        XCTAssertEqual(destination.packets, [[0xB0, 82, 127], [0xFB]])
+    }
+
+    func testNudgeWhileStoppedStaysStopped() {
+        clock.play(); clock.stop()
+        destination.reset()
+        clock.tapeNext()
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127]], "no Continue when the tape is stopped")
+    }
+
+    // MARK: - Tape seek op (CC + Song Position Pointer; no profile uses it now)
+
+    /// SPP seeking is hardware-verified (SPP 100 at 110 BPM -> 13s 15 frames) but absolute, so
+    /// the OP-1 profile uses `.tapeNudge`. These pin the op for any device that wants a seek.
+    private static let seekTransport = TransportMap(
+        play: [.midiStartOrContinue], stop: [.midiStop],
+        prev: [.tapeSeek(cc: 82, steps: -1)], next: [.tapeSeek(cc: 83, steps: +1)])
+
     /// Tape next: CC 83, then an SPP one bar (16 units) forward. Not playing → no resume.
     func testTapeNextSendsCCThenSongPosition() {
+        clock.transport = Self.seekTransport
         destination.reset()
         clock.tapeNext()
         XCTAssertEqual(destination.packets, [[0xB0, 83, 127], [0xF2, 16, 0]])
@@ -293,12 +347,14 @@ final class OP1TransportGoldenTests: XCTestCase {
 
     /// Tape prev is CC 82 and clamps the song position at zero rather than going negative.
     func testTapePrevClampsAtZero() {
+        clock.transport = Self.seekTransport
         destination.reset()
         clock.tapePrev()
         XCTAssertEqual(destination.packets, [[0xB0, 82, 127], [0xF2, 0, 0]])
     }
 
     func testTapeSeekAccumulatesSongPosition() {
+        clock.transport = Self.seekTransport
         clock.tapeNext(); clock.tapeNext(); clock.tapeNext()
         destination.reset()
         clock.tapeNext()
@@ -307,6 +363,7 @@ final class OP1TransportGoldenTests: XCTestCase {
 
     /// Seeking while playing must resume, or the device sits paused at the new position.
     func testTapeSeekResumesWhilePlaying() {
+        clock.transport = Self.seekTransport
         clock.play()
         destination.reset()
         clock.tapeNext()
@@ -315,6 +372,7 @@ final class OP1TransportGoldenTests: XCTestCase {
 
     /// Song position is 14-bit across two 7-bit bytes; past 127 units the high byte must carry.
     func testSongPositionSplitsAcrossTwoBytes() {
+        clock.transport = Self.seekTransport
         for _ in 0..<9 { clock.tapeNext() }   // 9 bars = 144 units > 127
         destination.reset()
         clock.tapeNext()
@@ -323,6 +381,7 @@ final class OP1TransportGoldenTests: XCTestCase {
 
     /// Scrub mode moves a quarter note (4 units) instead of a bar.
     func testScrubModeUsesSmallerStep() {
+        clock.transport = Self.seekTransport
         clock.tapeArrowMode = .scrub
         destination.reset()
         clock.tapeNext()

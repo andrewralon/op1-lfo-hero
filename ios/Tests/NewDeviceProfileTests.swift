@@ -1040,7 +1040,7 @@ final class TP7ScrubAndReverseTests: XCTestCase {
         c.transport = DeviceProfile.op1Field.transport
         destination.reset()
         c.beginScrub(forward: true)
-        XCTAssertEqual(destination.packets, [[0xB0, 83, 127], [0xF2, 16, 0]], "one tape seek")
+        XCTAssertEqual(destination.packets, [[0xB0, 83, 127]], "one nudge: the CC alone, no SPP")
     }
 }
 

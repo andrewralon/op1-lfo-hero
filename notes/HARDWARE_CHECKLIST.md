@@ -10,7 +10,7 @@ Needs `iPad Pro Dawg` with the device on USB-C. Record the commit, the date, and
 - [x] volume 100 (MIDI) shows 77 on the OP-1 (`v * 99 // 127`) (2026-10-16, Mac probe, USB and BLE)
 - [x] volume, pan and mute on tracks 1-4 (2026-10-16, iPad USB, midi sync)
 - [x] master FX and compressor (fx 1-4 and lfo 1-4 on master, via LFO; 2026-10-16, USB)
-- [x] tape prev / next (absolute position from the app's counter, not relative to the parked tape; 2026-10-16, USB)
+- [x] tape prev / next: CC-only relative nudges, like the OP-1's own buttons; keep playing while playing, stay stopped while stopped, and play afterwards resumes at the nudged position (2026-10-16, BLE; the old CC+SPP version snapped to the app's counter)
 - [x] play sends Continue and the OP-1 resumes from the last *synced* position, not a hand-parked one (documented in RESEARCH.md; midi sync only, beat match ignores app transport)
 - [x] stop stops it
 - [x] clock both ways: beat match (OP-1 master) and midi sync (app master); the BPM box drives the OP-1 live while dragging (2026-10-16, USB)

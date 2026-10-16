@@ -29,9 +29,10 @@ extension DeviceProfile {
         transport: TransportMap(
             play: [.midiStartOrContinue],
             stop: [.midiStop],
-            // Tape prev/next bar: CC nudge + Song Position Pointer seek.
-            prev: [.tapeSeek(cc: 82, steps: -1)],
-            next: [.tapeSeek(cc: 83, steps: +1)],
+            // Tape prev/next bar: the CC alone, a nudge relative to where the tape really is. An
+            // SPP (`.tapeSeek`) is absolute and would snap it to the app's own counter.
+            prev: [.tapeNudge(cc: 82)],
+            next: [.tapeNudge(cc: 83)],
             prevSymbol: "arrow.left",
             nextSymbol: "arrow.right"
         ),

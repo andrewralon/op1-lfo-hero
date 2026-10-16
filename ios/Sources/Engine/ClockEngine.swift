@@ -492,6 +492,11 @@ final class ClockEngine {
                 // the parameter and the button cannot diverge. Safe from recursion because
                 // `transport.play` contains no `.pressPlay`.
                 play()
+            case .tapeNudge(let cc):
+                router?.send([0xB0, UInt8(cc), 127])
+                // The nudge halts the OP-1's transport; resume it if it was rolling, as a nudge
+                // on the device itself keeps playing.
+                if isPlaying { router?.send([0xFB]) }
             case .tapeSeek(let cc, let steps):
                 sppPos = max(0, sppPos + steps * tapeArrowStep)
                 router?.send([0xB0, UInt8(cc), 127])

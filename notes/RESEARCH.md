@@ -1365,7 +1365,19 @@ OP-1 in **midi sync** (app = master), tempo 110 BPM, clock sent at 120 BPM (OP-1
   tempo, exactly.
 - **Speed follows the clock** (displayed 100% -> 109% as the clock arrived, before any movement).
 
-So the OP-1 resumes from "the last synced position", not from the physical tape position. The
+So the OP-1 resumes from "the last synced position", not from the physical tape position.
+
+**Tape prev/next: use the CC alone (2026-10-16).** CC 82/83 is a *relative* nudge from the tape's
+real position. The app used to follow it with an SPP and, while playing, a Continue; the SPP is
+absolute, so every press snapped the tape to the app's own position counter (the first press
+from a tape parked at 30 s landed at 2 s). Dropping the SPP fixes that: three presses of next
+move three bars from wherever the tape is, and a play afterwards starts at the *nudged* position,
+so a CC nudge, unlike a hand move, is not discarded. The nudge does halt a rolling transport;
+sending a Continue after it keeps the tape playing, as the device's own buttons do, and the
+tape stays stopped if it was stopped. Verified over BLE in midi sync, including a tape started
+from the OP-1 itself. `.tapeSeek` (CC + SPP) is kept as an op for devices that want an
+absolute seek; no profile uses it now.
+ The
 OP-1 never reports its position back (see the transmit findings above), so the app cannot know
 it. Only the app's own tape prev/next buttons, which send an SPP, move the tape reliably.
 

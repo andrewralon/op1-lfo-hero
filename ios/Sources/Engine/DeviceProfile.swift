@@ -163,6 +163,10 @@ enum TransportOp: Hashable {
     case pressPlay
     /// OP-1 tape seek: a CC nudge, then a Song Position Pointer, then resume if playing.
     case tapeSeek(cc: Int, steps: Int)
+    /// OP-1 tape nudge: the CC alone, a *relative* move from wherever the tape actually is.
+    /// Unlike `.tapeSeek` it sends no Song Position Pointer, so it cannot snap the tape to the
+    /// app's own position counter.
+    case tapeNudge(cc: Int)
     case cc(ch: Int, cc: Int, value: Int)
     /// Relative encoder nudge, in **two's complement**: `1...63` count up, `127...65` count
     /// down (127 = -1). For genuine relative encoders only (the TX-6's tempo CC 47), where each
