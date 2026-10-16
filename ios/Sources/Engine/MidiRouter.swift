@@ -10,6 +10,7 @@ protocol MidiDestination: AnyObject {
     func send(_ bytes: [UInt8])
     var onClock: (() -> Void)? { get set }
     var onStart: (() -> Void)? { get set }
+    var onContinue: (() -> Void)? { get set }
     var onStop:  (() -> Void)? { get set }
 }
 
@@ -32,12 +33,14 @@ final class MidiRouter: MidiDestination {
 
     var onClock: (() -> Void)?
     var onStart: (() -> Void)?
+    var onContinue: (() -> Void)?
     var onStop:  (() -> Void)?
     var onCC:    ((Int, Int, Int) -> Void)?
 
     init() {
         usb.onClock = { [weak self] in self?.forwardIfActive(.usb) { self?.onClock?() } }
         usb.onStart = { [weak self] in self?.forwardIfActive(.usb) { self?.onStart?() } }
+        usb.onContinue = { [weak self] in self?.forwardIfActive(.usb) { self?.onContinue?() } }
         usb.onStop  = { [weak self] in self?.forwardIfActive(.usb) { self?.onStop?()  } }
         usb.onCC    = { [weak self] ch, cc, v in
             self?.forwardIfActive(.usb) { self?.onCC?(ch, cc, v) }
@@ -45,6 +48,7 @@ final class MidiRouter: MidiDestination {
 
         ble.onClock = { [weak self] in self?.forwardIfActive(.ble) { self?.onClock?() } }
         ble.onStart = { [weak self] in self?.forwardIfActive(.ble) { self?.onStart?() } }
+        ble.onContinue = { [weak self] in self?.forwardIfActive(.ble) { self?.onContinue?() } }
         ble.onStop  = { [weak self] in self?.forwardIfActive(.ble) { self?.onStop?()  } }
         ble.onCC    = { [weak self] ch, cc, v in
             self?.forwardIfActive(.ble) { self?.onCC?(ch, cc, v) }

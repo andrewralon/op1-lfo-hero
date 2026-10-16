@@ -35,6 +35,7 @@ final class BLEMidi: NSObject, ObservableObject {
     // Callbacks — invoked on the BLE queue (background thread)
     var onClock:    (() -> Void)?
     var onStart:    (() -> Void)?
+    var onContinue: (() -> Void)?
     var onStop:     (() -> Void)?
     var onCC:       ((Int, Int, Int) -> Void)?   // channel, cc, value
 
@@ -139,7 +140,8 @@ final class BLEMidi: NSObject, ObservableObject {
     /// CC from a TX-6 injected phantom clock ticks that all landed in the same packet, and the
     /// app computed a BPM from microsecond intervals (observed: 640000 BPM).
     private func parse(_ data: Data) {
-        BleMidiPacket.parse(data, onClock: onClock, onStart: onStart, onStop: onStop, onCC: onCC)
+        BleMidiPacket.parse(data, onClock: onClock, onStart: onStart, onStop: onStop,
+                            onContinue: onContinue, onCC: onCC)
     }
 }
 
@@ -167,6 +169,7 @@ enum BleMidiPacket {
                       onClock: (() -> Void)?,
                       onStart: (() -> Void)?,
                       onStop: (() -> Void)?,
+                      onContinue: (() -> Void)? = nil,
                       onCC: ((Int, Int, Int) -> Void)?) {
         guard data.count >= 3 else { return }   // header + timestamp + at least one status
         var i = 1                               // skip the header
@@ -186,8 +189,9 @@ enum BleMidiPacket {
                     switch b {
                     case 0xF8: onClock?()
                     case 0xFA: onStart?()
+                    case 0xFB: onContinue?()
                     case 0xFC: onStop?()
-                    default: break              // 0xFB continue, 0xFE sensing, 0xFF reset
+                    default: break              // 0xFE sensing, 0xFF reset
                     }
                     i += 1
                     continue

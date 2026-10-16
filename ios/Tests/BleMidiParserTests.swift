@@ -154,4 +154,11 @@ final class BleMidiParserTests: XCTestCase {
             XCTAssertEqual(clocks + starts + stops, 0)
         }
     }
+
+    func testContinueIsReported() {
+        var continues = 0
+        BleMidiPacket.parse(Data([0x80, 0x81, 0xFB]), onClock: nil, onStart: nil, onStop: nil,
+                            onContinue: { continues += 1 }, onCC: nil)
+        XCTAssertEqual(continues, 1)
+    }
 }

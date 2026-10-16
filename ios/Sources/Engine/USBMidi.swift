@@ -37,6 +37,7 @@ final class USBMidi: NSObject, ObservableObject {
 
     var onClock: (() -> Void)?
     var onStart: (() -> Void)?
+    var onContinue: (() -> Void)?
     var onStop:  (() -> Void)?
     var onCC:    ((Int, Int, Int) -> Void)?
 
@@ -296,7 +297,7 @@ final class USBMidi: NSObject, ObservableObject {
             switch b {
             case 0xF8: onClock?(); i += 1
             case 0xFA: onStart?(); i += 1
-            case 0xFB:             i += 1
+            case 0xFB: onContinue?(); i += 1
             case 0xFC: onStop?();  i += 1
             default:
                 guard b & 0x80 != 0 else { i += 1; continue }

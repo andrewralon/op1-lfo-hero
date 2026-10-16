@@ -7,6 +7,7 @@ final class RecordingDestination: MidiDestination {
     private(set) var packets: [[UInt8]] = []
     var onClock: (() -> Void)?
     var onStart: (() -> Void)?
+    var onContinue: (() -> Void)?
     var onStop:  (() -> Void)?
     func send(_ bytes: [UInt8]) { packets.append(bytes) }
     func reset() { packets.removeAll() }
@@ -225,6 +226,18 @@ final class OP1TransportGoldenTests: XCTestCase {
         clock = ClockEngine()
         clock.router = destination
         clock.transport = DeviceProfile.op1Field.transport
+    }
+
+    /// Both Start and Continue from the device mean the transport is running: the OP-1 sends
+    /// Start after a double stop (tape at the beginning) and Continue when it resumes. Missing
+    /// Continue meant LFOs only restarted after a double stop.
+    func testIncomingStartAndContinueBothCountAsPlay() {
+        var played = 0
+        clock.onPlay = { played += 1 }
+        destination.onStart?()
+        XCTAssertEqual(played, 1)
+        destination.onContinue?()
+        XCTAssertEqual(played, 2)
     }
 
     /// Play always sends Continue (0xFB) so the tape resumes where it left off — matching the

@@ -154,13 +154,29 @@ All three ranges overlap completely (1/16 take 2 is the lowest reading overall a
 
 **Beat Match / PO Sync / 1/16 are indistinguishable via MIDI.** Functionally identical from the app's perspective: OP-1 is clock master, app follows.
 
-## Beat Match: Start/Stop are bar-position beacons, not transport state
+## Beat Match: Start and Stop are real transport presses (corrected 2026-10-16)
 
-In Beat Match mode, the OP-1 sends MIDI Start (0xFA) and Stop (0xFC) at bar boundaries as a clock-position signaling mechanism — even when the tape is completely stopped. These are byte-for-byte identical to actual play/stop button presses.
+An earlier version of this section claimed the OP-1 sends Start and Stop at bar boundaries as
+position beacons, even with the tape stopped, so a real press could not be told apart. **That does
+not hold** on the OP-1 Field over USB in beat match, measured from a Mac with `tools/midi/anymidi`
+(5 s windows, a 1 s drain window first — see the backlog note below):
 
-**Consequence:** It is impossible to track whether the OP-1 tape is actually playing by listening to Start/Stop in Beat Match mode. Any debounce or filtering approach fails because Stop arrives mid-bar and the gap between Stop and the next bar-boundary Start is several seconds (tempo-dependent) — no debounce window can span that gap without also swallowing real stop events.
+| What was done | Clock | Start `0xFA` | Stop `0xFC` |
+|---|---|---|---|
+| nothing, tape stopped | 221 | 0 | 0 |
+| nothing, tape rolling the whole window (90 BPM) | 180 | 0 | 0 |
+| press **play** on the OP-1 | 221 | **1** | 0 |
+| press **stop** on the OP-1 | 181 | 0 | **1** |
 
-**App behavior:** The play button sends a MIDI signal to the OP-1 but does not attempt to reflect OP-1 transport state. User checks the OP-1 directly to know if tape is playing.
+So a play press is one Start and a stop press is one Stop, and nothing else produces them. The
+app uses the Start to restart every active LFO from the beginning of its cycle
+(`ClockEngine.onPlay` -> `AutomationEngine.restartAll`). The windows are short (about 2 bars), so
+a rarer periodic beacon is not strictly excluded.
+
+**Measurement trap — USB backlog.** A listener that connects after a gap is first handed the
+clock the driver queued while nothing was listening: about 22 s of ticks after a 22 s gap, 44 s
+after a 44 s gap (970 and 1930 extra ticks), plus any Start/Stop from that gap. It is not live
+traffic, and a running app never sees it. Run a 1 s throwaway window first and count the next one.
 
 ## Resolved: tape state does not affect clock output
 

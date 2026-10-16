@@ -40,6 +40,14 @@ final class AutomationEngine {
     private var randomValue:     [UUID: Double] = [:]   // held output for current step
     private var disabledClipIDs: Set<UUID>      = []
 
+    /// Clock tick at which each chip's cycle begins. Absent means 0, i.e. the cycle is locked to
+    /// the clock grid (`tickCount % rateTicks`). A play event re-origins every active chip so it
+    /// starts again from the beginning of its wave; the global tick counter is never reset
+    /// (resetting it snapped LFOs to their centre — see ClockEngine.handleStart).
+    private var chipPhaseOrigin: [UUID: Int] = [:]
+    private var previewPhaseOrigin = 0
+    private var restartPending = false
+
     // Preview LFOs — run continuously, never appear in activeLfos
     private var previewLfos:        [LfoClip] = []
     private var previewLastSent:    [UUID: Double] = [:]
@@ -68,6 +76,7 @@ final class AutomationEngine {
         randomStep.removeValue(forKey: lfo.id)
         randomState.removeValue(forKey: lfo.id)
         randomValue.removeValue(forKey: lfo.id)
+        chipPhaseOrigin.removeValue(forKey: lfo.id)
         disabledClipIDs.remove(lfo.id)
         lock.unlock()
     }
@@ -77,8 +86,17 @@ final class AutomationEngine {
         lfos.removeAll()
         startTicks.removeAll(); freeRateStart.removeAll(); lastSent.removeAll()
         randomStep.removeAll(); randomState.removeAll(); randomValue.removeAll()
+        chipPhaseOrigin.removeAll()
         disabledClipIDs.removeAll()
         lock.unlock()
+    }
+
+    /// Restart every active LFO from the start of its cycle on the next clock tick. Called when
+    /// play is pressed on the app (app is master) or arrives from the device (device is master).
+    /// Paused chips are left alone, and a one-shot that already finished is no longer in the
+    /// engine, so neither is replayed.
+    func restartAll() {
+        lock.lock(); restartPending = true; lock.unlock()
     }
 
     func setEnabled(_ id: UUID, enabled: Bool) {
@@ -167,6 +185,21 @@ final class AutomationEngine {
 
         lock.lock()
         let current = lfos  // snapshot while locked
+        if restartPending {
+            restartPending = false
+            for lfo in current where !disabledClipIDs.contains(lfo.id) {
+                chipPhaseOrigin[lfo.id] = tickCount
+                startTicks[lfo.id] = tickCount
+                if lfo.freeRatePeriod != nil { freeRateStart[lfo.id] = now }
+                lastSent.removeValue(forKey: lfo.id)   // the first value must be sent even if equal
+                randomStep.removeValue(forKey: lfo.id)
+                randomState.removeValue(forKey: lfo.id)
+                randomValue.removeValue(forKey: lfo.id)
+            }
+            previewPhaseOrigin = tickCount
+            previewLastSent.removeAll(); freePreviewStart.removeAll()
+            previewRandStep.removeAll(); previewRandState.removeAll(); previewRandValue.removeAll()
+        }
         for lfo in current where startTicks[lfo.id] == nil {
             startTicks[lfo.id] = tickCount
         }
@@ -198,7 +231,10 @@ final class AutomationEngine {
                 lock.unlock()
                 let elapsed = tickCount - start
                 if !lfo.loop && elapsed >= lfo.rateTicks { finished.append(lfo); continue }
-                phase = Double(tickCount % lfo.rateTicks) / Double(lfo.rateTicks)
+                lock.lock()
+                let origin = chipPhaseOrigin[lfo.id] ?? 0
+                lock.unlock()
+                phase = Double(cycleTick(tickCount - origin, lfo.rateTicks)) / Double(lfo.rateTicks)
             }
 
             let value = evaluate(lfo, phase: phase)
@@ -233,7 +269,10 @@ final class AutomationEngine {
                 lock.unlock()
                 pPhase = ((now - start) / period).truncatingRemainder(dividingBy: 1.0)
             } else {
-                pPhase = Double(tickCount % lfo.rateTicks) / Double(lfo.rateTicks)
+                lock.lock()
+                let origin = previewPhaseOrigin
+                lock.unlock()
+                pPhase = Double(cycleTick(tickCount - origin, lfo.rateTicks)) / Double(lfo.rateTicks)
             }
             let pValue = evaluatePreview(lfo, phase: pPhase)
 
@@ -248,6 +287,11 @@ final class AutomationEngine {
     }
 
     // MARK: - Private
+
+    /// `ticks` modulo `cycle`, never negative.
+    private func cycleTick(_ ticks: Int, _ cycle: Int) -> Int {
+        ((ticks % cycle) + cycle) % cycle
+    }
 
     private func evaluatePreview(_ lfo: LfoClip, phase: Double) -> Double {
         var y: Double

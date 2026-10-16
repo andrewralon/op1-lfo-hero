@@ -1255,3 +1255,91 @@ final class PreviewRestoreTests: XCTestCase {
         XCTAssertTrue(destination.packets.isEmpty)
     }
 }
+
+/// Play restarts every active LFO from the start of its cycle.
+final class LfoRestartOnPlayTests: XCTestCase {
+
+    /// `Controller` is main-actor isolated, and releasing one as a local variable at the end of
+    /// a test method crashes the Swift runtime (`swift_task_deinitOnExecutor`). Keep them in a
+    /// stored property so they live as long as the test case, like the other test classes do.
+    private var keepAlive: [AnyObject] = []
+
+    private func makeEngine() -> (AutomationEngine, RecordingDestination) {
+        let dest = RecordingDestination()
+        let ctrl = Controller(router: dest)
+        ctrl.setProfile(.op1Field)
+        let engine = AutomationEngine()
+        engine.setProfile(.op1Field)
+        engine.controller = ctrl
+        keepAlive += [ctrl, dest, engine]
+        return (engine, dest)
+    }
+
+    private func clip(loop: Bool = true) -> LfoClip {
+        LfoClip(deviceId: "op1", track: 1, paramId: "volume", wave: .saw, rateTicks: 96,
+                depth: 40, centerValue: 64, inverted: false, loop: loop, originalValue: 64)
+    }
+
+    /// What a chip sends on its very first tick: the start of its wave.
+    private func firstPacket(preview: Bool = false) -> [UInt8] {
+        let (engine, dest) = makeEngine()
+        if preview { engine.setPreview([clip()]) } else { engine.add(clip()) }
+        dest.reset()
+        engine.onTick(0)
+        return dest.packets.first ?? []
+    }
+
+    func testRestartPutsAChipBackAtTheStartOfItsCycle() {
+        let start = firstPacket()
+        XCTAssertFalse(start.isEmpty)
+
+        let (engine, dest) = makeEngine()
+        engine.add(clip())
+        for t in 0..<50 { engine.onTick(t) }      // part-way through the cycle
+        dest.reset()
+        engine.onTick(50)
+        XCTAssertNotEqual(dest.packets.first ?? [], start, "mid-cycle is not the start")
+
+        engine.restartAll()
+        dest.reset()
+        engine.onTick(51)
+        XCTAssertEqual(dest.packets.first ?? [], start, "restart goes back to the start of the wave")
+    }
+
+    func testRestartResendsEvenWhenTheValueHasNotChanged() {
+        let (engine, dest) = makeEngine()
+        engine.add(clip())
+        engine.onTick(0)
+        engine.restartAll()
+        dest.reset()
+        engine.onTick(96)      // would be the same phase as before without the restart
+        XCTAssertFalse(dest.packets.isEmpty, "the restart must always emit its first value")
+    }
+
+    func testPausedChipsAreNotRestarted() {
+        let c = clip()
+        let (engine, dest) = makeEngine()
+        engine.add(c)
+        engine.setEnabled(c.id, enabled: false)
+        engine.restartAll()
+        dest.reset()
+        engine.onTick(10)
+        XCTAssertTrue(dest.packets.isEmpty, "a paused chip stays silent")
+        engine.setEnabled(c.id, enabled: true)
+        engine.onTick(11)
+        XCTAssertFalse(dest.packets.isEmpty)
+    }
+
+    func testRestartReachesPreviewToo() {
+        let start = firstPacket(preview: true)
+        XCTAssertFalse(start.isEmpty)
+
+        let (engine, dest) = makeEngine()
+        engine.setPreview([clip()])
+        for t in 0..<50 { engine.onTick(t) }
+        engine.restartAll()
+        dest.reset()
+        engine.onTick(50)
+        XCTAssertEqual(dest.packets.first ?? [], start)
+    }
+}

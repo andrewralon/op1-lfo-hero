@@ -436,6 +436,9 @@ final class AppState: ObservableObject {
     init() {
         controller = Controller(router: router)
         automation.controller = controller
+        // Play (pressed here, or sent by the device) restarts every active LFO from the start of
+        // its cycle, so the modulation lines up with the music from the downbeat.
+        clock.onPlay = { [weak self] in self?.automation.restartAll() }
         // `.transport` parameters need ClockEngine, which owns play state and song position.
         controller.transportRunner = { [weak clock] ops in clock?.runOps(ops) }
         // A tempo nudge from the transport buttons while the app is clock master: move the app's

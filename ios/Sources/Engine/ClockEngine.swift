@@ -118,6 +118,9 @@ final class ClockEngine {
             self?.handleSlaveTick()
         }
         router?.onStart = { [weak self] in self?.handleStart() }
+        // A device resuming from where it stopped sends Continue, not Start. For the app both
+        // mean "the transport is running now" — the OP-1 sends Start only after a double stop.
+        router?.onContinue = { [weak self] in self?.handleStart() }
         router?.onStop  = { [weak self] in self?.handleStop()  }
     }
 
@@ -168,6 +171,7 @@ final class ClockEngine {
 
     private func handleStart() {
         isPlaying = true
+        onPlay?()
         // slaveTick is intentionally NOT reset here. Resetting it causes the LFO phase formula
         // (tickCount % rateTicks) to jump to ~0 on every loop boundary, snapping LFOs to
         // their center value. slaveTick stays monotonic so phases continue smoothly.
@@ -286,6 +290,10 @@ final class ClockEngine {
     /// re-sending play — matching the TP-7's own play button. Set from the device profile.
     var playTogglesDirection = false
 
+    /// Fired when play starts: the user pressed play here, or the device sent Start. AppState
+    /// uses it to restart the LFOs from the beginning of their cycles.
+    var onPlay: (() -> Void)?
+
     func play() {
         // Matches the hardware: on a device whose play button reverses, a second press while
         // rolling flips direction rather than restarting playback.
@@ -302,6 +310,7 @@ final class ClockEngine {
         // the button was pressed in.
         run(transport.play)
         isPlaying = true
+        onPlay?()
     }
 
     /// Pitch-bend value that trims reverse playback to exactly 1x.
