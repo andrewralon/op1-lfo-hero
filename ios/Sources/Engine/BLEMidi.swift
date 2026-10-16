@@ -31,6 +31,9 @@ final class BLEMidi: NSObject, ObservableObject {
     @Published var discovered: [CBPeripheral] = []
     /// Profile id matched from the connected peripheral's name, nil when nothing matched.
     @Published var matchedProfileId: String?
+    /// The peripheral the link is actually up with. The device list matches on this, not on the
+    /// name: CoreBluetooth can report a different name before and after connecting.
+    @Published var connectedPeripheralID: UUID?
 
     // Callbacks — invoked on the BLE queue (background thread)
     var onClock:    (() -> Void)?
@@ -264,7 +267,10 @@ extension BLEMidi: CBCentralManagerDelegate {
         if let profile = DeviceRegistry.profile(forEndpointName: p.name ?? "") {
             DispatchQueue.main.async { self.matchedProfileId = profile.id }
         }
-        DispatchQueue.main.async { self.state = .connected(p.name ?? "device") }
+        DispatchQueue.main.async {
+            self.connectedPeripheralID = p.identifier
+            self.state = .connected(p.name ?? "device")
+        }
     }
 
     func centralManager(_ c: CBCentralManager, didDisconnectPeripheral p: CBPeripheral, error: Error?) {
@@ -273,6 +279,7 @@ extension BLEMidi: CBCentralManagerDelegate {
         forgetDiscovered(p)
         DispatchQueue.main.async {
             self.state = .disconnected(p.name ?? "device")
+            self.connectedPeripheralID = nil
             self.matchedProfileId = nil
         }
         startScan(continuous: continuousScan)
@@ -280,7 +287,10 @@ extension BLEMidi: CBCentralManagerDelegate {
 
     func centralManager(_ c: CBCentralManager, didFailToConnect p: CBPeripheral, error: Error?) {
         forgetDiscovered(p)
-        DispatchQueue.main.async { self.state = .scanning }
+        DispatchQueue.main.async {
+            self.connectedPeripheralID = nil
+            self.state = .scanning
+        }
         startScan(continuous: continuousScan)
     }
 }

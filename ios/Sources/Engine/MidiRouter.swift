@@ -85,6 +85,23 @@ final class MidiRouter: MidiDestination {
         body()
     }
 
+    /// The transport MIDI actually travels over right now. Auto-connect never claims the router,
+    /// and a device that sends nothing (an OP-1 in midi sync) never makes the router claim it
+    /// either, so `activeTransport` can stay unset while a device is connected and working. In
+    /// that case this resolves it the same way `send` does: USB if connected, else Bluetooth.
+    static func effectiveTransport(active: Transport?, usbConnected: Bool, bleConnected: Bool) -> Transport? {
+        if let active { return active }
+        if usbConnected { return .usb }
+        if bleConnected { return .ble }
+        return nil
+    }
+
+    var effectiveTransport: Transport? {
+        Self.effectiveTransport(active: activeTransport,
+                                usbConnected: usb.state.isConnected,
+                                bleConnected: ble.state.isConnected)
+    }
+
     func send(_ bytes: [UInt8]) {
         switch activeTransport {
         case .usb: usb.send(bytes)

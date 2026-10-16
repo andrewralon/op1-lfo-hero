@@ -280,7 +280,7 @@ struct StatusBarView: View {
                     Circle()
                         .fill(app.isConnected ? C.green : C.yellow)
                         .frame(width: 7, height: 7)
-                    Text(app.connectionLabel)
+                    Text(app.connectionLabel.lowercased())   // device names arrive in the device's own case
                         .font(.system(size: m.statusBarFont, weight: .medium, design: .monospaced))
                         .foregroundColor(.white)
                         .lineLimit(1)
@@ -315,9 +315,56 @@ struct StatusBarView: View {
 // MARK: - Device picker sheet (used by StatusBarView)
 
 
+/// Trailing mark on a device row: "connected" in green when it is the live device, otherwise the
+/// usual chevron.
+private struct ConnectedBadge: View {
+    let connected: Bool
+    var body: some View {
+        if connected {
+            HStack(spacing: 4) {
+                Text("connected")
+                Image(systemName: "checkmark.circle.fill")
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(C.green)
+        } else {
+            Image(systemName: "chevron.right").foregroundColor(C.dim)
+        }
+    }
+}
+
+private extension View {
+    /// A light green box around the row, so the connected device is obvious at a glance.
+    func connectedHighlight(_ on: Bool) -> some View {
+        self
+            .background(on ? C.green.opacity(0.18) : Color.clear)
+            .overlay(Rectangle().stroke(on ? C.green.opacity(0.7) : Color.clear, lineWidth: 1))
+            .accessibilityValue(on ? "connected" : "")
+    }
+}
+
 struct DevicePickerView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
+
+    /// Whether the list row `rowName` is the device the app is connected to right now. Only the
+    /// *active* transport counts: if both are connected, the one that carries MIDI is the one
+    /// that gets the highlight. Names are compared exactly as the lists show them.
+    static func isConnectedRow(_ rowName: String, connectedName: String?, transportIsActive: Bool) -> Bool {
+        guard transportIsActive, let connectedName else { return false }
+        return rowName.caseInsensitiveCompare(connectedName) == .orderedSame
+    }
+
+    /// Same, for a Bluetooth row: matched by peripheral identity, because a BLE device's name can
+    /// differ between the advertisement the list was built from and the connected peripheral.
+    static func isConnectedRow(_ rowID: UUID, connectedID: UUID?, transportIsActive: Bool) -> Bool {
+        transportIsActive && connectedID == rowID
+    }
+
+    private var connectedUSBName: String? {
+        if case .connected(let n) = app.usb.state { return n }
+        return nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -327,31 +374,35 @@ struct DevicePickerView: View {
                     // MARK: USB / Network MIDI
                     Text("usb / network midi")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundColor(C.dim)
+                        .foregroundColor(C.text)
                         .padding(.top, 20)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
 
                     if app.usb.discovered.isEmpty {
                         Text("no usb midi devices found")
-                            .foregroundColor(C.dim)
+                            .foregroundColor(C.text)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 12)
                     } else {
                         ForEach(app.usb.discovered, id: \.self) { name in
+                            let connected = Self.isConnectedRow(
+                                name, connectedName: connectedUSBName,
+                                transportIsActive: app.router.effectiveTransport == .usb)
                             Button {
                                 app.usb.connectTo(name)
                                 app.router.setActiveTransport(.usb)
                             } label: {
                                 HStack {
                                     Image(systemName: "cable.connector").foregroundColor(C.text)
-                                    Text(name)
+                                    Text(name.lowercased())
                                         .foregroundColor(C.text)
                                     Spacer()
-                                    Image(systemName: "chevron.right").foregroundColor(C.dim)
+                                    ConnectedBadge(connected: connected)
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
+                                .connectedHighlight(connected)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -364,7 +415,7 @@ struct DevicePickerView: View {
 
                     Text("bluetooth midi")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundColor(C.dim)
+                        .foregroundColor(C.text)
                         .padding(.top, 16)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
@@ -380,24 +431,28 @@ struct DevicePickerView: View {
                                 Label("no ble midi devices found", systemImage: "antenna.radiowaves.left.and.right")
                             }
                         }
-                        .foregroundColor(C.dim)
+                        .foregroundColor(C.text)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
                     } else {
                         ForEach(app.ble.discovered, id: \.identifier) { p in
+                            let connected = Self.isConnectedRow(
+                                p.identifier, connectedID: app.ble.connectedPeripheralID,
+                                transportIsActive: app.router.effectiveTransport == .ble)
                             Button {
                                 app.ble.connect(p)
                                 app.router.setActiveTransport(.ble)
                             } label: {
                                 HStack {
                                     Image(systemName: "antenna.radiowaves.left.and.right").foregroundColor(C.text)
-                                    Text(p.name ?? p.identifier.uuidString)
+                                    Text((p.name ?? p.identifier.uuidString).lowercased())
                                         .foregroundColor(C.text)
                                     Spacer()
-                                    Image(systemName: "chevron.right").foregroundColor(C.dim)
+                                    ConnectedBadge(connected: connected)
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
+                                .connectedHighlight(connected)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)

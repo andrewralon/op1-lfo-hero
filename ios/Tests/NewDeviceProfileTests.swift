@@ -1343,3 +1343,47 @@ final class LfoRestartOnPlayTests: XCTestCase {
         XCTAssertEqual(dest.packets.first ?? [], start)
     }
 }
+
+/// Which row of the device picker gets the green "connected" box.
+final class DevicePickerHighlightTests: XCTestCase {
+
+    func testOnlyTheConnectedDeviceOnTheActiveTransportIsHighlighted() {
+        XCTAssertTrue(DevicePickerView.isConnectedRow("OP-1", connectedName: "OP-1", transportIsActive: true))
+        XCTAssertFalse(DevicePickerView.isConnectedRow("TX-6", connectedName: "OP-1", transportIsActive: true))
+    }
+
+    func testNothingIsHighlightedWhenDisconnectedOrTheTransportIsNotActive() {
+        XCTAssertFalse(DevicePickerView.isConnectedRow("OP-1", connectedName: nil, transportIsActive: true))
+        XCTAssertFalse(DevicePickerView.isConnectedRow("OP-1", connectedName: "OP-1", transportIsActive: false),
+                       "a device connected on the other transport must not light up this list")
+    }
+
+    /// BLE rows match on the peripheral, not its name, which can change between discovery and
+    /// connection.
+    func testBluetoothRowsMatchOnPeripheralIdentity() {
+        let a = UUID(), b = UUID()
+        XCTAssertTrue(DevicePickerView.isConnectedRow(a, connectedID: a, transportIsActive: true))
+        XCTAssertFalse(DevicePickerView.isConnectedRow(b, connectedID: a, transportIsActive: true))
+        XCTAssertFalse(DevicePickerView.isConnectedRow(a, connectedID: nil, transportIsActive: true))
+        XCTAssertFalse(DevicePickerView.isConnectedRow(a, connectedID: a, transportIsActive: false))
+    }
+
+    /// An OP-1 in midi sync sends nothing, so the router never claims a transport for an
+    /// auto-connected device. The picker must still show it as connected.
+    func testAnAutoConnectedDeviceStillCountsWhenNothingHasClaimedTheRouter() {
+        XCTAssertEqual(MidiRouter.effectiveTransport(active: nil, usbConnected: false, bleConnected: true), .ble)
+        XCTAssertEqual(MidiRouter.effectiveTransport(active: nil, usbConnected: true, bleConnected: false), .usb)
+        XCTAssertEqual(MidiRouter.effectiveTransport(active: nil, usbConnected: true, bleConnected: true), .usb,
+                       "matches send(): usb wins when nothing is claimed")
+        XCTAssertNil(MidiRouter.effectiveTransport(active: nil, usbConnected: false, bleConnected: false))
+    }
+
+    func testAClaimedTransportAlwaysWins() {
+        XCTAssertEqual(MidiRouter.effectiveTransport(active: .ble, usbConnected: true, bleConnected: true), .ble)
+        XCTAssertEqual(MidiRouter.effectiveTransport(active: .usb, usbConnected: true, bleConnected: true), .usb)
+    }
+
+    func testNameMatchIgnoresCase() {
+        XCTAssertTrue(DevicePickerView.isConnectedRow("op-1", connectedName: "OP-1", transportIsActive: true))
+    }
+}
