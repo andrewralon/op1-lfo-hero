@@ -37,6 +37,15 @@ func snapshot(_ name: String, timeWaitingForIdle timeout: TimeInterval = 20) {
     Snapshot.snapshot(name, timeWaitingForIdle: timeout)
 }
 
+/// Where tests write screenshots. Nothing else creates it, so on a fresh machine every test
+/// that saves a PNG fails until it exists.
+enum ScreenshotDir {
+    static let path = "/tmp/claude-ss"
+    static func ensureExists() throws {
+        try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
+    }
+}
+
 enum SnapshotError: Error, CustomDebugStringConvertible {
     case cannotFindSimulatorHomeDirectory
     case cannotRunOnPhysicalDevice

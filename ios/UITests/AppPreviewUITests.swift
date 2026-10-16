@@ -9,6 +9,7 @@ final class AppPreviewUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        try ScreenshotDir.ensureExists()
     }
 
     // MARK: - App Store Preview demo

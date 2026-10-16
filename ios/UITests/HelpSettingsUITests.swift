@@ -4,6 +4,7 @@ final class HelpSettingsUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        try ScreenshotDir.ensureExists()
     }
 
     func testHelpModalOpensAndDismisses() throws {

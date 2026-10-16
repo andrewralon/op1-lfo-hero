@@ -8,6 +8,7 @@ final class MultiDeviceUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        try ScreenshotDir.ensureExists()
     }
 
     @MainActor
@@ -132,7 +133,7 @@ final class MultiDeviceUITests: XCTestCase {
 
         let tp7 = launch(profile: "tp7")
         tp7.buttons["paramPicker"].tap()
-        XCTAssertTrue(tp7.buttons["input gain"].waitForExistence(timeout: 3), "tp-7 has input gain")
+        XCTAssertTrue(tp7.buttons["gain 1"].waitForExistence(timeout: 3), "tp-7 has per-jack input gain")
         XCTAssertFalse(tp7.buttons["eq high"].exists, "tp-7 has no eq")
     }
 
