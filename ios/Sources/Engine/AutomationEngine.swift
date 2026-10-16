@@ -48,6 +48,13 @@ final class AutomationEngine {
     private var previewRandState:   [UUID: UInt64] = [:]
     private var previewRandValue:   [UUID: Double] = [:]
 
+    /// The first preview clip seen for each (track, parameter). Its `originalValue` is what the
+    /// parameter should go back to when preview stops targeting it. Kept across the clip
+    /// rebuilds that every slider tweak causes (each rebuild mints new UUIDs), so the value
+    /// recorded is the one from *before* the preview first touched the parameter.
+    private struct PreviewTarget: Hashable { let track: Int; let paramId: String }
+    private var previewOriginals: [PreviewTarget: LfoClip] = [:]
+
     func add(_ lfo: LfoClip) {
         lock.lock(); lfos.append(lfo); lock.unlock()
     }
@@ -87,6 +94,12 @@ final class AutomationEngine {
     func setPreview(_ clips: [LfoClip]) {
         lock.lock()
         previewLfos = clips
+        let targets = Set(clips.map { PreviewTarget(track: $0.track, paramId: $0.paramId) })
+        let departing = takeDepartingPreviewTargets(keeping: targets)
+        for clip in clips {
+            let t = PreviewTarget(track: clip.track, paramId: clip.paramId)
+            if previewOriginals[t] == nil { previewOriginals[t] = clip }
+        }
         let ids = Set(clips.map { $0.id })
         previewLastSent  = previewLastSent.filter  { ids.contains($0.key) }
         freePreviewStart  = freePreviewStart.filter  { ids.contains($0.key) }
@@ -94,14 +107,45 @@ final class AutomationEngine {
         previewRandState = previewRandState.filter { ids.contains($0.key) }
         previewRandValue = previewRandValue.filter { ids.contains($0.key) }
         lock.unlock()
+        restore(departing)
     }
 
+    /// Stops previewing and puts every previewed parameter back to the value it had before.
     func clearPreview() {
         lock.lock()
         previewLfos.removeAll()
         previewLastSent.removeAll(); freePreviewStart.removeAll()
         previewRandStep.removeAll(); previewRandState.removeAll(); previewRandValue.removeAll()
+        let departing = takeDepartingPreviewTargets(keeping: [])
         lock.unlock()
+        restore(departing)
+    }
+
+    /// The value `track`'s `paramId` had before preview first touched it, or nil if it isn't
+    /// being previewed. The app's live state can't answer this: it follows the running LFO.
+    func previewOriginalValue(track: Int, paramId: String) -> Double? {
+        lock.lock(); defer { lock.unlock() }
+        return previewOriginals[PreviewTarget(track: track, paramId: paramId)]?.originalValue
+    }
+
+    /// Removes and returns the recorded clip for every previewed target not in `keeping`.
+    /// Caller holds `lock`. A target an enabled chip is already driving is dropped without a
+    /// restore — the chip owns that parameter now, and a restore would only glitch it.
+    private func takeDepartingPreviewTargets(keeping: Set<PreviewTarget>) -> [LfoClip] {
+        var out: [LfoClip] = []
+        for (target, clip) in previewOriginals where !keeping.contains(target) {
+            previewOriginals.removeValue(forKey: target)
+            let drivenByChip = lfos.contains {
+                $0.track == target.track && $0.paramId == target.paramId
+                    && !disabledClipIDs.contains($0.id)
+            }
+            if !drivenByChip { out.append(clip) }
+        }
+        return out
+    }
+
+    private func restore(_ clips: [LfoClip]) {
+        for clip in clips { dispatch(lfo: clip, value: clip.originalValue) }
     }
 
     // Replace a clip's settings in-place without resetting its phase.

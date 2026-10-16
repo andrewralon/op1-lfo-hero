@@ -703,6 +703,20 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// What a new chip should treat as the parameter's "previous" value. The app's live state
+    /// (`volumes`, `pans`…) follows whatever LFO is running, so when a preview or another chip is
+    /// already driving the parameter it holds a mid-sweep value, not the real one. Prefer what
+    /// was recorded before that LFO started.
+    private func originalValueForNewChip(track: Int, fallback: Double) -> Double {
+        if let running = activeLfos.first(where: {
+            $0.track == track && $0.paramId == lfoParam.id && isRunning($0)
+        }) { return running.originalValue }
+        if let previewed = automation.previewOriginalValue(track: track, paramId: lfoParam.id) {
+            return previewed
+        }
+        return capturedValue(of: lfoParam, track: track, fallback: fallback)
+    }
+
     private func addLfo(track: Int, rateTicks: Int, freeRatePeriod: Double?, depth: Double, center: Double,
                         inverted: Bool, loop: Bool) {
         // Dedup: paused/disabled chips also count — re-enable instead of adding a duplicate.
@@ -716,21 +730,42 @@ final class AppState: ObservableObject {
                           rateTicks: rateTicks, freeRatePeriod: freeRatePeriod,
                           depth: depth, centerValue: center,
                           inverted: inverted, loop: loop,
-                          originalValue: capturedValue(of: lfoParam, track: track, fallback: center))
+                          originalValue: originalValueForNewChip(track: track, fallback: center))
         automation.add(lfo)
         activeLfos.append(lfo)
         updatePreviewIfActive()
     }
 
+    /// Deleting a running chip leaves its parameter wherever the LFO last put it, so it gets the
+    /// same treatment as pausing one: the "chip pause action" setting decides. A chip that is
+    /// already paused, or a one-shot that already finished, has been put back once; it is not
+    /// restored again.
+    private func isRunning(_ lfo: LfoClip) -> Bool {
+        lfo.isEnabled && automation.snapshot().contains { $0.id == lfo.id }
+    }
+
+    private func restoreAfterPause(_ lfo: LfoClip) {
+        let action = UserDefaults.standard.string(forKey: "chipPauseAction") ?? "previous"
+        switch action {
+        case "center": automation.sendRestore(lfo: lfo, value: lfo.centerValue)
+        case "hold":   break  // send nothing; op-1 holds last lfo value
+        default:       automation.sendRestore(lfo: lfo, value: lfo.originalValue)
+        }
+    }
+
     func stopLfo(_ lfo: LfoClip) {
+        let running = activeLfos.first { $0.id == lfo.id }.map(isRunning) ?? false
         automation.remove(lfo)
         activeLfos.removeAll { $0.id == lfo.id }
+        if running { restoreAfterPause(lfo) }
         updatePreviewIfActive()
     }
 
     func stopAllLfos() {
+        let running = activeLfos.filter(isRunning)
         automation.clearAll()
         activeLfos.removeAll()
+        for lfo in running { restoreAfterPause(lfo) }
         updatePreviewIfActive()
     }
 
@@ -746,12 +781,7 @@ final class AppState: ObservableObject {
             automation.setEnabled(lfo.id, enabled: true)
         } else {
             automation.setEnabled(lfo.id, enabled: false)
-            let action = UserDefaults.standard.string(forKey: "chipPauseAction") ?? "previous"
-            switch action {
-            case "center": automation.sendRestore(lfo: activeLfos[idx], value: lfo.centerValue)
-            case "hold":   break  // send nothing; op-1 holds last lfo value
-            default:       automation.sendRestore(lfo: activeLfos[idx], value: lfo.originalValue)
-            }
+            restoreAfterPause(activeLfos[idx])
         }
         updatePreviewIfActive()
     }
@@ -788,13 +818,15 @@ final class AppState: ObservableObject {
             clips.append(LfoClip(deviceId: profile.id, track: 0, paramId: lfoParam.id, wave: lfoWave,
                                  rateTicks: rt, freeRatePeriod: period,
                                  depth: depthMidi, centerValue: centerMidi,
-                                 inverted: masterOn == 2, loop: true, originalValue: centerMidi))
+                                 inverted: masterOn == 2, loop: true,
+                                 originalValue: capturedValue(of: lfoParam, track: 0, fallback: centerMidi)))
         } else {
             for (t, state) in trackOn.sorted(by: { $0.key < $1.key }) where state != 0 {
                 clips.append(LfoClip(deviceId: profile.id, track: t, paramId: lfoParam.id, wave: lfoWave,
                                      rateTicks: rt, freeRatePeriod: period,
                                      depth: depthMidi, centerValue: centerMidi,
-                                     inverted: state == 2, loop: true, originalValue: centerMidi))
+                                     inverted: state == 2, loop: true,
+                                     originalValue: capturedValue(of: lfoParam, track: t, fallback: centerMidi)))
             }
         }
         // Suppress preview on tracks where an identical enabled chip is already running —

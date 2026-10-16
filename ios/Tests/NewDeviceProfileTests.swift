@@ -1174,3 +1174,84 @@ final class TempoNudgeRoutingTests: XCTestCase {
         XCTAssertTrue(tx6Ops.contains { if case .ccRelative = $0 { return true } else { return false } })
     }
 }
+
+/// What happens to a parameter when preview stops targeting it. Preview sweeps the real
+/// parameter, so leaving it where the LFO last put it silently changes the user's mix.
+final class PreviewRestoreTests: XCTestCase {
+
+    private var destination: RecordingDestination!
+    private var ctrl: Controller!
+    private var engine: AutomationEngine!
+
+    override func setUp() {
+        super.setUp()
+        destination = RecordingDestination()
+        ctrl = Controller(router: destination)
+        ctrl.setProfile(.op1Field)
+        engine = AutomationEngine()
+        engine.setProfile(.op1Field)
+        engine.controller = ctrl
+    }
+
+    private func clip(_ paramId: String, track: Int, original: Double) -> LfoClip {
+        LfoClip(deviceId: "op1", track: track, paramId: paramId, wave: .sine, rateTicks: 96,
+                depth: 20, centerValue: 64, inverted: false, loop: true, originalValue: original)
+    }
+
+    func testTurningPreviewOffPutsTheParameterBack() {
+        engine.setPreview([clip("volume", track: 1, original: 80)])
+        destination.reset()
+        engine.clearPreview()
+        XCTAssertEqual(destination.packets, [[0xB0, 7, 80]])
+    }
+
+    func testSwitchingParameterRestoresTheOldOneAndNotTheNew() {
+        engine.setPreview([clip("fx 1", track: 0, original: 100)])
+        destination.reset()
+        engine.setPreview([clip("fx 2", track: 0, original: 50)])
+        XCTAssertEqual(destination.packets, [[0xB0, 70, 100]], "fx 1 goes back; fx 2 is untouched")
+    }
+
+    func testTurningOffOneTrackRestoresOnlyThatTrack() {
+        engine.setPreview([clip("volume", track: 1, original: 80), clip("volume", track: 2, original: 90)])
+        destination.reset()
+        engine.setPreview([clip("volume", track: 2, original: 90)])
+        XCTAssertEqual(destination.packets, [[0xB0, 7, 80]])
+    }
+
+    /// Every slider tweak rebuilds the preview clips with new UUIDs. That must neither restore
+    /// nor forget the value recorded before the preview first touched the parameter.
+    func testRebuildingTheSameTargetSendsNothingAndKeepsTheFirstOriginal() {
+        engine.setPreview([clip("volume", track: 1, original: 80)])
+        destination.reset()
+        engine.setPreview([clip("volume", track: 1, original: 99)])   // an LFO-driven value
+        XCTAssertTrue(destination.packets.isEmpty)
+        engine.clearPreview()
+        XCTAssertEqual(destination.packets, [[0xB0, 7, 80]], "restores the value from before preview")
+    }
+
+    func testNothingIsRestoredWhileAnEnabledChipDrivesTheParameter() {
+        engine.add(clip("volume", track: 1, original: 80))
+        engine.setPreview([clip("volume", track: 1, original: 80)])
+        destination.reset()
+        engine.clearPreview()
+        XCTAssertTrue(destination.packets.isEmpty, "the chip owns it; a restore would only glitch it")
+    }
+
+    /// A chip created while preview is running must remember the value from before the preview,
+    /// not whatever the preview had driven the app's state to.
+    func testPreviewOriginalValueIsTheOneFromBeforePreview() {
+        XCTAssertNil(engine.previewOriginalValue(track: 1, paramId: "volume"))
+        engine.setPreview([clip("volume", track: 1, original: 15)])
+        engine.setPreview([clip("volume", track: 1, original: 95)])   // rebuilt mid-sweep
+        XCTAssertEqual(engine.previewOriginalValue(track: 1, paramId: "volume"), 15)
+        XCTAssertNil(engine.previewOriginalValue(track: 2, paramId: "volume"))
+        engine.clearPreview()
+        XCTAssertNil(engine.previewOriginalValue(track: 1, paramId: "volume"))
+    }
+
+    func testClearingWithNothingPreviewedSendsNothing() {
+        engine.clearPreview()
+        XCTAssertTrue(destination.packets.isEmpty)
+    }
+}
