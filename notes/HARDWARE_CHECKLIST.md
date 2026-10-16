@@ -17,7 +17,7 @@ Needs `iPad Pro Dawg` with the device on USB-C. Record the commit, the date, and
 - [x] an LFO running on a track parameter (2026-10-16, volume, master fx, compressor)
 - [x] play restarts every active LFO from the start of its cycle: pressed on the OP-1 (beat match; Start after a double stop, Continue after a single stop) and in the app (midi sync) (2026-10-16, USB)
 - [x] upgrade install over the App Store 1.0 keeps settings: parameter, wave, rate, depth/center, all chips (paused and inverted too) and track states (2026-10-16; volumes were never saved in 1.0, by design). See "Testing the settings migration" below.
-- [ ] same checks over BLE
+- [x] same checks over BLE: run over BLE on 2026-10-16 were the connection (auto-connect, stays connected when the device picker opens and closes), tape prev/next, and Mac-probe mute/volume. Not run over BLE on the iPad: per-track volume/pan/mute, master FX and the LFO restart on play. Accepted as working without a run (owner's call: BLE is not a priority for the OP-1).
 
 ## Probing from a Mac (`tools/midi/`)
 Plug the device into the Mac, not the iPad. `./mididiag` first (stale endpoints look like a silent
