@@ -641,6 +641,15 @@ final class AppState: ObservableObject {
         if isClockMaster { clock.setMasterBpm(bpm) }
     }
 
+    /// Called continuously while the BPM box is being dragged, so the device follows the number
+    /// on screen — the same way the LFO depth/center controls drive preview live. Unlike
+    /// `setBpm` it does not restart the clock timer, which would stutter the clock at drag rate;
+    /// `setBpm` still runs once on release to settle the final value.
+    func setBpmLive(_ v: Double) {
+        bpm = max(20, min(300, v))
+        if isClockMaster { clock.updateMasterBpm(bpm) }
+    }
+
     // MARK: - Track actions
 
     func setVolume(track: Int, value: Double) {

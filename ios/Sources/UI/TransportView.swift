@@ -132,6 +132,7 @@ private struct BpmScrubber: View {
                     let dh = g.translation.height - prevHeight
                     accumulated += dh * 0.05 * precisionFactor(g.translation.width)
                     prevHeight = g.translation.height
+                    app.setBpmLive((live * 10).rounded() / 10)   // device follows while dragging
                 }
                 .onEnded { _ in
                     guard !editing else { return }
