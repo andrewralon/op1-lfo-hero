@@ -1330,6 +1330,32 @@ a CoreMIDI client only sees what the device transmits. Delivery is confirmed onl
 device react (`notes/HARDWARE_CHECKLIST.md`). The old on-device listener test
 (`MidiHardwareUITests`, which waited for an echo) could never pass and was removed.
 
+## Hardware findings — OP-1 Field transport position in midi sync (2026-10-16)
+
+Question: when the app presses play, where does the OP-1 tape start? In the app, play started at
+0 the first time and then always resumed at the app's last stop position, even after the tape was
+moved by hand on the OP-1. Isolated from a Mac (`sendbytes` / `sendclock` one-off probes, USB),
+OP-1 in **midi sync** (app = master), tempo 110 BPM, clock sent at 120 BPM (OP-1 showed 109%).
+
+- **A lone `0xFB` with no clock does nothing.** The slave waits for clock. (CC 83 / next bar did
+  move the tape, so the link was fine.)
+- **`0xFB` with clock already running** starts the tape from the OP-1's own current position
+  (26s -> 31s, 35s -> 40s).
+- **Hand moves are discarded.** Tape parked by hand at 10s, then clock + `0xFB`: it sat at 10s,
+  then jumped to 40s (where the previous synced run had stopped) and played from there.
+- **An SPP positions the tape.** `F2 64 00` (SPP 100 = 25 beats) then clock + `0xFB` started at
+  13s. Sent *alone*, with no clock, Continue or Stop, the counter went 18s -> 13s 15 frames:
+  25 beats * 60/110 = 13.636 s = 13 s + 15 frames at 24 fps. SPP maps to tape time at the OP-1's own
+  tempo, exactly.
+- **Speed follows the clock** (displayed 100% -> 109% as the clock arrived, before any movement).
+
+So the OP-1 resumes from "the last synced position", not from the physical tape position. The
+OP-1 never reports its position back (see the transmit findings above), so the app cannot know
+it. Only the app's own tape prev/next buttons, which send an SPP, move the tape reliably.
+
+Same as `main`: it also sent `0xFB` after the first play, and `0xFA` only on the first play of a
+session (equivalent at position 0). Not verified by running the 1.0 build.
+
 ## Open questions — answer on hardware
 
 - [ ] Do the pinned FX-bus channels (ch 8/9) actually land?

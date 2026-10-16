@@ -29,12 +29,17 @@ final class ClockEngine {
     // MARK: - Transport state
     // sppPos is in MIDI Song Position Pointer units (1/16 notes = 6 ticks at 24 PPQN)
     private var sppPos = 0
-    // Play always sends Continue (0xFB) so the tape picks up where it left off — the same
-    // behaviour as the hardware's own play button. Only an explicit rewind makes the next play
-    // send Start (0xFA), which per the MIDI spec restarts from position zero.
+    // Play always sends Continue (0xFB) so the tape picks up where it left off. Only an explicit
+    // rewind makes the next play send Start (0xFA), which per the MIDI spec restarts from zero.
     //
     // Verified on a TP-7: 0xFA rewound to 0, 0xFB resumed. Sending Start on the first play of a
     // session (the old behaviour) therefore rewound the user's tape once, unasked.
+    //
+    // OP-1 Field, midi sync (measured 2026-10-16): "where it left off" is the position of the
+    // last *synced* transport, not wherever the tape was moved by hand. A hand move is discarded
+    // when play arrives, and the first play of a fresh session starts at 0. A Song Position
+    // Pointer sent first does position the tape (SPP 100 at 110 BPM -> 13s 15 frames, and an SPP
+    // alone moves it with no clock or Continue). See notes/RESEARCH.md.
     //
     // Set by rewindToStart(), which the double-stop feature should call — see notes/FEATURES.md.
     private var rewindPending = false

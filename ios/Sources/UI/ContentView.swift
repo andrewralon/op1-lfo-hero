@@ -466,7 +466,7 @@ struct HelpView: View {
         ("mute", Text("tap a track's colored number pad to mute/unmute it. bright colored background = unmuted; dark background = muted.")),
         ("pan", Text("drag up/down on a knob to pan right/left. release near top dead center to snap to center. [vertical scrubbing for horizontal controls like pan are hard. i'm open to better ideas...]")),
         ("volume", Text("drag up/down on a fader to set that track's volume. drag to the side for fine scrubbing.")),
-        ("transport", Text("play/stop control op1 tape playback (play only works when the app is the clock master). left/right arrow buttons step the op1 tape position backward/forward.")),
+        ("transport", Text("play/stop control op1 tape playback (play only works when the app is the clock master). play resumes from where the last play stopped, not from where you moved the tape by hand. left/right arrow buttons step the op1 tape position backward/forward.")),
         ("metronome & tempo mode", app.profile.caps.canBeClockMaster
             ? Text("tap the metronome icon to switch the clock source. then change the \(dev) to match.\n\(Text("\(clk) (beat match)").foregroundColor(C.track(1))) — \(dev) is master\n· app's lfos follow the \(dev)'s tempo.\n\(Text("app (midi sync)").foregroundColor(C.green)) — app is master\n· app controls the \(dev)'s transport (play/stop/back/forward).")
             : Text("the \(dev) does not send midi clock, so the app is always the tempo source. its lfos run on the app's own clock and the transport buttons drive the \(dev) over cc.")),

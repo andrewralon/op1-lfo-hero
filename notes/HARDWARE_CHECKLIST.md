@@ -6,13 +6,13 @@ first (`xcodebuild build`, confirm `** BUILD SUCCEEDED **`, then `devicectl devi
 Needs `iPad Pro Dawg` with the device on USB-C. Record the commit, the date, and the tempo mode.
 
 ## OP-1 Field
-- [ ] track 1 mute from the app mutes track 1 on the OP-1; tapping again unmutes
-- [ ] volume 100 (MIDI) shows 77 on the OP-1 (`v * 99 // 127`)
+- [x] track 1 mute from the app mutes track 1 on the OP-1; tapping again unmutes (2026-10-16, USB)
+- [x] volume 100 (MIDI) shows 77 on the OP-1 (`v * 99 // 127`) (2026-10-16, Mac probe, USB and BLE)
 - [ ] volume, pan and mute on tracks 1-4
 - [ ] master FX and compressor
 - [ ] tape prev / next
-- [ ] play from a **parked** tape continues from there (play sends Continue `0xFB`, not Start)
-- [ ] stop stops it
+- [x] play sends Continue and the OP-1 resumes from the last *synced* position, not a hand-parked one (documented in RESEARCH.md; midi sync only, beat match ignores app transport)
+- [x] stop stops it
 - [ ] clock both ways: beat match (OP-1 master) and midi sync (app master)
 - [ ] an LFO running on a track parameter
 - [ ] upgrade install over an older build keeps settings (Keychain migration)
