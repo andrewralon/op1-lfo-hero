@@ -605,7 +605,7 @@
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "op1 lfo hero";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "LFO Hero needs Bluetooth to connect to the OP-1 Field via BLE MIDI.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "LFO Hero needs Bluetooth to connect to your OP-1 Field, TX-6 or TP-7 via BLE MIDI.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -645,7 +645,7 @@
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "op1 lfo hero";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
-				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "LFO Hero needs Bluetooth to connect to the OP-1 Field via BLE MIDI.";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "LFO Hero needs Bluetooth to connect to your OP-1 Field, TX-6 or TP-7 via BLE MIDI.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
