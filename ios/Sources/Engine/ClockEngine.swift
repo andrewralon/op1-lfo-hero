@@ -296,6 +296,9 @@ final class ClockEngine {
 
     /// CC 18 units per 1x of added speed while the tape is rolling FORWARD (parked it is exactly 4).
     static let rollingForwardUnitsPerX = 4.26
+    /// CC 18 units per 1x of reverse speed while the tape is rolling forward and being reversed:
+    /// speed = (64 - CC) / 3.76 - 1.
+    static let rollingReverseUnitsPerX = 3.76
 
     func play() {
         // Matches the hardware: on a device whose play button reverses, a second press while
@@ -549,6 +552,13 @@ final class ClockEngine {
                     // 6% off the reference repo's 4.0, which is exact for a parked tape.
                     let delta = Int((ClockEngine.rollingForwardUnitsPerX * (transportSpeed - 1)).rounded())
                     sendCC(ch: ch, cc: cc, val: center + delta)
+                } else if rolling && direction < 0 {
+                    // Reverse while rolling: the tape's forward 1x has to be cancelled first, so the
+                    // reverse speed T needs 3.76 * (T + 1) units below 64. Measured 2026-10-16 on the
+                    // same memo: CC 56 / 52 / 48 gave 1.13x / 2.19x / 3.25x, flat to +/-0.5 ticks/s,
+                    // with the counter confirmed counting down. A different slope from forward (4.26).
+                    let below = Int((ClockEngine.rollingReverseUnitsPerX * (transportSpeed + 1)).rounded())
+                    sendCC(ch: ch, cc: cc, val: center - below)
                 } else {
                     let offset = (rolling ? deadZone : 0) + Int((Double(unitSpeed) * transportSpeed).rounded())
                     sendCC(ch: ch, cc: cc, val: center + direction * max(1, offset))

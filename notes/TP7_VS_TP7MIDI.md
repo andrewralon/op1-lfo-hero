@@ -320,10 +320,25 @@ outside the +/-0.3 ticks/s spread. That formula is exact for a *parked* tape (sl
 above). The app now sends `64 + round(4.26 * (speed - 1))` for forward while rolling
 (`ClockEngine.rollingForwardUnitsPerX`): 2x -> 68, 3x -> 73, 14x -> 119, 1x -> 64, 0.25x -> 61.
 
-Still not re-measured: **reverse while rolling** keeps `64 - (4 + 4 * speed)`, from the older
-reverse table (slope 3.76 units per 1x), within about 10% of the label (about 2.2x at CC 52 and
-15x at CC 4); the app's press-and-hold ramp (1x to 14x over 1.5 s) end to end on an iPad; and the
-slope on a second memo or another tempo (the ratios should not depend on tempo).
+**Reverse while rolling (measured the same day, same memo, counter counting down):**
+
+| CC 18 (rolling) | ticks/s | multiple of 1x | old app formula label | `(64 - CC) / 3.76 - 1` |
+|---|---|---|---|---|
+| 56 | 40.53 | **1.13x** | 1x | 1.13 |
+| 52 | 78.81 | **2.19x** | 2x | 2.19 |
+| 48 | 117.06 | **3.25x** | 3x | 3.26 |
+
+The slope is **3.76 units per 1x**, the older reverse table's number, so reverse and forward
+differ while rolling (3.76 against 4.26). The old formula sent exactly these values for 1x / 2x /
+3x, so reverse ran 9 to 13% over its label. The app now sends `64 - round(3.76 * (speed + 1))`
+(`ClockEngine.rollingReverseUnitsPerX`): 1x -> 56 (1.13x, the nearest step: one CC unit is
+0.27x), 2x -> 53 (1.93x), 3x -> 49 (2.99x), 14x -> 8 (13.9x), 0.25x -> 59. The clock is unsigned;
+direction was confirmed by watching the counter run down.
+
+Still not re-measured: the new reverse values themselves (53 and 49 are predictions from the
+fitted slope; 56, 52 and 48 are measured); the app's press-and-hold ramp (1x to 14x over 1.5 s)
+end to end on an iPad; and the slope on a second memo or another tempo (the ratios should not
+depend on tempo).
 
 ### 2. ✅ CONFIRMED 2026-09-06 — The stop point during playback, our correction retracted
 Decided D2. `./cc18map TP-7 playing`, direction confirmed by watching the reel:

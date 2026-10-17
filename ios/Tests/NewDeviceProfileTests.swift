@@ -477,19 +477,37 @@ final class TP7TransportTests: XCTestCase {
     }
 
     /// While the tape is rolling the device's own +1x transport is inside every CC 18 reading, so
-    /// the dead zone of 4 applies: offset = 4 + 4 * speed. (From a parked tape it does not; that
-    /// was measured on 2026-09-06 and is the case above.)
-    func testSeekWhilePlayingKeepsTheDeadZone() {
+    /// the parked formula does not apply. Reverse needs the forward 1x cancelled first (see
+    /// `testReverseWhilePlayingUsesTheMeasuredSlope`); this keeps the parked case above honest.
+    func testReverseWhilePlayingDoesNotUseTheParkedFormula() {
         clock.play()
         destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 52]], "reverse: 64 - (4 + 4*2), unchanged")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 53]], "reverse 2x while rolling: 64 - round(3.76 * 3)")
     }
 
     /// Forward while rolling is NOT the dead-zone formula. The tape's own 1x adds to the CC, so
     /// speed = 1 + (CC - 64) / 4.26 and CC = 64 + 4.26 * (speed - 1). Measured on a TP-7 on
     /// 2026-10-16: CC 68 / 72 / 76 / 80 gave 1.94x / 2.87x / 3.81x / 4.75x (the old formula sent 76
     /// for 2x, which is 3.81x). See notes/TP7_VS_TP7MIDI.md.
+    /// Reverse while rolling has its own slope: speed = (64 - CC) / 3.76 - 1. Measured on a TP-7 on
+    /// 2026-10-16 with the counter counting down: CC 56 / 52 / 48 gave 1.13x / 2.19x / 3.25x (the
+    /// old formula sent exactly those for 1x / 2x / 3x, 9 to 13% over).
+    func testReverseWhilePlayingUsesTheMeasuredSlope() {
+        clock.play()
+        func prev(at speed: Double) -> [[UInt8]] {
+            clock.transportSpeed = speed
+            destination.reset()
+            clock.tapePrev()
+            return destination.packets
+        }
+        XCTAssertEqual(prev(at: 0.25), [[0xB0, 18, 59]], "64 - round(4.7): about 0.33x reverse")
+        XCTAssertEqual(prev(at: 1.0), [[0xB0, 18, 56]], "64 - round(7.52); the nearest step to 1x is 1.13x")
+        XCTAssertEqual(prev(at: 2.0), [[0xB0, 18, 53]], "64 - round(11.28): 1.93x")
+        XCTAssertEqual(prev(at: 3.0), [[0xB0, 18, 49]], "64 - round(15.04): 2.99x")
+        XCTAssertEqual(prev(at: 14.0), [[0xB0, 18, 8]], "the top of the ramp, 13.9x")
+    }
+
     func testForwardWhilePlayingUsesTheMeasuredAdditiveFormula() {
         clock.play()
         func next(at speed: Double) -> [[UInt8]] {
@@ -514,7 +532,7 @@ final class TP7TransportTests: XCTestCase {
         XCTAssertEqual(destination.packets, [[0xB0, 18, 68]], "forward 2x while rolling")
         destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 52]], "reverse 2x while rolling")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 53]], "reverse 2x while rolling")
     }
 
     /// Speed is a multiple of normal playback, not a raw CC offset, and the mapping is affine:
@@ -1046,9 +1064,9 @@ final class TP7ScrubAndReverseTests: XCTestCase {
         clock.endScrub()
     }
 
-    /// The top of the ramp must stay inside CC 18's range. While rolling, deadZone 4 + unitSpeed 4
-    /// saturates the offset at 63 (about 14.75x), so a max above that would ramp into a wall.
-    /// This test is the rolling case, the tighter limit; parked tapes have 4 more of headroom.
+    /// The top of the ramp must stay inside CC 18's range. Rolling reverse reaches the floor first
+    /// (64 - 3.76 * (speed + 1) >= 0 up to about 16x, forward rolling up to about 15.8x), and the
+    /// old dead-zone limit of 14.75x is kept as a conservative ceiling for the ramp.
     func testMaxScrubSpeedStaysWithinCC18Range() {
         XCTAssertLessThanOrEqual(clock.maxScrubSpeed, 14.75, "beyond this CC 18 saturates")
         clock.play()
@@ -1057,7 +1075,7 @@ final class TP7ScrubAndReverseTests: XCTestCase {
         clock.tapePrev()
         let value = destination.packets[0][2]
         XCTAssertGreaterThanOrEqual(value, 0)
-        XCTAssertEqual(value, 4, "reverse 64 - (4 + 4*14) = 4, just inside the floor")
+        XCTAssertEqual(value, 8, "reverse 64 - round(3.76 * 15) = 8, inside the floor")
     }
 
     func testMaxScrubSpeedFromAParkedTapeHasMoreHeadroom() {
