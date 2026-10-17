@@ -137,6 +137,27 @@ final class MultiDeviceUITests: XCTestCase {
         XCTAssertFalse(tp7.buttons["eq high"].exists, "tp-7 has no eq")
     }
 
+    // MARK: - Slaved to a clock that never arrives
+
+    /// Switching the clock source to a device that isn't sending clock freezes every LFO. The
+    /// only sign used to be a small "no clk" in the BPM box; the LFO panel now says so, and a tap
+    /// switches to the app's clock. No MIDI in the simulator, so the clock never arrives.
+    @MainActor func testLfosWaitingForClockAreFlaggedWhereTheLfosAre() throws {
+        let app = launch(profile: "op1")
+        let banner = app.buttons["clockWaitingBanner"]
+        XCTAssertFalse(banner.exists, "app is the clock: nothing to wait for")
+
+        app.buttons["repeatButton"].tap()                       // a running LFO chip
+        app.buttons["tempoModeButton"].tap()                    // slave to the op-1's clock
+        XCTAssertTrue(banner.waitForExistence(timeout: 6), "slaved, LFOs running, no clock")
+        try shot(app, "lfo_waiting_for_clock")
+
+        banner.tap()                                            // use the app clock
+        let gone = NSPredicate(format: "exists == false")
+        expectation(for: gone, evaluatedWith: banner)
+        waitForExpectations(timeout: 4)
+    }
+
     // MARK: - Device switching
 
     /// Switching devices and back must not lose the first device's chips — per-device state

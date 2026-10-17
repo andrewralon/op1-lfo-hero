@@ -37,6 +37,10 @@ final class AppState: ObservableObject {
     @Published var bpm: Double = 100.0
     @Published var isClockMaster = false
     @Published var slaveTicksReceived: Int = 0  // diagnostic: counts ticks from OP-1
+    /// True while the app is slaved to a device that is sending no clock and LFOs are waiting on
+    /// it. In slave mode the device's ticks are the only thing that drives LFOs, so without them
+    /// every one of them (chips and preview, free-rate too) silently stops.
+    @Published var lfosWaitingForClock = false
 
     // MARK: - Track state  (volume: 0-99 display, pan: -63..+63)
     @Published var volumes: [Int: Double] = [1: 99, 2: 99, 3: 99, 4: 99]
@@ -415,6 +419,31 @@ final class AppState: ObservableObject {
         applyDeviceState(s.perDevice[newProfile.id] ?? DeviceState(), for: newProfile)
     }
 
+    /// Seconds without a tick before LFOs are reported as waiting. A device at 24 PPQN ticks every
+    /// ~20 to 40 ms and a TP-7 at 0.25x about every 100 ms, so a second and a half is a real gap.
+    static let clockGapSeconds = 1.5
+
+    /// Whether to tell the user their LFOs are stuck waiting for a clock that isn't coming.
+    static func lfosWaitingForClock(isClockMaster: Bool, hasLfos: Bool, secondsSinceTick: Double?) -> Bool {
+        guard !isClockMaster, hasLfos else { return false }
+        guard let age = secondsSinceTick else { return true }   // slaved, and nothing has ever arrived
+        return age > clockGapSeconds
+    }
+
+    private func refreshLfosWaitingForClock() {
+        let hasLfos = isPreview || activeLfos.contains { $0.isEnabled }
+        let waiting = Self.lfosWaitingForClock(isClockMaster: isClockMaster, hasLfos: hasLfos,
+                                               secondsSinceTick: clock.secondsSinceExternalTick)
+        if waiting != lfosWaitingForClock { lfosWaitingForClock = waiting }
+    }
+
+    private func wireClockWatchdog() {
+        Timer.publish(every: 0.5, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in self?.refreshLfosWaitingForClock() }
+            .store(in: &cancellables)
+    }
+
     private func wireAutoSave() {
         Publishers.MergeMany(
             $lfoWave.map { _ in () }.eraseToAnyPublisher(),
@@ -453,6 +482,7 @@ final class AppState: ObservableObject {
 
         wireCallbacks()
         wireAutoSave()
+        wireClockWatchdog()
         loadSettings()  // restores settings and calls enableClock/disableClock
     }
 

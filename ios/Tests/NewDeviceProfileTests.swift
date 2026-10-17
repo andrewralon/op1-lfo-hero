@@ -1460,3 +1460,33 @@ final class BleScanGuardTests: XCTestCase {
         XCTAssertTrue(BLEMidi.shouldScan(linkIsUp: false))
     }
 }
+
+/// When to tell the user their LFOs are stuck waiting for a clock that isn't coming.
+final class LfosWaitingForClockTests: XCTestCase {
+    private func waiting(master: Bool = false, lfos: Bool = true, age: Double?) -> Bool {
+        AppState.lfosWaitingForClock(isClockMaster: master, hasLfos: lfos, secondsSinceTick: age)
+    }
+
+    func testNeverWaitingWhenTheAppIsTheClock() {
+        XCTAssertFalse(waiting(master: true, age: nil))
+        XCTAssertFalse(waiting(master: true, age: 60))
+    }
+
+    func testNothingToWaitForWithoutLFOs() {
+        XCTAssertFalse(waiting(lfos: false, age: nil))
+    }
+
+    func testSlavedWithNoClockEverReceivedIsWaiting() {
+        XCTAssertTrue(waiting(age: nil), "e.g. the op-1 is in the wrong tempo mode")
+    }
+
+    func testAClockThatIsArrivingIsNotWaiting() {
+        XCTAssertFalse(waiting(age: 0.03))
+        XCTAssertFalse(waiting(age: 1.4))
+    }
+
+    func testAClockThatHasGoneQuietIsWaiting() {
+        XCTAssertTrue(waiting(age: 1.6), "e.g. a stopped TP-7, which sends clock only while its tape moves")
+        XCTAssertTrue(waiting(age: 30))
+    }
+}

@@ -1,5 +1,37 @@
 import SwiftUI
 
+/// Shown over the waveform when the app is slaved to a device that is sending no clock: in slave
+/// mode the device's ticks drive every LFO, so without them they all stop with no other sign. A tap
+/// switches to the app's own clock. Lives here, not only in the BPM box's small "no clk", because
+/// this is where someone looks when their LFOs aren't moving.
+private struct ClockWaitingBanner: ViewModifier {
+    @EnvironmentObject var app: AppState
+    @Environment(\.metrics) private var m
+
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .top) {
+            if app.lfosWaitingForClock {
+                Button { app.enableClock() } label: {
+                    Text("lfos paused — no clock from \(app.profile.caps.clockLabel). tap to use the app clock")
+                        .font(.system(size: m.lfoChipFont, weight: .semibold, design: .monospaced))
+                        .foregroundColor(C.yellow)
+                        .multilineTextAlignment(.center)
+                        .padding(m.lfoPanelPad)
+                        .frame(maxWidth: .infinity)
+                        .background(C.bg.opacity(0.88))
+                        .overlay(Rectangle().stroke(C.yellow.opacity(0.8), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("clockWaitingBanner")
+            }
+        }
+    }
+}
+
+private extension View {
+    func clockWaitingBanner() -> some View { modifier(ClockWaitingBanner()) }
+}
+
 struct LFOPanelView: View {
     var needsCombinedLfoRow: Bool = false
     var needsSideBySide: Bool = false
@@ -362,6 +394,7 @@ struct LFOPanelView: View {
                     .background(C.bg2)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
+                    .clockWaitingBanner()
                     .padding(m.lfoPanelPad)
 
                     HStack(spacing: 0) {
@@ -404,6 +437,7 @@ struct LFOPanelView: View {
                 .background(C.bg2)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
+                .clockWaitingBanner()
                 .padding(8)
 
                 HStack(spacing: 0) {

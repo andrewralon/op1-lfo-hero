@@ -108,6 +108,12 @@ final class ClockEngine {
     ///
     /// False whenever the device is not in `sync` mode — there is no clock to hear, so the app
     /// falls back to assuming nothing.
+    /// Seconds since the last clock tick arrived from the device, or nil if none ever has. Unlike
+    /// `deviceIsRolling` this is the raw age, for a "no clock" warning with its own threshold.
+    var secondsSinceExternalTick: Double? {
+        lastExternalTickTime > 0 ? CACurrentMediaTime() - lastExternalTickTime : nil
+    }
+
     var deviceIsRolling: Bool {
         lastExternalTickTime > 0 && CACurrentMediaTime() - lastExternalTickTime < 0.25
     }

@@ -302,6 +302,7 @@ struct StatusBarView: View {
                 .font(.system(size: m.statusBarFont, weight: .medium, design: .monospaced))
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("tempoModeButton")
             // Devices that never emit MIDI clock can't be the tempo source, so the app stays master.
             .disabled(!app.profile.caps.canBeClockMaster)
         }
