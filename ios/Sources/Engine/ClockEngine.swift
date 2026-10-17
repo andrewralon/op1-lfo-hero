@@ -294,6 +294,9 @@ final class ClockEngine {
     /// uses it to restart the LFOs from the beginning of their cycles.
     var onPlay: (() -> Void)?
 
+    /// CC 18 units per 1x of added speed while the tape is rolling FORWARD (parked it is exactly 4).
+    static let rollingForwardUnitsPerX = 4.26
+
     func play() {
         // Matches the hardware: on a device whose play button reverses, a second press while
         // rolling flips direction rather than restarting playback.
@@ -537,8 +540,19 @@ final class ClockEngine {
                 // held 10 s from a parked tape moved the counter 10.4 s. Applying the dead zone
                 // unconditionally made every scrub from a parked tape run one whole 1x too fast.
                 let rolling = isPlaying || deviceIsRolling
-                let offset = (rolling ? deadZone : 0) + Int((Double(unitSpeed) * transportSpeed).rounded())
-                sendCC(ch: ch, cc: cc, val: center + direction * max(1, offset))
+                if rolling && direction > 0 {
+                    // Forward while rolling: the tape's own 1x adds to the CC, so the speed is
+                    // 1 + (CC - 64) / 4.26 and the CC for a wanted speed T is 64 + 4.26 * (T - 1).
+                    // CC 64 is plain playback (1x) and speeds under 1x sit below 64. Measured on a
+                    // TP-7 (firmware 1.1.11), a memo at 90 BPM, 2026-10-16: CC 68 / 72 / 76 / 80 gave
+                    // 1.94x / 2.87x / 3.81x / 4.75x, flat to +/-0.3 ticks/s over 10 s. The slope is
+                    // 6% off the reference repo's 4.0, which is exact for a parked tape.
+                    let delta = Int((ClockEngine.rollingForwardUnitsPerX * (transportSpeed - 1)).rounded())
+                    sendCC(ch: ch, cc: cc, val: center + delta)
+                } else {
+                    let offset = (rolling ? deadZone : 0) + Int((Double(unitSpeed) * transportSpeed).rounded())
+                    sendCC(ch: ch, cc: cc, val: center + direction * max(1, offset))
+                }
                 transportDirection = direction
             case .toggleCC(let ch, let cc, let value, let whenPlaying):
                 if isPlaying == whenPlaying { sendCC(ch: ch, cc: cc, val: value) }

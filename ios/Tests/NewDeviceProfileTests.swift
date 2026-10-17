@@ -482,15 +482,27 @@ final class TP7TransportTests: XCTestCase {
     func testSeekWhilePlayingKeepsTheDeadZone() {
         clock.play()
         destination.reset()
-        clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 76]], "64 + 4 + 4*2 at 2x")
-        destination.reset()
         clock.tapePrev()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 52]], "64 - (4 + 4*2)")
-        clock.transportSpeed = 1.0
-        destination.reset()
-        clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 72]], "64 + 4 + 4*1 at 1x")
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 52]], "reverse: 64 - (4 + 4*2), unchanged")
+    }
+
+    /// Forward while rolling is NOT the dead-zone formula. The tape's own 1x adds to the CC, so
+    /// speed = 1 + (CC - 64) / 4.26 and CC = 64 + 4.26 * (speed - 1). Measured on a TP-7 on
+    /// 2026-10-16: CC 68 / 72 / 76 / 80 gave 1.94x / 2.87x / 3.81x / 4.75x (the old formula sent 76
+    /// for 2x, which is 3.81x). See notes/TP7_VS_TP7MIDI.md.
+    func testForwardWhilePlayingUsesTheMeasuredAdditiveFormula() {
+        clock.play()
+        func next(at speed: Double) -> [[UInt8]] {
+            clock.transportSpeed = speed
+            destination.reset()
+            clock.tapeNext()
+            return destination.packets
+        }
+        XCTAssertEqual(next(at: 0.25), [[0xB0, 18, 61]], "slower than 1x sits under 64")
+        XCTAssertEqual(next(at: 1.0), [[0xB0, 18, 64]], "1x is plain playback")
+        XCTAssertEqual(next(at: 2.0), [[0xB0, 18, 68]], "2x (the default): 1.94x measured")
+        XCTAssertEqual(next(at: 3.0), [[0xB0, 18, 73]], "64 + round(8.52); 72 measured 2.87x")
+        XCTAssertEqual(next(at: 14.0), [[0xB0, 18, 119]], "the top of the scrub ramp, inside range")
     }
 
     /// A tape the device itself is rolling (sync mode, clock arriving) is rolling too, even though
@@ -499,7 +511,10 @@ final class TP7TransportTests: XCTestCase {
         clock.router?.onClock?()           // a tick arrives: the tape is moving
         destination.reset()
         clock.tapeNext()
-        XCTAssertEqual(destination.packets, [[0xB0, 18, 76]])
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 68]], "forward 2x while rolling")
+        destination.reset()
+        clock.tapePrev()
+        XCTAssertEqual(destination.packets, [[0xB0, 18, 52]], "reverse 2x while rolling")
     }
 
     /// Speed is a multiple of normal playback, not a raw CC offset, and the mapping is affine:
@@ -1039,10 +1054,10 @@ final class TP7ScrubAndReverseTests: XCTestCase {
         clock.play()
         clock.transportSpeed = clock.maxScrubSpeed
         destination.reset()
-        clock.tapeNext()
+        clock.tapePrev()
         let value = destination.packets[0][2]
-        XCTAssertLessThanOrEqual(value, 127)
-        XCTAssertEqual(value, 124, "64 + 4 + 4*14 = 124, just inside the ceiling")
+        XCTAssertGreaterThanOrEqual(value, 0)
+        XCTAssertEqual(value, 4, "reverse 64 - (4 + 4*14) = 4, just inside the floor")
     }
 
     func testMaxScrubSpeedFromAParkedTapeHasMoreHeadroom() {

@@ -24,7 +24,7 @@ numeric disagreement, is also resolved (test 3: our own "engage" model was over-
 **✅ CONFIRMED ON HARDWARE (2026-09-06): our `deadZone: 4` is wrong when the tape is stopped, by
 exactly 1x.** See test 1 below for the measurement — `CC 18 = 68` held for 10.0s from a parked
 tape moved the position counter at x1.04-1.05 (their prediction: 1x; ours: ~0.06x, the stall
-point). Not yet fixed in code — see [FIELD_DEVICE_SUPPORT.md](FIELD_DEVICE_SUPPORT.md).
+point). **Fixed in code 2026-10-16** (parked and forward-while-rolling; see test 1).
 
 Both projects measured the same slope for CC 18 — 4 MIDI units per 1x of playback speed. We
 differ on the intercept:
@@ -296,9 +296,34 @@ at ~0.3 s start-up plus a 0.2 s pause each, around `sleep 10`), so every predict
 
 Forward 1x (CC 68) was measured on 2026-09-06 (+10.4 s in 10.0 s). Reverse from a parked tape had
 never been measured; it follows the same rule with no dead zone. Spin-up and spin-down net to
-about nothing over these holds: the measured multiples are 2.0x, 1.0x and 2.0x. Not re-measured:
-the rolling case (the dead zone of 4 is kept, from the earlier playing-forward table) and the
-app's scrub ramp (1x to 14x over 1.5 s) end to end.
+about nothing over these holds: the measured multiples are 2.0x, 1.0x and 2.0x.
+
+**Forward while the tape is rolling is a different formula (2026-10-16).** The dead zone was kept
+for a while after the parked fix on the strength of the old playing-forward table. That table was
+measured on the *reverse* side, and forward does not follow it: with the tape rolling, its own 1x
+adds to the CC 18 speed. Measured by the sync clock on a recorded memo at 90 BPM (36 ticks/s = 1x;
+library WAVs send no clock), tape started by hand, readings flat to +/-0.3 ticks/s:
+
+| CC 18 (rolling) | ticks/s | multiple of 1x | `1 + (CC - 64) / 4.26` | old app formula (offset 4 + 4*speed) |
+|---|---|---|---|---|
+| 64 (released) | 36.19 | 1.00x | 1.00 | 1x |
+| 68 | 69.65 / 69.73 (two runs; the second after a 2 s settle, 8 s baseline, 3 s settle, 10 s window) | **1.93x / 1.94x** | 1.94 | stall (about 0x) |
+| 72 | 103.40 | **2.87x** | 2.88 | 1x |
+| 76 | 137.35 | **3.81x** | 3.82 | 2x |
+| 80 | 171.08 | **4.75x** | 4.76 | 3x |
+
+So the app sent CC 76 for "2x forward while rolling" and got 3.81x. The slope while rolling is
+**4.26 units per 1x**, and the null is near 59.7. This agrees with the reference repo in kind (null
+between 60 and 61 while playing, 64 is plain playback, speed is relative) but not in number: its
+single formula `(CC - 64) / 4` predicts 2.00x at CC 68 where we measure 1.94x, 3% off and well
+outside the +/-0.3 ticks/s spread. That formula is exact for a *parked* tape (slope 4.0, measured
+above). The app now sends `64 + round(4.26 * (speed - 1))` for forward while rolling
+(`ClockEngine.rollingForwardUnitsPerX`): 2x -> 68, 3x -> 73, 14x -> 119, 1x -> 64, 0.25x -> 61.
+
+Still not re-measured: **reverse while rolling** keeps `64 - (4 + 4 * speed)`, from the older
+reverse table (slope 3.76 units per 1x), within about 10% of the label (about 2.2x at CC 52 and
+15x at CC 4); the app's press-and-hold ramp (1x to 14x over 1.5 s) end to end on an iPad; and the
+slope on a second memo or another tempo (the ratios should not depend on tempo).
 
 ### 2. ✅ CONFIRMED 2026-09-06 — The stop point during playback, our correction retracted
 Decided D2. `./cc18map TP-7 playing`, direction confirmed by watching the reel:
