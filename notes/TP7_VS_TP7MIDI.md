@@ -495,8 +495,22 @@ Item 15 above establishes that the outgoing rate is a readout of the loaded cont
 setting*, not a live motor-speed parameter — so there was never a channel by which incoming
 clock pulses could have changed it. The "~51.3-51.5, never moving" baseline in the table above
 was this test's own memo/mode's tempo setting, staying exactly where a static readout should
-stay. See [RESEARCH.md](RESEARCH.md) for the full mechanism. Code change
-(flip the flag, decide `tp7.tempo`'s fate) deliberately not made yet — flagged for a decision.
+stay. See [RESEARCH.md](RESEARCH.md) for the full mechanism.
+
+**Re-tested and decided 2026-10-16.** With a recorded memo (90 BPM, 36 ticks/s = 1x, memo mode, `sync`),
+tape rolling at 1x, `clocksuppress` streamed our clock at 60 BPM (target 24 ticks/s) and 130 BPM
+(target 52 ticks/s), with the TP-7's metronome on for the second pair. Its own clock read **36
+ticks/s in every one of the 14 one-second windows of each run, listening and sending alike**.
+Playback speed, the counter and the metronome click all stayed at normal: nothing moved by ear
+either. Both targets are far from the natural rate, so this is decisive, and it is the "run it with
+a sweep" check the notes had wanted before touching code. Done: `followsClock: false`,
+`hasTempoParam: false`, and **`tp7.tempo` removed** from the profile (it would only have retuned the
+app's own timebase while the device played on). `canBeClockMaster: true` stays, because the app can
+slave to the TP-7's clock.
+
+Measurement trap found on the way: `clocksuppress` printed "SUPPRESSED" on its first run because
+the USB driver's backlog put 601 ticks in the first second of phase 1 and the tool averaged it in
+(130 ticks/s against 36). It now throws away its first second.
 
 ### 11. ✅ CONFIRMED 2026-09-07 — SPD varispeed × pitch bend: multiplicative, and a bonus
 ### confirmation that the bend curve is a portable device constant

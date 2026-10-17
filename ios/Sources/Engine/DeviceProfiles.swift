@@ -279,8 +279,13 @@ extension DeviceProfile {
             // (~1769 ticks in 40 s ≈ 110 BPM), so the app can slave to it. The published MIDI
             // reference documents no clock output — this was only found by listening.
             canBeClockMaster: true,
-            followsClock: true,     // UNVERIFIED — see notes/RESEARCH.md
-            hasTempoParam: true,
+            // The TP-7 does NOT act on incoming clock. Measured 2026-09-06 and again 2026-10-16 with
+            // a recorded memo (36 ticks/s = 1x): streaming 60 and 130 BPM at it left its own clock
+            // at 36 ticks/s every second, and playback speed, the counter and the metronome click
+            // stayed at normal. Its outgoing clock is a tempo readout, not a control.
+            // notes/TP7_VS_TP7MIDI.md, test 10.
+            followsClock: false,
+            hasTempoParam: false,
             clockLabel: "tp7",
             // TE's own docs: "TP-7 never reports its state via MIDI." There is nothing to
             // mirror, and in `ctrl` mode what it does send is its own button map.
@@ -373,11 +378,9 @@ extension DeviceProfile {
                       offOps: [.midiStop, .cc(ch: 0, cc: 14, value: 0)]),
                   lfoTargetable: false),
 
-        // Tempo. The TP-7 has no tempo control of its own, but it follows MIDI clock in `sync`
-        // mode — so retuning the app's clock retunes the device too, as well as the LFO rate.
-        // Same mechanism the OP-1 uses; sends no CC of its own.
-        ParamSpec(id: "tp7.tempo", name: "tempo", short: "tmp",
-                  track: nil, master: .virtualTempo, role: .tempo),
+        // No tempo parameter. The OP-1's works because the device follows the app's clock; the TP-7
+        // ignores incoming clock entirely (see `followsClock` above), so a tempo LFO would only
+        // retune the app's own timebase while the device kept playing normally.
         // No observable effect on hardware — sent 127 x4 and 0 x2 with the tape playing, and
         // nothing changed on the display or in the audio. Recorded as unverified rather than
         // broken: the TP-7 never reports its state, so "silently working" and "doing nothing"

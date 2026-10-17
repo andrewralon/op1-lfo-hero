@@ -241,8 +241,9 @@ All seven are built and unit-tested. **None have been tried on the device yet.**
       range so an LFO sweeps x0.25 to x2.0, with 64 at centre
 - [x] **2. Direction parameter** (`tp7.direction`) — two-state on `CC 18` like mute: above the
       threshold 68 (forward 1x), below 60 (reverse 1x). Never emits an intermediate value
-- [x] **3. Tempo parameter** (`tp7.tempo`) — `.virtualTempo`, retunes the app's clock, which the
-      TP-7 follows in `sync` mode. `hasTempoParam` flipped to true
+- [x] ~~**3. Tempo parameter** (`tp7.tempo`)~~ — **removed 2026-10-16.** The TP-7 does not follow
+      incoming clock (measured twice; `TP7_VS_TP7MIDI.md`, test 10), so it only retuned the app's own
+      timebase. `hasTempoParam` and `followsClock` are false
 - [x] **4. Play/stop parameter** (`tp7.play`) — new `ParamBinding.transport` case for real-time
       messages. **Edge-triggered**, so a sustained LFO value does not re-fire every clock tick
 - [x] **5. Record sequence** (`tp7.recSeq`) — stop (only if playing), arm, play. Off stops and

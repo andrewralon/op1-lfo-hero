@@ -266,10 +266,12 @@ final class TP7ProfileTests: XCTestCase {
                       "the TP-7 does send MIDI clock in sync mode — verified on hardware")
     }
 
-    /// hasTempoParam is true even though the TP-7 has no tempo CC: it *follows* MIDI clock in
-    /// `sync` mode, so retuning the app's clock retunes the device.
+    /// The TP-7 has no tempo CC and does not follow incoming MIDI clock (measured twice: 60 and
+    /// 130 BPM streamed at a rolling memo left its own clock at 36 ticks/s), so it has no tempo
+    /// parameter. See notes/TP7_VS_TP7MIDI.md, test 10.
     func testCapabilities() {
-        XCTAssertTrue(profile.caps.hasTempoParam)
+        XCTAssertFalse(profile.caps.hasTempoParam)
+        XCTAssertFalse(profile.caps.followsClock)
         // TE's docs: "TP-7 never reports its state via MIDI" — nothing to mirror.
         XCTAssertFalse(profile.caps.mirrorsIncomingCC)
     }
@@ -777,27 +779,20 @@ final class TP7PlaybackParamsTests: XCTestCase {
 
     // MARK: - Tempo
 
-    /// The TP-7 has no tempo CC, but it follows MIDI clock — so tempo retunes the app's clock,
-    /// which the device tracks. Sends no MIDI of its own, exactly like the OP-1's tempo.
-    func testTempoSendsNothingButIsAvailable() {
-        let spec = DeviceProfile.tp7.param("tp7.tempo")!
-        XCTAssertEqual(spec.role, .tempo)
-        XCTAssertTrue(spec.isMasterOnly)
-        XCTAssertEqual(send("tp7.tempo", 120), [], "virtual tempo emits no MIDI")
-    }
-
-    /// Tempo is master-only, so selecting it must force the master target on — the same
-    /// behaviour the OP-1 relies on.
-    func testTempoIsMasterOnlyLikeTheOP1() {
-        XCTAssertTrue(DeviceProfile.tp7.param("tp7.tempo")!.isMasterOnly)
+    /// There is no TP-7 tempo parameter: it would only retune the app's own clock, because the
+    /// device ignores incoming clock. The OP-1's tempo parameter stays master-only.
+    func testTheTP7HasNoTempoParameter() {
+        XCTAssertNil(DeviceProfile.tp7.param("tp7.tempo"))
+        XCTAssertFalse(DeviceProfile.tp7.params.contains { $0.role == .tempo },
+                       "no parameter on the TP-7 may retune the app's clock")
         XCTAssertTrue(DeviceProfile.op1Field.param("tempo")!.isMasterOnly)
     }
 
-    func testAllThreeAppearInThePicker() {
+    func testSpeedAndDirectionAppearInThePickerButTempoDoesNot() {
         let ids = DeviceProfile.tp7.pickerParams.map(\.id)
         XCTAssertTrue(ids.contains("tp7.pitchbend"))
         XCTAssertTrue(ids.contains("tp7.direction"))
-        XCTAssertTrue(ids.contains("tp7.tempo"))
+        XCTAssertFalse(ids.contains("tp7.tempo"))
     }
 }
 

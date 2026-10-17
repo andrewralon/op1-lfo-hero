@@ -68,6 +68,10 @@ func send(_ b: [UInt8]) {
 }
 
 print("tape must be ROLLING in `sync` mode. sending nothing yet.")
+// A listener that connects after a gap is first handed the clock the driver queued while nothing
+// was listening (hundreds of ticks in the first second). Throw that second away, or phase 1
+// averages it in and the verdict compares a burst against the steady rate.
+Thread.sleep(forTimeInterval: 1.0); _ = c.drain()
 print("--- phase 1: listen only (6s) ---"); fflush(stdout)
 var phase1: [Int] = []
 for s in 1...6 {
