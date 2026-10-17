@@ -28,7 +28,16 @@ final class MidiRouter: MidiDestination {
 
     /// The transport currently in control of routing. `nil` means neither transport is
     /// connected, in which case either one connecting claims it.
-    private(set) var activeTransport: Transport?
+    private(set) var activeTransport: Transport? {
+        didSet {
+            // Claims happen on MIDI threads and change what the app shows (the status text and
+            // the device layout), so tell subscribers, serialised on the main thread.
+            let t = activeTransport
+            DispatchQueue.main.async { [weak self] in self?.activeTransportChanged.send(t) }
+        }
+    }
+    /// Emits whenever `activeTransport` changes, so the UI can follow a claim as well as a connect.
+    let activeTransportChanged = CurrentValueSubject<Transport?, Never>(nil)
     private var cancellables = Set<AnyCancellable>()
 
     var onClock: (() -> Void)?
@@ -38,6 +47,7 @@ final class MidiRouter: MidiDestination {
     var onCC:    ((Int, Int, Int) -> Void)?
 
     init() {
+        ble.shouldAutoConnect = { [weak self] in self?.mayAutoConnect ?? true }
         usb.onClock = { [weak self] in self?.forwardIfActive(.usb) { self?.onClock?() } }
         usb.onStart = { [weak self] in self?.forwardIfActive(.usb) { self?.onStart?() } }
         usb.onContinue = { [weak self] in self?.forwardIfActive(.usb) { self?.onContinue?() } }
@@ -54,23 +64,52 @@ final class MidiRouter: MidiDestination {
             self?.forwardIfActive(.ble) { self?.onCC?(ch, cc, v) }
         }
 
-        // Release the active claim the moment its own transport drops the connection, so the
-        // other transport (or a fresh connect on the same one) can claim it again. This is the
-        // only automatic transition allowed — it never hands control to the OTHER transport
-        // just because that one happens to be connected.
+        // The first transport to connect owns the routing, and keeps it: a device that connects later
+        // never takes over an active connection. When the owner disconnects, the other transport
+        // takes over if it is connected (a device being unplugged or going away is the one time
+        // the app moves on by itself); with neither connected the claim is released, so the next
+        // one to connect claims it. Claiming at connect time, not at the first message, matters:
+        // an OP-1 in midi sync sends nothing, and a claim that waits for a message lets a later
+        // connection win.
         usb.$state
             .sink { [weak self] state in
-                guard let self, self.activeTransport == .usb, !state.isConnected else { return }
-                self.activeTransport = nil
+                guard let self else { return }
+                self.activeTransport = Self.transportAfterChange(
+                    current: self.activeTransport,
+                    usbConnected: state.isConnected, bleConnected: self.ble.state.isConnected,
+                    bleConnecting: self.ble.state.isConnecting)
             }
             .store(in: &cancellables)
         ble.$state
             .sink { [weak self] state in
-                guard let self, self.activeTransport == .ble, !state.isConnected else { return }
-                self.activeTransport = nil
+                guard let self else { return }
+                self.activeTransport = Self.transportAfterChange(
+                    current: self.activeTransport,
+                    usbConnected: self.usb.state.isConnected, bleConnected: state.isConnected,
+                    bleConnecting: state.isConnecting)
             }
             .store(in: &cancellables)
     }
+
+    /// Who owns the routing after a connection change. A claim is kept while its transport is
+    /// connected **or still connecting**: tapping a Bluetooth device in the picker claims the
+    /// routing at once, and the state passes through "connecting" before "connected", so judging the
+    /// claim on "connected" alone lost an explicit choice within a fraction of a second. A
+    /// connection that fails stops connecting, and the claim then falls back to a working device.
+    /// Otherwise (no claim yet, or the owner dropped) the first *connected* transport takes it, USB
+    /// first only as a tie-break; with nothing connected there is no claim.
+    static func transportAfterChange(current: Transport?, usbConnected: Bool, bleConnected: Bool,
+                                     bleConnecting: Bool = false) -> Transport? {
+        if let current, current == .usb ? usbConnected : (bleConnected || bleConnecting) { return current }
+        if usbConnected { return .usb }
+        if bleConnected { return .ble }
+        return nil
+    }
+
+    /// Whether a transport may connect to a device on its own (an auto-connect on discovery): only
+    /// when nothing is connected or claimed. A device found while another is active is listed in the
+    /// device picker, and a tap there connects it as an explicit choice.
+    var mayAutoConnect: Bool { activeTransport == nil && !usb.state.isConnected && !ble.state.isConnected }
 
     /// Claims the active transport for an explicit user pick (device picker connect buttons).
     func setActiveTransport(_ transport: Transport) {

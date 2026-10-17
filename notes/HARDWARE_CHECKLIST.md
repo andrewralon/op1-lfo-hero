@@ -40,10 +40,9 @@ disappears once it has been migrated. The throwaway test deletes real data on th
 commit it.
 
 ## Two devices at once (layout, status and routing must agree)
-- [ ] OP-1 on BLE plus TX-6 on USB-C (and the other way round, and in each connection order): the
+- [x] (2026-10-17, iPad Pro, OP-1 on BLE + TX-6 on USB-C, both orders, plus picks and handover each way) OP-1 on BLE plus TX-6 on USB-C (and the other way round, and in each connection order): the
       layout (4 or 6 tracks and the parameter set), the status text and where a fader move
       actually goes must all change **at the same moment**, and all switch back together when one
-      is unplugged. Seen broken 2026-10-17: status `op-1 (ble)` with the TX-6's 6-track layout
-      (`AppState.resolveProfile` prefers USB; routing follows the claimed transport). Tracked in
-      `FEATURES.md`.
+      is unplugged. Was broken 2026-10-17 (status `op-1 (ble)` with the TX-6's 6-track layout);
+      fixed and verified the same day. Not checked: a TP-7 in either role, and an iPhone.
 

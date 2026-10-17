@@ -375,7 +375,24 @@ final class AppState: ObservableObject {
 
     /// Pick the profile: an explicit override wins; otherwise the connected endpoint's name;
     /// otherwise keep whatever is already loaded (never silently reset the user's device).
-    func resolveProfile() {
+    func resolveProfile() { resolveProfile(active: router.activeTransport) }
+
+    /// Which device's profile (layout, parameters) to show: the one on the transport MIDI really
+    /// travels over — the claimed one, otherwise USB if connected, otherwise Bluetooth, exactly as
+    /// `MidiRouter.send` and the status label resolve it. Taking USB's match unconditionally put
+    /// a TX-6's 6-track layout on screen while the status said `op-1 (ble)` and every fader move
+    /// still went to the OP-1.
+    static func profileId(active: MidiRouter.Transport?, usbProfile: String?, bleProfile: String?,
+                          usbConnected: Bool, bleConnected: Bool) -> String? {
+        switch MidiRouter.effectiveTransport(active: active, usbConnected: usbConnected,
+                                             bleConnected: bleConnected) {
+        case .usb: return usbProfile
+        case .ble: return bleProfile
+        case nil:  return usbProfile ?? bleProfile
+        }
+    }
+
+    func resolveProfile(active: MidiRouter.Transport?) {
         let stored = UserDefaults.standard.string(forKey: Self.profileOverrideKey) ?? "auto"
         if profileOverrideId != stored { profileOverrideId = stored }
 
@@ -384,7 +401,10 @@ final class AppState: ObservableObject {
             switchProfile(to: DeviceRegistry.profile(id: stored))
             return
         }
-        if let id = usb.matchedProfileId ?? ble.matchedProfileId {
+        if let id = Self.profileId(active: active, usbProfile: usb.matchedProfileId,
+                                   bleProfile: ble.matchedProfileId,
+                                   usbConnected: usb.state.isConnected,
+                                   bleConnected: ble.state.isConnected) {
             profileIsAssumed = false
             switchProfile(to: DeviceRegistry.profile(id: id))
         } else {
@@ -512,16 +532,25 @@ final class AppState: ObservableObject {
         // USB + BLE state → connection label, following whichever transport is actively
         // routing (router.activeTransport) rather than always preferring USB when both are
         // present — a newly available transport must never silently steal the connection.
-        Publishers.CombineLatest(router.ble.$state, router.usb.$state)
+        // The device picker reads app.ble / app.usb, which are separate ObservableObjects, and SwiftUI
+        // only watches AppState. Without forwarding their changes, a device that is discovered
+        // while nothing else on AppState changes (nothing auto-connects over an active connection
+        // any more) is appended to the list and never drawn: the picker kept saying "scanning…".
+        router.ble.objectWillChange.merge(with: router.usb.objectWillChange)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] bleState, usbState in
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        Publishers.CombineLatest3(router.ble.$state, router.usb.$state, router.activeTransportChanged)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] bleState, usbState, active in
                 guard let self else { return }
-                let status = Self.connectionStatus(active: self.router.activeTransport,
-                                                   usb: usbState, ble: bleState)
+                let status = Self.connectionStatus(active: active, usb: usbState, ble: bleState)
                 self.connectionLabel = status.label
                 self.isConnected = status.isConnected
-                // Whatever just connected may be a different device than last time.
-                self.resolveProfile()
+                // Whatever just connected, or just took over the routing, may be a different device
+                // than last time — and the layout must change at the same moment as the status.
+                self.resolveProfile(active: active)
             }
             .store(in: &cancellables)
 

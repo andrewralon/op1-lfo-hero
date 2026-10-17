@@ -1534,3 +1534,119 @@ final class ConnectionStatusTests: XCTestCase {
         XCTAssertFalse(s.isConnected)
     }
 }
+
+/// The layout (profile) must follow the same transport as the status text and the MIDI routing.
+/// Seen broken 2026-10-17: an OP-1 on BLE and a TX-6 plugged into USB-C showed `op-1 (ble)` with
+/// the TX-6's 6-track layout, and MIDI kept going to the OP-1.
+final class ProfileFollowsTheRoutedTransportTests: XCTestCase {
+
+    private func id(active: MidiRouter.Transport? = nil, usb: String? = nil, ble: String? = nil,
+                    usbUp: Bool = false, bleUp: Bool = false) -> String? {
+        AppState.profileId(active: active, usbProfile: usb, bleProfile: ble,
+                           usbConnected: usbUp, bleConnected: bleUp)
+    }
+
+    /// The reported case: BLE already carries the OP-1, a TX-6 then appears on USB.
+    func testAClaimedBluetoothDeviceKeepsItsLayoutWhenAnotherDeviceAppearsOnUSB() {
+        XCTAssertEqual(id(active: .ble, usb: "tx6", ble: "op1", usbUp: true, bleUp: true), "op1",
+                       "was \"tx6\" (usb always won) while the status said op-1 (ble)")
+    }
+
+    func testPickingTheUSBDeviceMovesTheLayoutWithTheRouting() {
+        XCTAssertEqual(id(active: .usb, usb: "tx6", ble: "op1", usbUp: true, bleUp: true), "tx6")
+    }
+
+    /// Nothing claimed: `MidiRouter.send` uses USB when it is connected, so the layout does too.
+    func testWhenNothingIsClaimedUSBWinsLikeSend() {
+        XCTAssertEqual(id(usb: "tx6", ble: "op1", usbUp: true, bleUp: true), "tx6")
+    }
+
+    func testWhenNothingIsClaimedAndOnlyBluetoothIsConnectedItsDeviceWins() {
+        XCTAssertEqual(id(ble: "op1", bleUp: true), "op1")
+    }
+
+    func testAnUnrecognisedClaimedDeviceDoesNotBorrowTheOtherTransportsLayout() {
+        XCTAssertNil(id(active: .ble, usb: "tx6", ble: nil, usbUp: true, bleUp: true),
+                     "the routed device is unrecognised: keep the last layout, don't switch to the one we are not talking to")
+    }
+
+    func testNothingConnectedFallsBackToWhateverMatchedLast() {
+        XCTAssertEqual(id(usb: "tx6", ble: "op1"), "tx6")
+        XCTAssertNil(id())
+    }
+}
+
+/// An active connection is never taken over by a new one; when it goes away the other takes over.
+final class RoutingOwnershipTests: XCTestCase {
+
+    private func owner(_ current: MidiRouter.Transport?, usb: Bool, ble: Bool) -> MidiRouter.Transport? {
+        MidiRouter.transportAfterChange(current: current, usbConnected: usb, bleConnected: ble)
+    }
+
+    func testTheFirstTransportToConnectClaimsTheRoutingImmediately() {
+        XCTAssertEqual(owner(nil, usb: false, ble: true), .ble, "no need to wait for a message")
+        XCTAssertEqual(owner(nil, usb: true, ble: false), .usb)
+    }
+
+    /// Round 2 of 2026-10-17: a TX-6 on USB, then the picker's scan auto-connected the OP-1 on BLE.
+    func testALateConnectionNeverTakesOverAnActiveOne() {
+        XCTAssertEqual(owner(.usb, usb: true, ble: true), .usb)
+        XCTAssertEqual(owner(.ble, usb: true, ble: true), .ble, "round 1: the TX-6 arriving on USB changes nothing")
+    }
+
+    func testWhenTheOwnerDisconnectsTheOtherConnectedTransportTakesOver() {
+        XCTAssertEqual(owner(.usb, usb: false, ble: true), .ble)
+        XCTAssertEqual(owner(.ble, usb: true, ble: false), .usb)
+    }
+
+    func testWhenTheOwnerDisconnectsWithNothingElseTheClaimIsReleased() {
+        XCTAssertNil(owner(.usb, usb: false, ble: false))
+        XCTAssertNil(owner(.ble, usb: false, ble: false))
+    }
+
+    /// Seen 2026-10-17: tapping the OP-1's row while a TX-6 was active flickered to 4 tracks and
+    /// straight back, because the claim was judged on "connected" while BLE was still "connecting".
+    func testAnExplicitPickSurvivesTheConnectingPhase() {
+        XCTAssertEqual(MidiRouter.transportAfterChange(current: .ble, usbConnected: true,
+                                                       bleConnected: false, bleConnecting: true), .ble)
+    }
+
+    func testAFailedConnectionFallsBackToTheWorkingDevice() {
+        XCTAssertEqual(MidiRouter.transportAfterChange(current: .ble, usbConnected: true,
+                                                       bleConnected: false, bleConnecting: false), .usb,
+                       "no longer connecting and never connected: the claim is dropped")
+    }
+
+    func testAConnectingTransportNeverClaimsOnItsOwn() {
+        XCTAssertNil(MidiRouter.transportAfterChange(current: nil, usbConnected: false,
+                                                     bleConnected: false, bleConnecting: true),
+                     "only a claim already made is kept while connecting; nothing claims until connected")
+    }
+
+    func testAnUnconnectedClaimantNeverKeepsTheClaim() {
+        XCTAssertEqual(owner(.ble, usb: true, ble: false), .usb, "ble claimed but is no longer connected")
+    }
+}
+
+/// The picker lists what is available now: a device that stops advertising drops off the list.
+final class StaleBluetoothDevicesTests: XCTestCase {
+    private let a = UUID(), b = UUID(), c = UUID()
+
+    func testADeviceNotSeenForLongerThanTheWindowIsStale() {
+        let stale = BLEMidi.staleIds(lastSeen: [a: 100, b: 104], now: 106, staleAfter: 5, keep: [])
+        XCTAssertEqual(stale, [a], "a was last seen 6 s ago, b 2 s ago")
+    }
+
+    func testADeviceSeenWithinTheWindowStays() {
+        XCTAssertTrue(BLEMidi.staleIds(lastSeen: [a: 100], now: 104.9, staleAfter: 5, keep: []).isEmpty)
+    }
+
+    func testTheConnectedDeviceIsNeverStaleBecauseItStopsAdvertising() {
+        XCTAssertTrue(BLEMidi.staleIds(lastSeen: [a: 0], now: 1000, staleAfter: 5, keep: [a]).isEmpty)
+    }
+
+    func testOnlyTheQuietOnesAreDropped() {
+        let stale = Set(BLEMidi.staleIds(lastSeen: [a: 0, b: 99, c: 0], now: 100, staleAfter: 5, keep: [c]))
+        XCTAssertEqual(stale, [a])
+    }
+}

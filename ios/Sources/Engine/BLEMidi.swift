@@ -1,3 +1,4 @@
+import QuartzCore
 import Combine
 import CoreBluetooth
 import Foundation
@@ -25,6 +26,11 @@ final class BLEMidi: NSObject, ObservableObject {
             if case .connected = self { return true }
             return false
         }
+
+        var isConnecting: Bool {
+            if case .connecting = self { return true }
+            return false
+        }
     }
 
     @Published var state: State = .scanning
@@ -34,6 +40,9 @@ final class BLEMidi: NSObject, ObservableObject {
     /// The peripheral the link is actually up with. The device list matches on this, not on the
     /// name: CoreBluetooth can report a different name before and after connecting.
     @Published var connectedPeripheralID: UUID?
+    /// Asked before connecting to a known device on discovery. The router answers false while
+    /// another transport already has a connection.
+    var shouldAutoConnect: () -> Bool = { true }
 
     // Callbacks — invoked on the BLE queue (background thread)
     var onClock:    (() -> Void)?
@@ -55,6 +64,42 @@ final class BLEMidi: NSObject, ObservableObject {
     private let queue = DispatchQueue(label: "ble.midi", qos: .userInteractive)
     private var scanTimeout: DispatchWorkItem?
     private var connectTimeout: DispatchWorkItem?
+    /// When each listed peripheral was last seen advertising (guarded by `queue`). CoreBluetooth
+    /// reports a device being found but never being lost, so "gone" has to be inferred from silence.
+    private var lastSeen: [UUID: Double] = [:]
+    private var pruneTimer: DispatchSourceTimer?
+    /// A listed device not seen for this long is dropped from the picker.
+    static let staleAfter: Double = 5.0
+
+    /// The listed devices that have gone quiet. Whatever is in `keep` (the connected or connecting
+    /// peripheral, which stops advertising) is never stale.
+    static func staleIds(lastSeen: [UUID: Double], now: Double, staleAfter: Double, keep: Set<UUID>) -> [UUID] {
+        lastSeen.filter { !keep.contains($0.key) && now - $0.value > staleAfter }.map(\.key)
+    }
+
+    private func pruneStale() {
+        let keep = Set([peripheral?.identifier].compactMap { $0 })
+        for id in BLEMidi.staleIds(lastSeen: lastSeen, now: CACurrentMediaTime(),
+                                   staleAfter: BLEMidi.staleAfter, keep: keep) {
+            lastSeen.removeValue(forKey: id)
+            discoveredIds.remove(id)
+            DispatchQueue.main.async { self.discovered.removeAll { $0.identifier == id } }
+        }
+    }
+
+    /// While the picker is open (continuous scan), check once a second for devices that went quiet.
+    private func startPruning() {
+        guard pruneTimer == nil else { return }
+        let t = DispatchSource.makeTimerSource(queue: queue)
+        t.schedule(deadline: .now() + 1.0, repeating: 1.0)
+        t.setEventHandler { [weak self] in
+            guard let self, self.continuousScan else { return }
+            self.pruneStale()
+        }
+        t.resume()
+        pruneTimer = t
+    }
+
     private var discoveredIds = Set<UUID>()   // guarded by `queue`
     /// True while the connection menu is open: scanning restarts on its own timeout forever
     /// and never surfaces `.notFound`, instead of giving up after the launch window.
@@ -87,11 +132,16 @@ final class BLEMidi: NSObject, ObservableObject {
             // Restarting the window under continuous mode keeps `discovered` as-is so the
             // picker's list doesn't flicker empty every cycle while the menu is open.
             discoveredIds.removeAll()                          // sync on queue — cleared before scan starts
+            lastSeen.removeAll()
             DispatchQueue.main.async { self.discovered.removeAll() }
         }
         guard central.state == .poweredOn else { return }
         DispatchQueue.main.async { self.state = .scanning }
-        central.scanForPeripherals(withServices: [bleMIDIServiceUUID])
+        // While the picker is open, ask for every advertisement, not just the first, so a device
+        // that is switched off can be told apart from one that is still there.
+        central.scanForPeripherals(withServices: [bleMIDIServiceUUID],
+                                   options: [CBCentralManagerScanOptionAllowDuplicatesKey: continuous])
+        if continuous { startPruning() }
         let timeout = DispatchWorkItem { [weak self] in
             guard let self else { return }
             if self.continuousScan {
@@ -247,13 +297,17 @@ extension BLEMidi: CBCentralManagerDelegate {
     func centralManager(_ c: CBCentralManager, didDiscover p: CBPeripheral,
                         advertisementData: [String: Any], rssi: NSNumber) {
         scanTimeout?.cancel()
-        guard discoveredIds.insert(p.identifier).inserted else { return }
+        lastSeen[p.identifier] = CACurrentMediaTime()
+        let isNew = discoveredIds.insert(p.identifier).inserted
+        guard isNew else { return }
         DispatchQueue.main.async { self.discovered.append(p) }
         // Auto-connect to the first known TE device found. Everything discovered is still
         // listed in `discovered`, so an unrecognised peripheral can be picked by hand.
         // `matchedProfileId` (and therefore app layout) is not set here — only a name match
         // is known at this point, not an actual connection. It is set in `didConnect`.
-        if DeviceRegistry.profile(forEndpointName: p.name ?? "") != nil {
+        // Only when nothing else is connected: a device found while another is active is listed in
+        // the picker and left for the user to choose, never connected over the top.
+        if DeviceRegistry.profile(forEndpointName: p.name ?? "") != nil, shouldAutoConnect() {
             connect(p)
         }
     }
@@ -262,6 +316,7 @@ extension BLEMidi: CBCentralManagerDelegate {
     /// connection menu doesn't keep showing devices that are no longer reachable.
     private func forgetDiscovered(_ p: CBPeripheral) {
         discoveredIds.remove(p.identifier)
+        lastSeen.removeValue(forKey: p.identifier)
         DispatchQueue.main.async { self.discovered.removeAll { $0.identifier == p.identifier } }
     }
 
