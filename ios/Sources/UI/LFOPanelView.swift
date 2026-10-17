@@ -12,7 +12,12 @@ private struct ClockWaitingBanner: ViewModifier {
         content.overlay(alignment: .top) {
             if app.lfosWaitingForClock {
                 Button { app.enableClock() } label: {
-                    Text("lfos paused — no clock from \(app.profile.caps.clockLabel). tap to use the app clock")
+                    // Say why: not connected at all is a different fix from connected but silent
+                    // (an op-1 in the wrong tempo mode).
+                    let device = app.profile.caps.clockLabel
+                    Text(app.isConnected
+                         ? "lfos paused — no clock from \(device). tap to use the app clock"
+                         : "lfos paused — \(device) not connected. tap to use the app clock")
                         .font(.system(size: m.lfoChipFont, weight: .semibold, design: .monospaced))
                         .foregroundColor(C.yellow)
                         .multilineTextAlignment(.center)

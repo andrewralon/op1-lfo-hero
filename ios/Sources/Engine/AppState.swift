@@ -486,6 +486,28 @@ final class AppState: ObservableObject {
         loadSettings()  // restores settings and calls enableClock/disableClock
     }
 
+    /// What the status bar and the LFO banner say about the connection.
+    ///
+    /// Follows the transport MIDI really travels over: the claimed one if there is one, otherwise
+    /// whichever is connected, resolved the same way `MidiRouter.send` does. The router only claims
+    /// a transport when a message *arrives*, and an OP-1 in midi sync sends none, so a connected
+    /// device would otherwise read as "scanning…" / "no device found" (Bluetooth's state) while MIDI
+    /// flowed over USB.
+    static func connectionStatus(active: MidiRouter.Transport?, usb: USBMidi.State,
+                                 ble: BLEMidi.State) -> (label: String, isConnected: Bool) {
+        let transport = MidiRouter.effectiveTransport(active: active,
+                                                      usbConnected: usb.isConnected,
+                                                      bleConnected: ble.isConnected)
+        switch transport {
+        case .usb: return (usb.label, usb.isConnected)
+        case .ble: return (ble.label, ble.isConnected)
+        case nil:
+            // USB MIDI devices visible but no known device name matched: show what was found.
+            if case .found = usb { return (usb.label, false) }
+            return (ble.label, ble.isConnected)
+        }
+    }
+
     private func wireCallbacks() {
         // USB + BLE state → connection label, following whichever transport is actively
         // routing (router.activeTransport) rather than always preferring USB when both are
@@ -494,23 +516,10 @@ final class AppState: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] bleState, usbState in
                 guard let self else { return }
-                switch self.router.activeTransport {
-                case .usb:
-                    self.connectionLabel = usbState.label
-                    self.isConnected = usbState.isConnected
-                case .ble:
-                    self.connectionLabel = bleState.label
-                    self.isConnected = bleState.isConnected
-                case nil:
-                    if case .found = usbState {
-                        // USB MIDI devices visible but no known device name matched — show what was found
-                        self.connectionLabel = usbState.label
-                        self.isConnected = false
-                    } else {
-                        self.connectionLabel = bleState.label
-                        self.isConnected = bleState.isConnected
-                    }
-                }
+                let status = Self.connectionStatus(active: self.router.activeTransport,
+                                                   usb: usbState, ble: bleState)
+                self.connectionLabel = status.label
+                self.isConnected = status.isConnected
                 // Whatever just connected may be a different device than last time.
                 self.resolveProfile()
             }

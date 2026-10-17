@@ -1490,3 +1490,47 @@ final class LfosWaitingForClockTests: XCTestCase {
         XCTAssertTrue(waiting(age: 30))
     }
 }
+
+/// The status bar must show a connected device even when nothing has claimed the router: an OP-1 in
+/// midi sync sends no MIDI, so the router never claims a transport for it.
+final class ConnectionStatusTests: XCTestCase {
+
+    private func status(active: MidiRouter.Transport? = nil, usb: USBMidi.State = .disconnected,
+                        ble: BLEMidi.State = .scanning) -> (label: String, isConnected: Bool) {
+        AppState.connectionStatus(active: active, usb: usb, ble: ble)
+    }
+
+    func testAConnectedUSBDeviceShowsEvenWhenNothingHasClaimedTheRouter() {
+        let s = status(usb: .connected("OP-1"), ble: .notFound)
+        XCTAssertEqual(s.label, "OP-1 (usb)")
+        XCTAssertTrue(s.isConnected, "was reading Bluetooth's \"no device found\" while USB worked")
+    }
+
+    func testAConnectedBluetoothDeviceShowsWhenNothingHasClaimedTheRouter() {
+        let s = status(usb: .disconnected, ble: .connected("OP-1"))
+        XCTAssertEqual(s.label, "OP-1 (ble)")
+        XCTAssertTrue(s.isConnected)
+    }
+
+    func testUSBWinsWhenNothingIsClaimedAndBothAreConnected() {
+        XCTAssertEqual(status(usb: .connected("OP-1"), ble: .connected("OP-1")).label, "OP-1 (usb)",
+                       "the same rule MidiRouter.send uses")
+    }
+
+    func testAClaimedTransportAlwaysWins() {
+        XCTAssertEqual(status(active: .ble, usb: .connected("OP-1"), ble: .connected("OP-1")).label, "OP-1 (ble)")
+        XCTAssertEqual(status(active: .usb, usb: .connected("OP-1"), ble: .connected("OP-1")).label, "OP-1 (usb)")
+    }
+
+    func testNothingConnectedStillReportsScanningAndNoDevice() {
+        XCTAssertEqual(status(ble: .scanning).label, "scanning…")
+        XCTAssertFalse(status(ble: .scanning).isConnected)
+        XCTAssertEqual(status(ble: .notFound).label, "no device found")
+    }
+
+    func testUnmatchedUSBDevicesAreListedWhenNothingIsConnected() {
+        let s = status(usb: .found(["Some Synth"]), ble: .scanning)
+        XCTAssertEqual(s.label, "Some Synth")
+        XCTAssertFalse(s.isConnected)
+    }
+}
