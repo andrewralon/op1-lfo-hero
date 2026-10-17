@@ -46,3 +46,12 @@ commit it.
       is unplugged. Was broken 2026-10-17 (status `op-1 (ble)` with the TX-6's 6-track layout);
       fixed and verified the same day. Not checked: a TP-7 in either role, and an iPhone.
 
+## TX-6 (USB-C) — shared changes made on the OP-1
+- [x] connects, 6 tracks, status `tx-6 (usb)` (2026-10-17, iPad Pro, `midi control = in`)
+- [x] play pressed **in the app** restarts a running LFO from the start of its wave
+- [x] play pressed on the TX-6 itself restarts nothing: **by design**, it sends no Start/Continue
+      (`midi control = in` is silent; `out` sends a stateless CC 32); see RESEARCH.md
+- [ ] live BPM drag: the TX-6 follows the app's tempo while dragging (clock SRC = usb), no stutter
+- [ ] preview off, a parameter switch during preview, and deleting a running chip put the TX-6
+      parameter back (the app restores its own value, not the physical fader position)
+

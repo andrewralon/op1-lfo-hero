@@ -184,6 +184,7 @@ extension DeviceProfile {
             "set `clock SRC` to `usb` — otherwise it won't follow the app's tempo.",
             "to go the other way and have the app follow the tx-6, set `clock SRC` to internal and enable clock `out`, then tap the metronome so it reads `tx6`. the −/+ buttons then move both tempos together.",
             "while an lfo drives a channel, moving that channel's fader on the tx-6 will fight the lfo rather than take over. pause the chip first.",
+            "lfos restart when you press play in the app. pressing play on the tx-6 itself can't restart them: in `in` it sends nothing, and in `out` it ignores the app.",
         ]
     )
 

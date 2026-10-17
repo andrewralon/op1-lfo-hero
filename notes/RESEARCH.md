@@ -350,6 +350,29 @@ behavior" below.
 `cc33` fx I · `cc34` fx II · `cc35` shift — every one matching the documented outgoing table.
 Faders **do** transmit; an earlier session that saw none simply had no fader movement.
 
+### The TX-6's play button does not tell the app anything (2026-10-17)
+
+Passive probe from a Mac (`tools/midi/anymidi` and a timestamped dump), the TX-6's **encoder button**
+used as its play/pause toggle, three attempts at each `midi control` setting:
+
+- **`midi control = in`** (the setting the app needs to control the TX-6): **silent.** No message of any
+  kind for the presses, in two separate 12 s windows.
+- **`midi control = out`:** each press sends **`B0 20 7F` then `B0 20 00`** (CC 32, channel 1, value 127
+  then 0, about 0.2 s apart). **The same two messages for play and for pause**: a press, with no
+  state. No Start (`0xFA`), Continue (`0xFB`) or Stop (`0xFC`) at all.
+
+The TX-6's `midi control` has exactly **three settings: `x` (off), `in` and `out`**, so no setting lets
+it take control from the app and report its own controls back at the same time.
+
+So a play press on the TX-6 itself cannot restart the LFOs the way the OP-1's does:
+`ClockEngine` listens for Start and Continue, which the TX-6 never sends; in `out` the only trace is a
+stateless CC 32 that cannot tell play from pause; and `out` makes the TX-6 ignore everything the
+app sends, so it cannot be used together with the app controlling the TX-6. A play press **in the
+app** restarts the LFOs as designed (verified on an iPad with a TX-6 on USB-C). Not tested: the
+TX-6's **sequencer** play, which may send something different; no good way to exercise it was
+available. This also answers the open question below about starting the transport from the panel:
+the app cannot know it happened.
+
 ### MIDI clock
 
 **It does send clock — but only when configured to.** With `clock SRC` set to internal and clock
