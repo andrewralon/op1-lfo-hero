@@ -297,6 +297,7 @@ extension DeviceProfile {
         setupSteps: [
             "any midi mode except `ctrl` works. `ctrl` turns the tp-7 into a midi controller for other gear — it stops playback and stops accepting anything the app sends.",
             "use `sync` if you want the app to follow the tp-7's tempo — it streams midi clock in that mode. volume/mute/gain control works in `off` and `sync` alike.",
+            "stop on a tape that is already stopped rewinds it to the start, exactly like the tp-7's own stop button — so a stop pressed after scrubbing a parked tape sends it back to the beginning.",
         ]
     )
 

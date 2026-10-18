@@ -66,10 +66,10 @@ commit it.
       does **not** restart the LFOs (it would restart itself); app presses still do
 - [x] an LFO driving the **`direction` parameter** (`tp7.direction`) **does** restart the LFOs on every
       flip, from the same Start echo. Left as is: `play` reverses without a restart, `direction` with one
-- [ ] scrub from a parked tape: hold ⏩ about 3 s, about +30 s on the counter, stops on release
-- [ ] scrub backwards from a parked tape, about -30 s, stops on release
-- [ ] scrub while the tape is rolling, forward and back; returns to normal speed on release
-- [ ] stop after a scrub from parked does not rewind the tape to 0:00
-- [ ] preview off / parameter switch / deleting a chip put a TP-7 parameter back (volume)
-- [ ] OP-1 on BLE plus TP-7 on USB-C: first owns the routing, a later one never takes over, handover
+- [x] scrub from a parked tape: hold ⏩ about 3 s, about +26 s on the counter, stops on release (2026-10-18)
+- [x] scrub backwards from a parked tape, about -26 s, stops on release (2026-10-18)
+- [x] scrub while the tape is rolling, forward and back; ramps from normal, returns to 1x and keeps playing on release (2026-10-18)
+- [x] stop after a scrub from a parked tape **rewinds to 0:00**: by design, a Stop on a stopped TP-7 does that, and the TP-7's own stop button does the same (2026-10-18); documented in the TP-7 setup text
+- [x] preview off / parameter switch / deleting a chip put a TP-7 parameter back (volume) (2026-10-18)
+- [x] TP-7 on USB-C plus a **TX-6 on BLE** (2026-10-18, iPad Pro; an OP-1 was not used): the TX-6 listed in the picker unconnected, an explicit pick switched the layout and routing together and held, app fader and mute moved the TX-6, and unplugging the TP-7 handed over to the TX-6 by itself. Not done: the TX-6's own fader and mute moving the app in `out` mode (not supported, see FEATURES.md)
 
