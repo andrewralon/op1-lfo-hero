@@ -223,9 +223,12 @@ Found by hardware testing — **all five would have shipped**:
 
 ### 🟠 Medium — verifying things currently taken on trust
 
-- [ ] **TX-6: 13 per-channel parameters never sent** — filter, EQ high/mid/low, comp, synth
-      wave/freq/len/detune, fx1 send, aux send, aux2 send, seq pattern
-- [ ] **TX-6: master bus never sent** — main vol, aux vol, cue vol, local control
+- [x] **TX-6: 13 per-channel parameters never sent** — filter, EQ high/mid/low, comp, synth
+      wave/freq/len/detune, fx1 send, aux send, aux2 send, seq pattern. **All move the right
+      control** (2026-10-18, iPad Pro, USB-C, `midi control = in`, previewed on track 1)
+- [x] **TX-6: master bus never sent** — main vol, aux vol, cue vol, local control. **All work**
+      (2026-10-18): the three volumes move, and local control behaves as MIDI defines it: off
+      disconnects the TX-6's physical faders from its sound, on restores them
 - [ ] **TP-7: does recording overwrite or create a new take?** Observed non-destructive (new
       track) in one test, but the guide's record menu is images-only and could not be read. If
       an overwrite setting exists, the app must warn before arming record

@@ -1411,7 +1411,7 @@ session (equivalent at position 0). Not verified by running the 1.0 build.
 
 - [ ] Do the pinned FX-bus channels (ch 8/9) actually land?
 - [ ] Does the TX-6 *follow* incoming MIDI clock, even though it does not send it?
-- [ ] How badly does TX-6 CC 46 desync when the transport is started from the device panel?
+- [x] How badly does TX-6 CC 46 desync when the transport is started from the device panel? (2026-10-18: CC 46 works from the app: play starts the sequencer, play again restarts it, stop pauses it. A press on the device followed by one in the app just restarts it; the one odd case is a start on the device then a stop in the app while the device is stopped, which can start it. Accepted; the device never reports its own transport.)
 - [ ] Is TX-6 program change on ch 7 usable for scene slots?
 - [ ] Exact BLE peripheral names for TX-6 and TP-7 — or whether they do BLE MIDI at all.
 - [ ] A TP-7 CC 18 ff/rewind step size that feels right (currently ±8).

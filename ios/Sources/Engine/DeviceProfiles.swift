@@ -181,7 +181,7 @@ extension DeviceProfile {
         // Verified on hardware: a default TX-6 ignores the app entirely until both are set.
         setupSteps: [
             "set `midi control` to `in` — until you do, the tx-6 ignores everything the app sends. note this also stops the tx-6 sending its own knob/fader messages.",
-            "set `clock SRC` to `usb` — otherwise it won't follow the app's tempo.",
+            "set `clock SRC` to match how you are connected: `usb` over usb-c, `ble` over bluetooth. it only accepts clock and play/stop from the source you pick, so with the wrong one the app's tempo, play, pause and stop silently do nothing, while volume, pan and mute still work.",
             "to go the other way and have the app follow the tx-6, set `clock SRC` to internal and enable clock `out`, then tap the metronome so it reads `tx6`. the −/+ buttons then move both tempos together.",
             "while an lfo drives a channel, moving that channel's fader on the tx-6 will fight the lfo rather than take over. pause the chip first.",
             "lfos restart when you press play in the app. pressing play on the tx-6 itself can't restart them: in `in` it sends nothing, and in `out` it ignores the app.",
@@ -215,6 +215,10 @@ extension DeviceProfile {
             masterOnly("tx6.mainVol",  "main vol",  "mvo", cc: 7,   channel: 6),
             masterOnly("tx6.auxVol",   "aux vol",   "avo", cc: 14,  channel: 6),
             masterOnly("tx6.cueVol",   "cue vol",   "cvo", cc: 15,  channel: 6),
+            // MIDI Local Control. Verified on hardware 2026-10-18: off disconnects the TX-6's own faders
+            // from its sound (they stop affecting it), on restores them. A wave on this parameter
+            // flips it at 64, so keep a center above 64: stopping a preview restores the center and
+            // so leaves it on.
             masterOnly("tx6.localCtl", "local ctl", "loc", cc: 122, channel: 6, encoding: teSwitch),
         ]
 

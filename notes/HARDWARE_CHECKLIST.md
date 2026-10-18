@@ -49,6 +49,7 @@ commit it.
 ## TX-6 (USB-C) — shared changes made on the OP-1
 - [x] connects, 6 tracks, status `tx-6 (usb)` (2026-10-17, iPad Pro, `midi control = in`)
 - [x] play pressed **in the app** restarts a running LFO from the start of its wave
+- [x] the app's play and stop drive the TX-6 sequencer (CC 46 plus Start/Continue): play starts it, play again restarts it, stop pauses it (2026-10-18)
 - [x] play pressed on the TX-6 itself restarts nothing: **by design**, it sends no Start/Continue
       (`midi control = in` is silent; `out` sends a stateless CC 32); see RESEARCH.md
 - [x] live BPM drag: the TX-6 follows the app's tempo while dragging (clock SRC = usb), smooth, settles on
@@ -72,4 +73,14 @@ commit it.
 - [x] stop after a scrub from a parked tape **rewinds to 0:00**: by design, a Stop on a stopped TP-7 does that, and the TP-7's own stop button does the same (2026-10-18); documented in the TP-7 setup text
 - [x] preview off / parameter switch / deleting a chip put a TP-7 parameter back (volume) (2026-10-18)
 - [x] TP-7 on USB-C plus a **TX-6 on BLE** (2026-10-18, iPad Pro; an OP-1 was not used): the TX-6 listed in the picker unconnected, an explicit pick switched the layout and routing together and held, app fader and mute moved the TX-6, and unplugging the TP-7 handed over to the TX-6 by itself. Not done: the TX-6's own fader and mute moving the app in `out` mode (not supported, see FEATURES.md)
+- [x] **parameter pass** (2026-10-18, iPad Pro, USB-C, `midi control = in`, `app (midi sync)`): faders, pan,
+      mute and gain on tracks 1-6; filter, eq high/mid/low, comp; fx1/aux/aux2 send; syn wave/freq/len/
+      detune and seq pattern; main/aux/cue vol; fx1 and fx2 enable, engine, p1-p3, fx1 return, fx2 track;
+      and local control (off: the physical faders stop affecting the sound; on: they work again; a preview
+      with the center above 64 always leaves it on). Every one moves the right control
+- [x] TX-6 over BLE (2026-10-18): the mixer CCs worked from the start, but play/stop and tempo did nothing
+      with `clock SRC = usb`: the TX-6 only accepts clock and Start/Stop from the source it is set to, and
+      its `clock src` menu offers `int`, `usb`, `ble` and `tr1`-`tr6`. With **`clock src = ble`** the app's
+      play starts, restarts and stops the sequencer and the TX-6's tempo follows a live BPM drag. The
+      TX-6 setup text now says `usb` over USB-C and `ble` over Bluetooth
 

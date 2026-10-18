@@ -20,6 +20,8 @@ For what the code actually does, read these instead:
 
 # TX-6 FX I / FX II transport buttons
 
+> ⛔ **Dropped 2026-10-18.** The blocking question below is answered: a TX-6 over USB-C in `midi control = in` **does** act on the app's play/stop (play starts its sequencer, play again restarts it, stop pauses it), so the premise that they "appear to do nothing" was false and replacing them would remove a working control. FX I / FX II toggles could still be added *alongside* play/stop (the enables already exist as LFO parameters); that is not planned.
+
 > 🟡 **Deferred — not built.** The two unresolved questions below need hardware or a decision.
 
 
