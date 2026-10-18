@@ -882,6 +882,33 @@ final class TP7ScrubAndReverseTests: XCTestCase {
 
     // MARK: - Play reverses
 
+    /// Every play press restarts the LFOs: the first, the ones that reverse, and the ones that go
+    /// forward again. Seen on a TP-7 on 2026-10-18: reverse presses restarted them by accident (the
+    /// device answered the stop/continue resync with a Start) and the forward-again press did not.
+    /// An LFO driving the play parameter presses play on each rising edge. That press must not restart
+    /// the LFOs, or the LFO restarts itself, climbs back to its threshold and fires again at a
+    /// fraction of its period.
+    func testAnLFODrivenPlayPressDoesNotRestartTheLFOs() {
+        var restarts = 0
+        clock.onPlay = { restarts += 1 }
+        clock.runOps([.pressPlay])                 // forward: the first press
+        clock.runOps([.pressPlay])                 // reverse: a press while rolling
+        clock.runOps([.pressPlay])                 // forward again
+        XCTAssertEqual(restarts, 0)
+        XCTAssertTrue(clock.isPlaying, "the press itself still did its job")
+        clock.play()                               // a press by the user does restart them
+        XCTAssertEqual(restarts, 1)
+    }
+
+    func testEveryPlayPressRestartsTheLFOsIncludingTheReversingOnes() {
+        var restarts = 0
+        clock.onPlay = { restarts += 1 }
+        for press in 1...6 {          // forward, reverse, forward, reverse, forward, reverse
+            clock.play()
+            XCTAssertEqual(restarts, press, "press \(press) must restart the LFOs")
+        }
+    }
+
     /// First play rolls the tape; a second press while rolling reverses, matching the
     /// TP-7's own play button rather than re-sending play.
     func testSecondPlayReversesInsteadOfReplaying() {

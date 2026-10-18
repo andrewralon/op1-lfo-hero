@@ -51,7 +51,25 @@ commit it.
 - [x] play pressed **in the app** restarts a running LFO from the start of its wave
 - [x] play pressed on the TX-6 itself restarts nothing: **by design**, it sends no Start/Continue
       (`midi control = in` is silent; `out` sends a stateless CC 32); see RESEARCH.md
-- [ ] live BPM drag: the TX-6 follows the app's tempo while dragging (clock SRC = usb), no stutter
-- [ ] preview off, a parameter switch during preview, and deleting a running chip put the TX-6
-      parameter back (the app restores its own value, not the physical fader position)
+- [x] live BPM drag: the TX-6 follows the app's tempo while dragging (clock SRC = usb), smooth, settles on
+      the app's value (2026-10-17, iPad Pro, USB-C)
+- [x] preview off, a parameter switch during preview, and deleting a running chip put the TX-6
+      parameter back (the app restores its own value, not the physical fader position) (2026-10-17)
+
+## TP-7 (USB-C, `sync` mode) — shared changes made on the OP-1
+- [x] connects, 6 tracks, `tp-7 (usb)`, no tempo parameter in the LFO picker (2026-10-18, iPad Pro)
+- [x] **play pressed in the app restarts every running LFO on every press**, the ones that reverse the
+      tape included. Before 2026-10-18 only the reversing presses did, by accident: the resync that
+      precedes a reverse (`0xFC` then `0xFB`) makes the TP-7 answer with its own Start, and the press
+      that goes forward again sends only `0xFB`, so it restarted nothing
+- [x] an LFO driving the **`play` parameter** (`tp7.playPress`) presses play on each rising edge and
+      does **not** restart the LFOs (it would restart itself); app presses still do
+- [x] an LFO driving the **`direction` parameter** (`tp7.direction`) **does** restart the LFOs on every
+      flip, from the same Start echo. Left as is: `play` reverses without a restart, `direction` with one
+- [ ] scrub from a parked tape: hold ⏩ about 3 s, about +30 s on the counter, stops on release
+- [ ] scrub backwards from a parked tape, about -30 s, stops on release
+- [ ] scrub while the tape is rolling, forward and back; returns to normal speed on release
+- [ ] stop after a scrub from parked does not rewind the tape to 0:00
+- [ ] preview off / parameter switch / deleting a chip put a TP-7 parameter back (volume)
+- [ ] OP-1 on BLE plus TP-7 on USB-C: first owns the routing, a later one never takes over, handover
 

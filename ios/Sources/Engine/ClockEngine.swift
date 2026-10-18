@@ -306,7 +306,10 @@ final class ClockEngine {
     /// speed = (64 - CC) / 3.76 - 1.
     static let rollingReverseUnitsPerX = 3.76
 
-    func play() {
+    /// `restartLFOs` is false when an LFO is the one pressing play (the `tp7.playPress` parameter):
+    /// an LFO that restarted itself by pressing play would climb back to its threshold and fire again
+    /// at a fraction of its period, forever. Only a press by the user restarts the LFOs.
+    func play(restartLFOs: Bool = true) {
         // Matches the hardware: on a device whose play button reverses, a second press while
         // rolling flips direction rather than restarting playback.
         //
@@ -316,13 +319,20 @@ final class ClockEngine {
         if playTogglesDirection && (isPlaying || deviceIsRolling) {
             isPlaying = true
             reverseDirection()
+            // Every play press restarts the LFOs, the one that reverses the tape included. Before
+            // this the reversing presses restarted them only by accident: the resync that precedes
+            // a reverse (0xFC then 0xFB) makes the TP-7 answer with a Start/Continue of its own, and
+            // the press that goes forward again sends only 0xFB, so it restarted nothing. Measured
+            // on a TP-7, 2026-10-18: presses forward, reverse, forward, reverse restarted LFOs on
+            // reverse, forward-after-reverse never.
+            if restartLFOs { onPlay?() }
             return
         }
         // Ops run before `isPlaying` flips, so a `.toggleCC(whenPlaying:)` op sees the state
         // the button was pressed in.
         run(transport.play)
         isPlaying = true
-        onPlay?()
+        if restartLFOs { onPlay?() }
     }
 
     /// Pitch-bend value that trims reverse playback to exactly 1x.
@@ -502,8 +512,9 @@ final class ClockEngine {
             case .pressPlay:
                 // Delegate, never duplicate: this is the same entry point the UI button uses, so
                 // the parameter and the button cannot diverge. Safe from recursion because
-                // `transport.play` contains no `.pressPlay`.
-                play()
+                // `transport.play` contains no `.pressPlay`. An LFO is pressing here, not the
+                // user, so it must not restart the LFOs (it would restart itself).
+                play(restartLFOs: false)
             case .tapeNudge(let cc):
                 router?.send([0xB0, UInt8(cc), 127])
                 // The nudge halts the OP-1's transport; resume it if it was rolling, as a nudge
