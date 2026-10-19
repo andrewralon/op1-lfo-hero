@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Anchors
 
-/// Collects the bounds of every control the walkthrough can point at.
+/// Collects the bounds of every control the tutorial can point at.
 ///
 /// A list per id rather than one anchor: some steps cover several views that can't be wrapped
 /// in one container without changing the layout (the landscape transport column's rows each
@@ -16,7 +16,7 @@ struct TourAnchorKey: PreferenceKey {
 }
 
 extension View {
-    /// Marks this view as (part of) a walkthrough step. `when: false` tags nothing, which keeps
+    /// Marks this view as (part of) a tutorial step. `when: false` tags nothing, which keeps
     /// the view's identity the same for the one instance per type that is tagged (track 1 only).
     func tourAnchor(_ id: TourAnchor, when tagged: Bool = true) -> some View {
         anchorPreference(key: TourAnchorKey.self, value: .bounds) { tagged ? [id: [$0]] : [:] }

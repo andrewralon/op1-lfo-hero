@@ -72,9 +72,11 @@ struct DarkButton: ButtonStyle {
     }
 }
 
-/// Light capsule used for the settings / help action buttons ("show walkthrough", "reset to
+/// Light capsule used for the settings / help action buttons ("show tutorial", "reset to
 /// defaults"). One style so the same button looks the same wherever it appears.
 struct CapsuleButtonStyle: ButtonStyle {
+    /// Capsule color. The label stays the dark background color either way.
+    var fill: Color = C.text
     @Environment(\.horizontalSizeClass) private var hSize
 
     func makeBody(configuration: Configuration) -> some View {
@@ -85,7 +87,7 @@ struct CapsuleButtonStyle: ButtonStyle {
             .fixedSize()
             .padding(.horizontal, 20)
             .padding(.vertical, 5)
-            .background(C.text.opacity(configuration.isPressed ? 0.7 : 1))
+            .background(fill.opacity(configuration.isPressed ? 0.7 : 1))
             .clipShape(Capsule())
     }
 }

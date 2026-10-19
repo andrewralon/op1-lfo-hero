@@ -234,7 +234,7 @@ final class AppState: ObservableObject {
     static func migratedParamId(_ id: String) -> String { legacyParamIdMap[id] ?? id }
 
     private func loadSettings() {
-        // TourController reads the same flag (and --uitest-tour) to keep the walkthrough out of
+        // TourController reads the same flag (and --uitest-tour) to keep the tutorial out of
         // the UI tests.
         if CommandLine.arguments.contains("--uitest-reset") {
             KeychainStore.delete(account: settingsKey)
@@ -375,7 +375,7 @@ final class AppState: ObservableObject {
     /// but its name matched no known device. Surfaced in the status bar.
     @Published private(set) var profileIsAssumed = false
 
-    /// The device the first-run walkthrough should talk about, or nil when none is known yet.
+    /// The device the first-run tutorial should talk about, or nil when none is known yet.
     ///
     /// `profile` is the last device the app remembered (it survives relaunches and reinstalls), so
     /// with nothing connected it can name a device the user no longer has. The tour only trusts

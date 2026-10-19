@@ -11,7 +11,7 @@ struct TransportBarView: View {
 
             Spacer()
 
-            // Tagged one by one: the walkthrough's transport step spans all four.
+            // Tagged one by one: the tutorial's transport step spans all four.
             TransBtn(symbol: "play.fill",  active: false) { app.play() }
                 .tourAnchor(.transport)
             TransBtn(symbol: "stop.fill",  active: false)                                        { app.stop() }

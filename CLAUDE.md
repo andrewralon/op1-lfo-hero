@@ -276,12 +276,12 @@ Use XCUITest (not `cliclick` coordinate math) to drive the simulator — accessi
 - `repeatButton` — looping LFO start button (↻)
 - `oneShotButton` — one-shot LFO start button (→|)
 - `trashButton` — delete all chips button
-- `tourCard`, `tourTitle`, `tourCounter` — first-run walkthrough hint card, its title and its `n / total` counter
+- `tourCard`, `tourTitle`, `tourCounter` — first-run tutorial hint card, its title and its `n / total` counter
 - `tourSkipButton` (top right) / `tourLaterButton` / `tourBackButton` / `tourNextButton` (bottom row) — the card's buttons (`tourNextButton` reads "start" on the welcome card and "done" on the last step; `tourBackButton` is disabled on the first)
-- `replayTourButton` (settings) / `replayTourFromHelp` (help) — the "show walkthrough" button in each sheet's header, restarts the walkthrough at step 1
+- `replayTourButton` (settings) / `replayTourFromHelp` (help) — the "show tutorial" button in each sheet's header, restarts the tutorial at step 1
 - `muteButton1` … `muteButton<n>` — mute pads; `value` is `muted` / `unmuted`
 
-**Reset app state in UITests** — pass `--uitest-reset` as a launch argument to clear UserDefaults before the test. It also marks the first-run walkthrough done, because the walkthrough's overlay swallows every tap — **every UI test must pass `--uitest-reset`** (or `--uitest-tour` to test the walkthrough itself), including tests that otherwise want no setup. Add `--uitest-profile <id>` (`op1` / `tx6` / `tp7`) to pin the device, so 6-track layouts can be tested with no hardware attached:
+**Reset app state in UITests** — pass `--uitest-reset` as a launch argument to clear UserDefaults before the test. It also marks the first-run tutorial done, because the tutorial's overlay swallows every tap — **every UI test must pass `--uitest-reset`** (or `--uitest-tour` to test the tutorial itself), including tests that otherwise want no setup. Add `--uitest-profile <id>` (`op1` / `tx6` / `tp7`) to pin the device, so 6-track layouts can be tested with no hardware attached:
 ```swift
 app.launchArguments = ["--uitest-reset", "--uitest-profile", "tx6"]
 app.launch()

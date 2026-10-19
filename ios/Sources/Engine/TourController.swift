@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-/// One stop on the first-run walkthrough. Declaration order is the tour order, and it is also
+/// One stop on the first-run tutorial. Declaration order is the tour order, and it is also
 /// how a step that no longer applies is replaced: by the next case after it that does.
 enum TourAnchor: String, CaseIterable {
     /// The opening card. Points at nothing: it sits mid-screen over a full dim.
@@ -24,7 +24,7 @@ enum TourAnchor: String, CaseIterable {
     }
 }
 
-/// State of the first-run walkthrough: which step is showing, and whether it should show at all.
+/// State of the first-run tutorial: which step is showing, and whether it should show at all.
 ///
 /// Persisted in `UserDefaults`, not the Keychain settings blob. It isn't a secret, and being
 /// wiped with the app is right: a reinstall should see the tour again.

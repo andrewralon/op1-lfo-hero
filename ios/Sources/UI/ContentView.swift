@@ -130,7 +130,7 @@ struct LayoutMetrics {
     // Estimated rendered height; used to size lfoH correctly.
     var statusBarH: CGFloat    { statusBarFont + 2 * statusBarVPad + 8 }
 
-    // ── Tier 2: first-run walkthrough ───────────────────────────────────
+    // ── Tier 2: first-run tutorial ───────────────────────────────────
 
     /// Hint card width. Landscape has height to spare beside the target but not above it, so the
     /// card is narrower there; iPad portrait would otherwise stretch a two-line hint to one.
@@ -529,9 +529,9 @@ struct DevicePickerView: View {
     }
 }
 
-// MARK: - Help copy (shared by HelpView and the walkthrough)
+// MARK: - Help copy (shared by HelpView and the tutorial)
 
-/// Section titles and short walkthrough hints in one place, so the tour and help can't disagree.
+/// Section titles and short tutorial hints in one place, so the tour and help can't disagree.
 /// Help keeps the long text; the tour shows `tourTitle` plus `tourText`.
 enum HelpCopy {
     static func title(_ a: TourAnchor) -> String {
@@ -621,7 +621,7 @@ enum HelpCopy {
         case .chipArea:
             return "lfo chips created as loop or 1x are shown here. tap chips to pause, long-press to edit (and again to save changes), or tap × to delete."
         case .helpSettings:
-            return "show descriptions for every control from help. change options or replay this walkthrough from settings."
+            return "show descriptions for every control from help. change options or replay this tutorial from settings."
         }
     }
 }
@@ -652,23 +652,23 @@ struct HelpView: View {
         }
         return out + [
         (HelpCopy.title(.mutePad), Text("tap a track's colored number pad to mute/unmute it. bright colored background = unmuted; dark background = muted.")),
-        (HelpCopy.title(.panKnob), Text("drag up/down on a knob to pan right/left. release near top dead center to snap to center. [vertical scrubbing for horizontal controls like pan are hard. i'm open to better ideas...]")),
+        (HelpCopy.title(.panKnob), Text("drag up/down on a knob to pan right/left. release near top dead center to snap to center.\n[vertical scrubbing for horizontal controls like pan are hard. i'm open to better ideas...]")),
         (HelpCopy.title(.volumeFader), Text("drag up/down on a fader to set that track's volume. drag to the side for fine scrubbing.")),
-        (HelpCopy.title(.transport), Text("play/stop control op1 tape playback (play only works when the app is the clock master). play resumes from where the last play stopped, not from where you moved the tape by hand. left/right arrow buttons step the op1 tape position backward/forward.")),
+        (HelpCopy.title(.transport), Text("play/stop control op1 tape playback (play only works when the app is the clock master). play resumes from where the last play stopped, not from where you moved the tape by hand. left/right arrow buttons (op-1 field and tp-7) move the device's tape position backward/forward. -/+ buttons (tx-6) adjust the tempo bpm.")),
         (HelpCopy.title(.tempoMode), app.profile.caps.canBeClockMaster
-            ? Text("tap the metronome icon to switch the clock source. then change the \(dev) to match.\n\(Text("\(clk) (beat match)").foregroundColor(C.track(1))) — \(dev) is master\n· app's lfos follow the \(dev)'s tempo.\n\(Text("app (midi sync)").foregroundColor(C.green)) — app is master\n· app controls the \(dev)'s transport (play/stop/back/forward).")
+            ? Text("tap the metronome icon to switch the clock source. then change the \(dev) to match.\n· \(Text("\(clk) (beat match)").foregroundColor(C.track(1))) — \(dev) is master — lfos follow the \(dev)'s tempo.\n· \(Text("app (midi sync)").foregroundColor(C.green)) — app is master — app controls the \(dev)'s transport (play/stop/back/forward).")
             : Text("the \(dev) does not send midi clock, so the app is always the tempo source. its lfos run on the app's own clock and the transport buttons drive the \(dev) over cc.")),
-        (HelpCopy.title(.bpm), Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.\n\(Text("· note: ").bold())tempo control requires 'app (midi sync)' mode and usb-c; ble midi (bluetooth) does not send high-resolution tempo changes.")),
+        (HelpCopy.title(.bpm), Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.\n· app tempo control of op-1 field requires 'app (midi sync)' mode and usb-c\n· op-1 field ble midi does not send tempo change messages")),
         (HelpCopy.title(.trackToggle), Text("tap to cycle off → on → inverted. tracks apply the lfo to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
         (HelpCopy.title(.preview), Text("enables live preview: the current editor settings are sent to the device in real time as you adjust them, so you can hear the effect while dialing in speed, depth, center, and wave shape. no chip is created — press repeat or 1x to create an lfo.")),
         (HelpCopy.title(.paramPicker), Text("choose which parameter the lfo modulates, and which waveform shape it follows. tap the icons to step to the next option without opening the picker.")),
         (HelpCopy.title(.speedBox), Text("drag up/down on a box to scrub its value. tap the speed (timer) icon to step to the next speed value one at a time. speed sets lfo speed, depth sets its range, center sets its midpoint.")),
         (HelpCopy.title(.waveform), Text("when no lfo chips are running, shows the current editor settings as a preview. when chips are active, shows all running lfo curves overlaid, colored per track.")),
-        (HelpCopy.title(.startButtons), Text("start the lfo looping, start it once, or delete all currently active lfos.")),
-        (HelpCopy.title(.chipArea), Text("lfos are shown as 'chips' showing 'track/master·parameter·wave·speed·center±depth·repeat/loop'.\n\(Text("tap").bold()) — toggle the lfo on/off without stopping it.\n\(Text("long-press").bold()) — enter edit mode; adjust controls to update the chip live, then long-press again to save changes.\n\(Text("tap anywhere else").bold()) — cancel the current edit.\n\(Text("×").bold()) — stop and delete the lfo.")),
+        (HelpCopy.title(.startButtons), Text("start the lfo looping (repeat), run it once (one-shot), or delete all lfos.")),
+        (HelpCopy.title(.chipArea), Text("lfos are shown as chips with abbreviated names. example: 'track/master·parameter·wave·speed·center±depth·repeat/loop'.\n· \(Text("tap").bold()) — toggle the lfo on/off\n· \(Text("long-press").bold()) — edit the controls for selected chip and hear changes live, then long-press again to save changes.\n· \(Text("tap anywhere else").bold()) — cancel the current edit.\n· \(Text("×").bold()) — stop and delete the lfo.")),
         (HelpCopy.title(.statusBar), Text(app.profile.caps.canBeClockMaster
-            ? "two buttons. left: current midi connection; tap it to choose a usb or ble midi device. right: tempo source; tap it to switch the clock source, the same as the metronome icon."
-            : "left: current midi connection; tap it to choose a usb or ble midi device. right: tempo source, which is always the app on the \(dev)."))
+            ? "· left side: midi device — tap it to connect to a usb or ble device\n· right side: tempo source — tap it to switch the tempo source (same as tapping the metronome icon)"
+            : "· left side: midi device — tap it to connect to a usb or ble device\n· right side: tempo source — always set to 'app' on the \(dev)."))
         ]
     }
 
@@ -691,8 +691,8 @@ struct HelpView: View {
                             .minimumScaleFactor(0.8)
                         Spacer(minLength: 8)
                         // Right-aligned under the nav bar's "done", in line with the header.
-                        Button("show walkthrough") { tour.replay(); dismiss() }
-                            .buttonStyle(CapsuleButtonStyle())
+                        Button("show tutorial") { tour.replay(); dismiss() }
+                            .buttonStyle(CapsuleButtonStyle(fill: C.track(1)))
                             .accessibilityIdentifier("replayTourFromHelp")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -907,8 +907,8 @@ struct SettingsView: View {
 
     /// Starts once this sheet has closed. Deliberately not part of reset to defaults.
     private var replayTourBtn: some View {
-        Button("show walkthrough") { tour.replay(); dismiss() }
-            .buttonStyle(CapsuleButtonStyle())
+        Button("show tutorial") { tour.replay(); dismiss() }
+            .buttonStyle(CapsuleButtonStyle(fill: C.track(1)))
             .accessibilityIdentifier("replayTourButton")
     }
 

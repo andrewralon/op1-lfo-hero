@@ -1,7 +1,7 @@
 import XCTest
 @testable import op1_lfo_hero
 
-/// The first-run walkthrough's state: which steps a device gets, and what skip / later / next
+/// The first-run tutorial's state: which steps a device gets, and what skip / later / next
 /// leave behind for the next launch.
 @MainActor
 final class TourControllerTests: XCTestCase {

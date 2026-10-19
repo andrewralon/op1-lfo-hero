@@ -1,6 +1,6 @@
 import XCTest
 
-/// The first-run walkthrough. `--uitest-reset` keeps it out of every other UI test;
+/// The first-run tutorial. `--uitest-reset` keeps it out of every other UI test;
 /// `--uitest-tour` forces it back on here.
 final class TourUITests: XCTestCase {
 

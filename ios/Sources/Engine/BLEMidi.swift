@@ -73,7 +73,7 @@ final class BLEMidi: NSObject, ObservableObject {
             case .connecting(let n):   return "connecting to \(n)…"
             case .connected(let n):    return "\(n) (ble)"
             case .disconnected(let n): return "\(n) disconnected"
-            case .notFound:            return "no device found"
+            case .notFound:            return "no device found; tap to connect"
             }
         }
 

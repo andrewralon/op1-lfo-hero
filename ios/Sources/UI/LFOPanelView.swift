@@ -521,7 +521,7 @@ struct LFOPanelView: View {
             get: { m.isIpad && showSettings },
             set: { if !$0 { showSettings = false } }
         )) { SettingsView() }
-        // The walkthrough never sits over a sheet, and replay waits for these to close.
+        // The tutorial never sits over a sheet, and replay waits for these to close.
         .onChange(of: showHelp)     { _, shown in tour.sheet(shown) }
         .onChange(of: showSettings) { _, shown in tour.sheet(shown) }
     }

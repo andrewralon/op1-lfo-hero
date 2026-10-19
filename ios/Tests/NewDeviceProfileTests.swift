@@ -1706,7 +1706,7 @@ final class ConnectionStatusTests: XCTestCase {
     func testNothingConnectedStillReportsScanningAndNoDevice() {
         XCTAssertEqual(status(ble: .scanning).label, "scanning…")
         XCTAssertFalse(status(ble: .scanning).isConnected)
-        XCTAssertEqual(status(ble: .notFound).label, "no device found")
+        XCTAssertEqual(status(ble: .notFound).label, "no device found; tap to connect")
     }
 
     func testUnmatchedUSBDevicesAreListedWhenNothingIsConnected() {

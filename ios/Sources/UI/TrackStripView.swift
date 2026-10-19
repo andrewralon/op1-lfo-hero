@@ -16,7 +16,7 @@ struct TrackStripView: View {
                             set: { app.setVolume(track: track, value: $0) })
         let pan   = Binding(get: { app.pans[track] ?? 0 },
                             set: { app.setPan(track: track, value: $0) })
-        // The walkthrough points at one strip only.
+        // The tutorial points at one strip only.
         let tagged = track == app.profile.trackIndices.first
 
         VStack(spacing: 0) {
