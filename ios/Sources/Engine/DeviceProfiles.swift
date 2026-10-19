@@ -300,7 +300,7 @@ extension DeviceProfile {
         ),
         setupSteps: [
             "use `sync` for the app to follow the tp-7's tempo — it streams midi clock in that mode. volume/mute/gain control works in `off` and `sync` alike.",
-            "note: in `ctrl` mode the tp-7 acts as a midi controller for other gear. it will not playback and stops receiving commands from the app.)"
+            "note: in `ctrl` mode the tp-7 acts as a midi controller for other gear. it will not playback and stops receiving commands from the app"
         ]
     )
 
