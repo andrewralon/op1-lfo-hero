@@ -60,15 +60,13 @@ final class ClockEngine {
     static let bpmDisplayInterval = 0.25
     /// A change this large (a deliberate jump, not jitter or a drag) is shown at once.
     static let bpmImmediateChange = 0.02
-    /// The anti-jitter smoothing (the averaging window, the step detection, the snap and the hysteresis),
-    /// switched OFF for ticks timed by the sender's own timestamps. A BLE-MIDI stamp is accurate to about
-    /// 0.4 ms, so each tick's own interval is already a clean tempo and every smoothing step only added
-    /// lag (measured on a TX-6 over Bluetooth, 2026-10-18: the display now locks onto a new tempo at once
-    /// instead of arriving within 1-2 BPM and settling over a second). The logic is kept, not deleted:
-    /// set true to restore it. It always applies to ticks timed by arrival (USB, or a device with no
-    /// usable stamps), where per-tick timing is not clean enough to show raw. The 4/s display limit
-    /// applies either way.
-    var antiJitter = false
+    /// The anti-jitter smoothing (the averaging window, the step detection, the snap and the hysteresis).
+    /// ON. It was switched off for sender-stamped (BLE) ticks on 2026-10-18 to see the raw tempo: it locked
+    /// onto a change at once, but showed the stamps' own wobble (1 ms resolution plus the source's tick
+    /// timing, ~0.1%: 386.9 / 387.7 at 387 BPM) and was judged less steady than the smoothed readout. false
+    /// shows each tick's stamped interval over ~0.5 s (`rawSpanSeconds`) with nothing else filtered. The
+    /// 4/s display limit applies either way.
+    var antiJitter = true
 
     private var lastBpmPublishTime: Double = 0
     private var lastPublishedBpm: Double = 0
@@ -88,6 +86,11 @@ final class ClockEngine {
     private let smoothSeconds = 3.0
     /// The window when the ticks are timed by the sender's stamps (see handleSlaveTick).
     private let stampedWindowTicks = 32
+    /// Raw (anti-jitter off) mode: time one reading spans. Stamps are whole ms, so one interval at 400 BPM
+    /// (6.25 ms) reads 6 or 7 ms = 416.7 or 357.1. Spanning ~0.5 s of ticks cancels it (+/-1 ms of 500 = 0.2%).
+    private let rawSpanSeconds = 0.5
+    private let rawSpanMinTicks = 8
+    private var rawIntervals: [Double] = []
     private let stampedWindowSeconds = 1.0
     /// A tempo change shows as the last `stepRecentTicks` ticks disagreeing with the window by this much.
     private let stepRecentTicks = 12
@@ -241,9 +244,13 @@ final class ClockEngine {
                 return
             }
             if !antiJitter, stampedInterval != nil {
-                // Anti-jitter off and the tick is sender-stamped: its own interval is the tempo, nothing
-                // averaged, snapped or held back (only the display rate below).
-                bpm = (60.0 / (Double(PPQN) * interval) * 10).rounded() / 10
+                // Anti-jitter off and the tick is sender-stamped: its interval is the tempo (spanned over
+                // `rawSpanSeconds` only to undo the 1 ms stamp rounding), nothing snapped or held back (only the display rate below).
+                rawIntervals.append(interval)
+                while rawIntervals.count > rawSpanMinTicks,
+                      rawIntervals.reduce(0, +) - rawIntervals[0] >= rawSpanSeconds { rawIntervals.removeFirst() }
+                let span = rawIntervals.reduce(0, +) / Double(rawIntervals.count)
+                bpm = (60.0 / (Double(PPQN) * span) * 10).rounded() / 10
                 let value = bpm
                 let publish = ClockEngine.shouldPublishBpm(now: now, lastPublishTime: lastBpmPublishTime,
                                                            current: value, lastPublished: lastPublishedBpm,
@@ -355,7 +362,7 @@ final class ClockEngine {
         lock.lock()
         isClockMaster = false
         bpm = 0   // sentinel: no slave data; cleared when first OP-1 ticks arrive
-        bpmHistory.removeAll(); historySeconds = 0
+        bpmHistory.removeAll(); historySeconds = 0; rawIntervals.removeAll()
         lastBpmPublishTime = 0; lastPublishedBpm = 0
         lastSenderStampMs = nil; pendingSenderStampMs = nil
         lastTickTime = 0

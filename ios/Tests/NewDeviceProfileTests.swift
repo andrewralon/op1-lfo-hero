@@ -1755,7 +1755,7 @@ final class SenderStampedClockTests: XCTestCase {
         clock = ClockEngine()
         clock.router = destination
         clock.disableClock()                           // slaved to the device
-        clock.antiJitter = true                        // these exercise the smoothing, which is off by default
+        clock.antiJitter = true                        // these exercise the smoothing (on by default; set explicitly so they hold either way)
     }
 
     // MARK: the interval between two stamps
@@ -1869,10 +1869,10 @@ final class RawStampedTempoTests: XCTestCase {
         clock = ClockEngine()
         clock.router = destination
         clock.disableClock()
-        XCTAssertFalse(clock.antiJitter, "off by default")
+        clock.antiJitter = false
     }
 
-    func testEachTicksOwnStampedIntervalIsTheTempo() {
+    func testATempoChangeIsFollowedWithinTheSpanNotAHoldOff() {
         var t = 0
         func tick(_ interval: Int) {
             t += interval
@@ -1880,9 +1880,24 @@ final class RawStampedTempoTests: XCTestCase {
             destination.onClock?()
         }
         for _ in 0..<10 { tick(31) }
-        XCTAssertEqual(clock.bpm, 80.6, "60 / (24 * 0.031): nothing averaged")
-        tick(32)
-        XCTAssertEqual(clock.bpm, 78.1, "the very next tick moves it: no window, no hysteresis")
+        XCTAssertEqual(clock.bpm, 80.6, "60 / (24 * 0.031)")
+        for _ in 0..<30 { tick(32) }
+        XCTAssertEqual(clock.bpm, 78.1, "the span is ~0.5 s: once full of the new tempo it is exact, no hysteresis")
+    }
+
+    /// 400 BPM is 6.25 ms a tick on 1 ms stamps: single intervals read 6 or 7 ms (416.7 / 357.1) and the
+    /// display flickered between them. A fixed span of ticks cancels the rounding.
+    func testFourHundredBpmDoesNotFlickerOnWholeMillisecondStamps() {
+        var exactMs = 0.0
+        var seen: [Double] = []
+        for k in 0..<300 {
+            exactMs += 6.25
+            destination.onClockStamp?(Int(exactMs.rounded()) % 8192)
+            destination.onClock?()
+            if k > 60 { seen.append(clock.bpm) }
+        }
+        XCTAssertLessThan((seen.max() ?? 0) - (seen.min() ?? 0), 8, "was 357.1 to 416.7")
+        XCTAssertEqual(seen.last ?? 0, 400, accuracy: 4)
     }
 
     /// The display limit stays: the box is told once, however many ticks arrive in an instant.

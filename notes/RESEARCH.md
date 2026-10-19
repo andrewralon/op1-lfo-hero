@@ -1442,6 +1442,11 @@ detection, the snap, the hysteresis) only added lag: raw per-tick timing from th
 and took about a second to settle. `ClockEngine.antiJitter = false` for sender-stamped ticks; the logic is
 kept (set it true to restore it) and still applies to ticks timed by arrival.
 
+**Then it went back on.** Raw readings are only as good as the stamps: whole milliseconds, plus the source's own
+tick timing. At 400 BPM (6.25 ms a tick) single intervals read 6 or 7 ms, 416.7 / 357.1, so raw mode now spans
+~0.5 s of ticks (`rawSpanSeconds`). That left ~0.1% wobble (386.9 / 387.7 at 387 BPM), which looked less steady
+than the smoothed readout, so `ClockEngine.antiJitter = true` again (2026-10-18). Raw mode is kept behind the flag.
+
 ## Open questions — answer on hardware
 
 - [ ] Do the pinned FX-bus channels (ch 8/9) actually land?
