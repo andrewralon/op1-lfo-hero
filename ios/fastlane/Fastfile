@@ -135,13 +135,19 @@ platform :ios do
 
   desc "Upload app preview videos from fastlane/app_previews/ to App Store Connect"
   lane :previews do
-    deliver(
-      skip_metadata: true,
-      skip_screenshots: true,
-      skip_binary_upload: true,
-      overwrite_preview_videos: true,
-      precheck_include_in_app_purchases: false
-    )
+    begin
+      deliver(
+        skip_metadata: true,
+        skip_screenshots: true,
+        skip_binary_upload: true,
+        overwrite_preview_videos: true,
+        precheck_include_in_app_purchases: false
+      )
+    rescue FastlaneCore::Interface::FastlaneError => e
+      # Same poster-frame rejection as `upload_media`; the video itself arrives.
+      raise unless e.message.include?("Asset Not in Complete state")
+      UI.important("Previews uploaded, but App Store Connect refused the poster frame; pick it in the web UI.")
+    end
   end
 
   desc "Full release: build + upload metadata + screenshots + submit for review"
