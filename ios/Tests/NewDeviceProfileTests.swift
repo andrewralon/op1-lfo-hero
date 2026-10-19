@@ -1480,11 +1480,165 @@ final class DevicePickerHighlightTests: XCTestCase {
 
 /// Opening the device picker must not make a working Bluetooth link look lost.
 final class BleScanGuardTests: XCTestCase {
-    func testNoScanWhileTheLinkIsUp() {
-        XCTAssertFalse(BLEMidi.shouldScan(linkIsUp: true))
+    func testALinkedNonContinuousScanStopsInsteadOfResettingTheStatus() {
+        XCTAssertEqual(BLEMidi.scanPlan(linkIsUp: true, continuous: false), .stop)
     }
-    func testScansWhenThereIsNoLink() {
-        XCTAssertTrue(BLEMidi.shouldScan(linkIsUp: false))
+    /// The picker open on a connected device must still find the other ones, without the status
+    /// flipping to "scanning" or the list being emptied.
+    func testALinkedContinuousScanRunsQuietly() {
+        XCTAssertEqual(BLEMidi.scanPlan(linkIsUp: true, continuous: true), .quiet)
+    }
+    /// Opening the picker on a connected device must not empty the list: that device does not advertise,
+    /// so it would never come back and lose its green row.
+    func testAQuietScanNeverClearsTheList() {
+        XCTAssertFalse(BLEMidi.clearsList(plan: .quiet, isRestart: false))
+        XCTAssertFalse(BLEMidi.clearsList(plan: .stop, isRestart: false))
+        XCTAssertTrue(BLEMidi.clearsList(plan: .normal, isRestart: false))
+        XCTAssertFalse(BLEMidi.clearsList(plan: .normal, isRestart: true))
+    }
+    func testScansNormallyWhenThereIsNoLink() {
+        XCTAssertEqual(BLEMidi.scanPlan(linkIsUp: false, continuous: false), .normal)
+        XCTAssertEqual(BLEMidi.scanPlan(linkIsUp: false, continuous: true), .normal)
+    }
+    /// A device that just disconnected stays listed through the grace period, then drops by the usual rule.
+    func testADisconnectedDeviceStaysListedThroughTheGraceThenDrops() {
+        let id = UUID()
+        let now = 1000.0
+        let seen = [id: now + BLEMidi.disconnectGrace]
+        XCTAssertTrue(BLEMidi.staleIds(lastSeen: seen, now: now + BLEMidi.disconnectGrace, staleAfter: BLEMidi.staleAfter, keep: []).isEmpty)
+        XCTAssertEqual(BLEMidi.staleIds(lastSeen: seen, now: now + BLEMidi.disconnectGrace + BLEMidi.staleAfter + 1,
+                                        staleAfter: BLEMidi.staleAfter, keep: []), [id])
+    }
+}
+
+/// The picker's Bluetooth list as a state machine: whatever order scans, connects, disconnects and silence
+/// arrive in, the connected device stays a row and everything else follows the silence rule.
+final class BleDeviceListTests: XCTestCase {
+    private let tx6 = UUID(), tp7 = UUID(), other = UUID()
+    private var list = BleDeviceList()
+
+    func testNewDevicesAreListedOnceInTheOrderFound() {
+        XCTAssertTrue(list.sawAdvertisement(tx6, now: 0))
+        XCTAssertTrue(list.sawAdvertisement(tp7, now: 1))
+        XCTAssertFalse(list.sawAdvertisement(tx6, now: 2), "a repeat advertisement is not new")
+        XCTAssertEqual(list.order, [tx6, tp7])
+    }
+
+    /// The bug: opening the picker on a connected device cleared the list, and the connected device,
+    /// which does not advertise, never came back.
+    func testAFreshScanKeepsTheConnectedDevice() {
+        _ = list.sawAdvertisement(tx6, now: 0)
+        _ = list.sawAdvertisement(tp7, now: 0)
+        list.pin(tx6, now: 1)
+        list.startFreshScan()
+        XCTAssertEqual(list.order, [tx6])
+    }
+
+    func testTheConnectedDeviceNeverGoesStaleHoweverLongItIsSilent() {
+        list.pin(tx6, now: 0)
+        XCTAssertTrue(list.removeStale(now: 10_000, staleAfter: 5).isEmpty)
+        XCTAssertEqual(list.order, [tx6])
+    }
+
+    func testAnotherDeviceFoundWhileConnectedIsListedAlongsideIt() {
+        list.pin(tx6, now: 0)
+        XCTAssertTrue(list.sawAdvertisement(tp7, now: 1))
+        XCTAssertEqual(list.order, [tx6, tp7])
+    }
+
+    func testAnotherDeviceThatGoesQuietDropsButTheConnectedOneStays() {
+        list.pin(tx6, now: 0)
+        _ = list.sawAdvertisement(tp7, now: 1)
+        XCTAssertEqual(list.removeStale(now: 7, staleAfter: 5), [tp7])
+        XCTAssertEqual(list.order, [tx6])
+    }
+
+    func testAPinnedDeviceNotYetListedBecomesARow() {
+        list.pin(tx6, now: 0)
+        XCTAssertEqual(list.order, [tx6], "e.g. connected by hand before any advertisement was seen")
+    }
+
+    /// The other bug: a disconnect removed the device although it was still there.
+    func testADisconnectedDeviceStaysListed() {
+        list.pin(tx6, now: 0)
+        list.unpin(tx6, now: 10, grace: BLEMidi.disconnectGrace)
+        XCTAssertNil(list.pinned)
+        XCTAssertTrue(list.removeStale(now: 10 + BLEMidi.disconnectGrace, staleAfter: 5).isEmpty)
+        XCTAssertEqual(list.order, [tx6])
+    }
+
+    func testADisconnectedDeviceThatNeverAdvertisesAgainDrops() {
+        list.pin(tx6, now: 0)
+        list.unpin(tx6, now: 10, grace: BLEMidi.disconnectGrace)
+        XCTAssertEqual(list.removeStale(now: 10 + BLEMidi.disconnectGrace + 5.1, staleAfter: 5), [tx6])
+        XCTAssertTrue(list.order.isEmpty)
+    }
+
+    func testADisconnectedDeviceThatAdvertisesAgainStays() {
+        list.pin(tx6, now: 0)
+        list.unpin(tx6, now: 10, grace: BLEMidi.disconnectGrace)
+        _ = list.sawAdvertisement(tx6, now: 12)
+        XCTAssertTrue(list.removeStale(now: 14, staleAfter: 5).isEmpty)
+        XCTAssertEqual(list.removeStale(now: 18, staleAfter: 5), [tx6], "then follows the plain silence rule")
+    }
+
+    func testAFailedConnectionDropsAfterTheSilenceWindowNotAtOnce() {
+        _ = list.sawAdvertisement(tx6, now: 0)
+        list.pin(tx6, now: 1)
+        list.unpin(tx6, now: 2, grace: 0)
+        XCTAssertTrue(list.removeStale(now: 4, staleAfter: 5).isEmpty)
+        XCTAssertEqual(list.removeStale(now: 8, staleAfter: 5), [tx6])
+    }
+
+    func testAFreshScanAfterADisconnectEmptiesTheList() {
+        _ = list.sawAdvertisement(tp7, now: 0)
+        list.pin(tx6, now: 0)
+        list.unpin(tx6, now: 1, grace: 10)
+        list.startFreshScan()
+        XCTAssertTrue(list.order.isEmpty, "nothing is pinned any more")
+    }
+
+    /// Connecting to a second device moves the pin; the first stays listed (it is still there).
+    func testPinningAnotherDeviceMovesThePin() {
+        list.pin(tx6, now: 0)
+        list.pin(tp7, now: 1)
+        XCTAssertEqual(list.pinned, tp7)
+        XCTAssertEqual(list.order, [tx6, tp7])
+        XCTAssertEqual(list.removeStale(now: 100, staleAfter: 5), [tx6])
+    }
+}
+
+/// Reaching a known device without waiting for it to advertise.
+final class BleReconnectPlanTests: XCTestCase {
+    private let tx6 = UUID(), tp7 = UUID()
+    private func plan(os: [UUID] = [], remembered: UUID? = nil, suppressed: Bool = false,
+                      may: Bool = true, pending: Bool = false) -> BLEMidi.ReconnectPlan {
+        BLEMidi.reconnectPlan(osConnected: os, remembered: remembered, suppressed: suppressed,
+                              mayAutoConnect: may, alreadyPending: pending)
+    }
+
+    func testADeviceAlreadyLinkedByTheSystemIsConnectedToDirectly() {
+        XCTAssertEqual(plan(os: [tx6]), .connectNow(tx6), "it does not advertise, so a scan would never find it")
+    }
+    func testTheRememberedOneIsPreferredWhenSeveralAreLinked() {
+        XCTAssertEqual(plan(os: [tx6, tp7], remembered: tp7), .connectNow(tp7))
+    }
+    func testARememberedDeviceGetsAPendingConnectNotAScan() {
+        XCTAssertEqual(plan(remembered: tx6), .pending(tx6))
+    }
+    func testNothingIsIssuedTwiceWhileOneIsPending() {
+        XCTAssertEqual(plan(remembered: tx6, pending: true), .none)
+    }
+    func testNothingRememberedAndNothingLinkedMeansJustScan() {
+        XCTAssertEqual(plan(), .none)
+    }
+    /// The disconnect button must not be undone by the next scan.
+    func testADeliberateDisconnectIsNeverUndone() {
+        XCTAssertEqual(plan(os: [tx6], remembered: tx6, suppressed: true), .none)
+        XCTAssertEqual(plan(remembered: tx6, suppressed: true), .none)
+    }
+    func testNothingConnectsOverAnotherActiveTransport() {
+        XCTAssertEqual(plan(os: [tx6], remembered: tx6, may: false), .none)
     }
 }
 
