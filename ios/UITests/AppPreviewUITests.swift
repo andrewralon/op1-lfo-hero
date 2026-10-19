@@ -1,84 +1,61 @@
 import XCTest
 
-// Demo test designed for recording as an App Store Preview video.
-// Run on a fresh simulator (or any device — --uitest-reset clears saved state).
-// The test forces portrait orientation. Record with:
+// Demo test designed for recording as an App Store Preview video (OP-1 Field, 4 tracks).
+// App Store Connect wants 15-30 s, max 30 fps, H.264, 886x1920 for the large iPhone sizes.
+// Rotate nothing: the demo is portrait. Record with:
 //   xcrun simctl io <udid> recordVideo --codec h264 /tmp/claude-ss/preview.mov
-// then immediately run this test. Stop recording with Ctrl+C (SIGINT) when done.
+// run this test, then stop the recording with Ctrl+C (SIGINT). The recording starts before the
+// app launches, so trim the lead-in with ffmpeg (see CLAUDE.md).
+//
+// One continuous take, paced so every change is visible before the next one starts:
+//   Scene 1: track 1 · volume · square · depth 10 → repeat. A chip appears.
+//   Scene 2: track 2 on, track 4 inverted · pan · sine · depth 30 → repeat. Chips appear for
+//            tracks 1 + 2 + 4 and the pans sweep in opposite directions.
+//   Final:   a long hold with nothing changing, so the end state can be read.
 final class AppPreviewUITests: XCTestCase {
+
+    /// Gap after each action, so the viewer sees what just changed. Everything is multiplied by
+    /// this; raise it to slow the whole demo down, lower it to speed it up.
+    private let pace = 0.7
+    private let finalHold: TimeInterval = 6
 
     override func setUpWithError() throws {
         continueAfterFailure = false
         try ScreenshotDir.ensureExists()
     }
 
-    // MARK: - App Store Preview demo
-    //
-    // Records one continuous video that can be split into two previews at the
-    // 5-second hold after Scene 2 (chip 1 running).
-    //
-    // Preview 1 (~22s): launch → configure chip 1 → chip running (5s hold)
-    //   Scene 1: App launches. Dark UI: 4 track strips, waveform view, LFO controls. (5s hold)
-    //   Scene 2: Build chip 1 — track 1 · volume · square · speed 4 · center 90 · depth 10.
-    //            Tap repeat (↻) — chip appears, volume LFO runs. (5s hold) ← CUT HERE
-    //
-    // Preview 2 (~20s): configure multi-track pan LFOs → chips running (5s hold)
-    //   Scene 3: Turn track 1 off. Enable track 2 (normal) and track 4 (inverted).
-    //            Switch to pan · sine · speed 2 · center 50 · depth 30.
-    //            Tap repeat (↻) — two chips appear (t2 normal, t4 inverted pan/sine),
-    //            pans sweep in opposite directions. (5s hold)
-
     @MainActor func testAppPreviewDemo() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["--uitest-reset"]
+        // --uitest-spoof-connected: the simulator has no Bluetooth, so show an OP-1 Field on BLE.
+        app.launchArguments = ["--uitest-reset", "--uitest-profile", "op1", "--uitest-spoof-connected"]
         app.launch()
 
-        let helpButton = app.buttons["helpButton"]
-        XCTAssertTrue(helpButton.waitForExistence(timeout: 10))
-        sleep(2)
+        XCTAssertTrue(app.buttons["helpButton"].waitForExistence(timeout: 10))
+        beat(2.0)                                   // the starting screen, untouched
 
-        // Scene 1: Initial state — 5s hold so this can be the start of preview 1.
-        try snapshot("01_launch", app: app)
-        sleep(5)
-
-        // Scene 2: Chip 1 — track 1, volume, square, speed 4, center 80, depth 10
-        // After --uitest-reset, trackOn defaults to [1:1, ...] so track 1 is already ON (state 1 = normal).
-        // param defaults to "volume" — no picker tap needed
+        // Scene 1: chip 1 — track 1 (already on), volume (default), square, depth 10
         selectPicker(app, picker: "wavePicker", option: "square")
-        bumpRate(app, by: 2)                        // index 3 -> 5 (displayed "4")
-        // center defaults to 90 — no scrub needed
         scrub(app, identifier: "depthScrub", to: 10)
-        try snapshot("02_chip1_configured", app: app)
-
+        beat(0.8)
         app.buttons["repeatButton"].tap()
-        sleep(5)                                    // ← cut here to split preview 1 / preview 2
-        try snapshot("03_chip1_created", app: app)
+        beat(2.0)                                   // chip 1 running
 
-        // Scene 3: Track 1 off, track 2 normal, track 4 inverted, pan, sine, speed 2, center 50, depth 30
-        // Track 1 is at state 1 (on, normal) — cycle 1→2→0 to turn it off.
-        app.buttons["track1Button"].tap()          // 1 -> 2 (inverted)
-        Thread.sleep(forTimeInterval: 0.4)
-        app.buttons["track1Button"].tap()          // 2 -> 0 (off)
-        Thread.sleep(forTimeInterval: 0.5)
-
-        app.buttons["track2Button"].tap()          // 0 -> 1 (on, normal)
-        Thread.sleep(forTimeInterval: 0.5)
-
-        app.buttons["track4Button"].tap()          // 0 -> 1 (on)
-        Thread.sleep(forTimeInterval: 0.4)
-        app.buttons["track4Button"].tap()          // 1 -> 2 (inverted)
-        Thread.sleep(forTimeInterval: 0.5)
-
+        // Scene 2: chip 2 — tracks 1 + 2 normal, track 4 inverted · pan · sine · depth 30
+        app.buttons["track2Button"].tap()           // off -> normal
+        beat(0.8)
+        app.buttons["track4Button"].tap()           // off -> normal
+        beat(0.6)
+        app.buttons["track4Button"].tap()           // normal -> inverted
+        beat(0.9)
         selectPicker(app, picker: "paramPicker", option: "pan")
         selectPicker(app, picker: "wavePicker", option: "sine")
-        bumpRate(app, by: 2)                        // index 5 -> 7 (displayed "2")
-        scrub(app, identifier: "centerScrub", to: 50)
         scrub(app, identifier: "depthScrub", to: 30)
-        try snapshot("04_chip2_configured", app: app)
-
+        beat(0.8)
         app.buttons["repeatButton"].tap()
-        sleep(5)                                    // ← end of preview 2
-        try snapshot("05_chip2_created", app: app)
+
+        // Final state: no taps, nothing changes except the LFOs running.
+        Thread.sleep(forTimeInterval: finalHold)
+        try snapshot("final_state", app: app)
     }
 
     // MARK: - Helpers
@@ -90,12 +67,16 @@ final class AppPreviewUITests: XCTestCase {
         try image.pngData()?.write(to: URL(fileURLWithPath: path))
     }
 
+    /// A pause long enough to read the screen, scaled by `pace`.
+    private func beat(_ seconds: TimeInterval) { Thread.sleep(forTimeInterval: seconds * pace) }
+
     @MainActor private func selectPicker(_ app: XCUIApplication, picker: String, option: String) {
         app.buttons[picker].tap()
         let opt = app.buttons[option]
         XCTAssertTrue(opt.waitForExistence(timeout: 3))
+        beat(0.8)                                   // the open list stays on screen
         opt.tap()
-        Thread.sleep(forTimeInterval: 0.3)
+        beat(0.8)
     }
 
     // The rate stepper button increments app.lfoRate by 1 per tap (wraps 25 -> 1).
@@ -103,7 +84,7 @@ final class AppPreviewUITests: XCTestCase {
         let btn = app.buttons["rateStepButton"]
         for _ in 0..<steps {
             btn.tap()
-            Thread.sleep(forTimeInterval: 0.15)
+            beat(0.7)
         }
     }
 
@@ -128,7 +109,7 @@ final class AppPreviewUITests: XCTestCase {
             let start = el.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
             let end = start.withOffset(CGVector(dx: 0, dy: dh))
             start.press(forDuration: 0.1, thenDragTo: end)
-            Thread.sleep(forTimeInterval: 0.3)
+            Thread.sleep(forTimeInterval: 0.15)
         }
     }
 }

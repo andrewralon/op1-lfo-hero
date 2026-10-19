@@ -287,6 +287,8 @@ app.launchArguments = ["--uitest-reset", "--uitest-profile", "tx6"]
 app.launch()
 ```
 
+**Spoof a connection for screenshots and previews** with `--uitest-spoof-connected`: the simulator has no Bluetooth, so the status bar would read a yellow "bluetooth off". The flag makes it read a green `<device> (ble)` for the pinned `--uitest-profile` (default OP-1 Field). Display only — no transport is touched.
+
 **Segmented controls in the settings sheet** need settling: a tap made while the sheet is still animating in is silently dropped by UIKit. Tap, verify `isSelected`, and retry — see `selectDevice` in `MultiDeviceUITests`.
 
 **Run specific tests from the command line:**
@@ -320,6 +322,17 @@ xcrun simctl list devices available | grep iPhone
 ```
 
 ### App Store Preview video recording
+
+App Store Connect wants 15-30 s, max 30 fps, H.264, and 886x1920 portrait for the large iPhone sizes. `simctl` records the simulator's native 1284x2778 and starts before the app does, so trim and rescale with ffmpeg afterwards (add a silent AAC track, as the earlier previews have):
+
+```bash
+ffmpeg -ss <main ui appears> -to <last change + ~4.5s> -i preview.mov \
+  -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -map 0:v -map 1:a -shortest \
+  -vf "scale=886:1920:flags=lanczos,fps=30,format=yuv420p" -c:v libx264 -profile:v high -level 4.0 \
+  -b:v 10M -maxrate 12M -bufsize 20M -movflags +faststart -c:a aac -b:a 256k out.mov
+```
+
+`ffmpeg -vf "select='gt(scene,0.01)',showinfo"` lists scene-change times, which find the cut points. `AppPreviewUITests` has a `pace` constant for slowing the whole demo down.
 
 Use `--codec h264` (not the default HEVC) and stop with SIGINT so the file is properly finalized:
 

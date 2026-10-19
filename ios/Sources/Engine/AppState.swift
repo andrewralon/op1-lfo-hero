@@ -544,6 +544,17 @@ final class AppState: ObservableObject {
         }
     }
 
+    /// `--uitest-spoof-connected`: show the status bar as connected to an OP-1 Field over BLE.
+    /// Display only, and named for the pinned profile — no transport is touched, so nothing is sent anywhere.
+    static let spoofsConnection = CommandLine.arguments.contains("--uitest-spoof-connected")
+
+    /// The device named in the spoofed status: the one `--uitest-profile` pins, else the OP-1 Field.
+    private static var spoofedLabel: String {
+        let args = CommandLine.arguments
+        let id = args.firstIndex(of: "--uitest-profile").flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil } ?? "op1"
+        return "\(DeviceRegistry.profile(id: id).displayName) (ble)"
+    }
+
     private func wireCallbacks() {
         // USB + BLE state → connection label, following whichever transport is actively
         // routing (router.activeTransport) rather than always preferring USB when both are
@@ -561,7 +572,10 @@ final class AppState: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] bleState, usbState, active in
                 guard let self else { return }
-                let status = Self.connectionStatus(active: active, usb: usbState, ble: bleState)
+                var status = Self.connectionStatus(active: active, usb: usbState, ble: bleState)
+                // Screenshots only: the simulator has no Bluetooth, so the status bar would read
+                // "bluetooth off" in yellow. Looks like a connected OP-1 Field on BLE instead.
+                if Self.spoofsConnection { status = (Self.spoofedLabel, true) }
                 self.connectionLabel = status.label
                 self.isConnected = status.isConnected
                 // Whatever just connected, or just took over the routing, may be a different device
