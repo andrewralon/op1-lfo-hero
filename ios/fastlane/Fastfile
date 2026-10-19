@@ -124,23 +124,27 @@ platform :ios do
       )
     rescue FastlaneCore::Interface::FastlaneError => e
       # After the video uploads, deliver sets the preview's poster frame, and App Store Connect
-      # rejects that ("Asset Not in Complete state! can't update Image!") even once the asset reads
-      # COMPLETE; retrying for 5 minutes did not help (fastlane 2.236.1 and 2.241.1). The video
-      # and the screenshots do arrive, so treat that one error as a warning and set the poster
-      # frame in App Store Connect by hand. Any other error still fails the lane.
+      # rejects that ("Asset Not in Complete state! can't update Image!"). Likely cause (inferred
+      # from the API, not documented): deliver waits for `video_url` to be non-nil, but App Store
+      # Connect returns "" while the video is still processing (Apple says up to 24 hours), and
+      # `assetDeliveryState` already reads COMPLETE, which only means the upload finished. A poster
+      # image at the default 5 s exists anyway. Retrying for 5 minutes did not help (fastlane
+      # 2.236.1 and 2.241.1). The video and the screenshots do arrive, so treat that one error as
+      # a warning and set the poster frame in App Store Connect by hand. Any other error still
+      # fails the lane.
       raise unless e.message.include?("Asset Not in Complete state")
       UI.important("Previews uploaded, but App Store Connect refused the poster frame; pick it in the web UI.")
     end
   end
 
-  desc "Upload app preview videos from fastlane/app_previews/ to App Store Connect"
-  lane :previews do
+  desc "Upload app preview videos from fastlane/app_previews/ to App Store Connect. overwrite:false keeps what is already there (deliver skips files whose checksum matches); the default deletes the previews in EVERY device set first, so it restarts Apple's processing for all of them"
+  lane :previews do |options|
     begin
       deliver(
         skip_metadata: true,
         skip_screenshots: true,
         skip_binary_upload: true,
-        overwrite_preview_videos: true,
+        overwrite_preview_videos: options[:overwrite] != false && options[:overwrite] != "false",
         precheck_include_in_app_purchases: false
       )
     rescue FastlaneCore::Interface::FastlaneError => e

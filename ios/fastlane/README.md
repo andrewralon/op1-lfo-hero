@@ -77,7 +77,7 @@ Upload screenshots and app previews together (replaces what is on App Store Conn
 [bundle exec] fastlane ios previews
 ```
 
-Upload app preview videos from fastlane/app_previews/ to App Store Connect
+Upload app preview videos from fastlane/app_previews/ to App Store Connect. overwrite:false keeps what is already there (deliver skips files whose checksum matches); the default deletes the previews in EVERY device set first, so it restarts Apple's processing for all of them
 
 ### ios release
 
