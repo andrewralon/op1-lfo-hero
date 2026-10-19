@@ -540,19 +540,19 @@ enum HelpCopy {
         case .panKnob:      return "pan"
         case .volumeFader:  return "volume"
         case .transport:    return "transport"
-        case .bpm:          return "tempo (bpm)"
+        case .bpm:          return "tempo bpm"
         case .tempoMode:    return "tempo source"
-        case .trackToggle:  return "track & master"
+        case .trackToggle:  return "tracks"
         case .masterToggle: return "master"
-        case .preview:      return "preview (p)"
+        case .preview:      return "preview"
         case .paramPicker:  return "parameter & curve"
         case .wavePicker:   return "wave shape"
         case .speedBox:     return "speed & center & depth"
         case .centerBox:    return "center"
         case .depthBox:     return "depth"
         case .waveform:     return "waveform preview"
-        case .startButtons: return "repeat & one-shot & delete"
-        case .chipArea:     return "active lfos"
+        case .startButtons: return "repeat, 1x, delete"
+        case .chipArea:     return "lfo chips"
         case .helpSettings: return "help & settings"
         }
     }
@@ -595,7 +595,7 @@ enum HelpCopy {
         case .masterToggle:
             return "applies the lfo to a master parameter, like tempo, instead of one track. tap to cycle off → on → inverted."
         case .preview:
-            return "hear the current settings live while you dial them in. nothing runs until you press repeat or 1x."
+            return "hear a preview of the lfo live as you change settings, before creating an lfo."
         case .paramPicker:
             return "choose what the lfo changes. tap the bolt icon to step to the next parameter without opening the list."
         case .wavePicker:
@@ -611,7 +611,7 @@ enum HelpCopy {
         case .startButtons:
             return "create an lfo from current settings that loops (repeat) or runs once (one-shot). or delete all lfos."
         case .chipArea:
-            return "lfos show up here as chips. tap chips to pause, long-press to edit (and again to save changes), or tap × to delete."
+            return "lfo chips created as loop or 1x are shown here. tap chips to pause, long-press to edit (and again to save changes), or tap × to delete."
         case .helpSettings:
             return "show descriptions for every control from help. change options or replay this walkthrough from settings."
         }
@@ -821,13 +821,8 @@ struct SettingsView: View {
                     .padding(.horizontal, isPad ? 24 : 16)
                     .padding(.vertical, isPad ? 16 : 12)
 
-                    // The joke toggles below change nothing; keep them visibly apart from real settings.
+                    // The joke toggles below change nothing; the line keeps them apart from real settings.
                     Divider()
-                    Text("experimental")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(C.text)
-                        .padding(.top, isPad ? 24 : 18)
-                        .padding(.horizontal, isPad ? 24 : 16)
 
                     settingRow(
                         "defiant jazz mode",

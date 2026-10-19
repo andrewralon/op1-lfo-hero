@@ -337,7 +337,7 @@ struct LFOPanelView: View {
                                                   disabled: app.lfoParam.isMasterOnly || app.masterOn > 0) {
                                     app.cycleTrack(t)
                                 }
-                                .tourAnchor(.trackToggle, when: t == app.profile.trackIndices.first)
+                                .tourAnchor(.trackToggle)
                             case .master:
                                 MasterToggleButton(state: app.masterOn,
                                                    disabled: !app.lfoParam.isMasterCapable) {
