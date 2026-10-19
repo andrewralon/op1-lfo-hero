@@ -313,7 +313,7 @@ final class AutomationEngine {
         }
         if lfo.inverted { y = -y }
         if isTempo(lfo, profile) {
-            return max(20, min(300, lfo.centerValue + y * lfo.depth))
+            return max(AppState.minBpm, min(AppState.maxBpm, lfo.centerValue + y * lfo.depth))
         }
         return max(0, min(127, (lfo.centerValue + y * lfo.depth).rounded()))
     }
@@ -340,7 +340,7 @@ final class AutomationEngine {
         if lfo.inverted { y = -y }
 
         if isTempo(lfo, profile) {
-            return max(20, min(300, lfo.centerValue + y * lfo.depth))
+            return max(AppState.minBpm, min(AppState.maxBpm, lfo.centerValue + y * lfo.depth))
         }
         return max(0, min(127, (lfo.centerValue + y * lfo.depth).rounded()))
     }

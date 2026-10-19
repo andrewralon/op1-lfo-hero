@@ -576,7 +576,7 @@ final class AppState: ObservableObject {
             // A measured tempo, so it can be nonsense if the incoming stream is. Ignore rather
             // than clamp: a reading outside musical range is a transport artefact, and pinning
             // it to 300 would show a plausible-looking number that was never real.
-            guard newBpm >= Self.minBpm, newBpm <= Self.maxBpm else { return }
+            guard Self.acceptsIncomingBpm(newBpm) else { return }
             DispatchQueue.main.async { self?.bpm = newBpm }
         }
 
@@ -686,7 +686,16 @@ final class AppState: ObservableObject {
     /// Musical range for any tempo the app will accept or display. 0 is kept as a separate
     /// sentinel meaning "slaved, no clock data yet", so it is deliberately outside this.
     static let minBpm = 20.0
-    static let maxBpm = 300.0
+    /// The one tempo ceiling, used everywhere: what the app generates as clock master, the tempo LFO
+    /// range, the typed and scrubbed BPM, a saved tempo, and what it accepts from a device it follows.
+    /// Set to the highest of TE's own limits (OP-1 Field 440, TX-6 400, TP-7 shows 200 but is assumed to
+    /// cope with 400), so no device's real tempo is ever ignored: a TX-6 at 400 over Bluetooth read 300.0
+    /// when a lower ceiling rejected the reading. Becomes a per-device capability if it ever has to.
+    static let maxBpm = 440.0
+
+    /// A tempo measured from a device is accepted if it is musical. It is rejected, not clamped: a
+    /// reading outside the range is a transport artefact (the old timestamp bug read 640000).
+    static func acceptsIncomingBpm(_ v: Double) -> Bool { v >= minBpm && v <= maxBpm }
 
     func enableClock() {
         isClockMaster = true
@@ -705,7 +714,7 @@ final class AppState: ObservableObject {
     }
 
     func setBpm(_ v: Double) {
-        bpm = max(20, min(300, v))
+        bpm = max(Self.minBpm, min(Self.maxBpm, v))
         if isClockMaster { clock.setMasterBpm(bpm) }
     }
 
@@ -714,7 +723,7 @@ final class AppState: ObservableObject {
     /// `setBpm` it does not restart the clock timer, which would stutter the clock at drag rate;
     /// `setBpm` still runs once on release to settle the final value.
     func setBpmLive(_ v: Double) {
-        bpm = max(20, min(300, v))
+        bpm = max(Self.minBpm, min(Self.maxBpm, v))
         if isClockMaster { clock.updateMasterBpm(bpm) }
     }
 
@@ -742,7 +751,7 @@ final class AppState: ObservableObject {
     // Effective tick count for waveform display (converts free-rate periods using current BPM).
     var lfoDisplayRateTicks: Int {
         if let secs = FREE_RATE_SECONDS[lfoRate] {
-            return max(1, Int(secs * max(20, bpm) * Double(PPQN) / 60.0))
+            return max(1, Int(secs * max(AppState.minBpm, bpm) * Double(PPQN) / 60.0))
         }
         return RATE_TICKS[lfoRate] ?? (4 * PPQN)
     }
@@ -751,7 +760,7 @@ final class AppState: ObservableObject {
         let period = FREE_RATE_SECONDS[lfoRate]
         let rt: Int
         if let secs = period {
-            rt = max(1, Int(secs * max(20, bpm) * Double(PPQN) / 60.0))
+            rt = max(1, Int(secs * max(AppState.minBpm, bpm) * Double(PPQN) / 60.0))
         } else {
             rt = RATE_TICKS[lfoRate] ?? (4 * PPQN)
         }
@@ -886,7 +895,7 @@ final class AppState: ObservableObject {
         let period = FREE_RATE_SECONDS[lfoRate]
         let rt: Int
         if let secs = period {
-            rt = max(1, Int(secs * max(20, bpm) * Double(PPQN) / 60.0))
+            rt = max(1, Int(secs * max(AppState.minBpm, bpm) * Double(PPQN) / 60.0))
         } else {
             rt = RATE_TICKS[lfoRate] ?? (4 * PPQN)
         }
@@ -965,7 +974,7 @@ final class AppState: ObservableObject {
 
         if let secs = FREE_RATE_SECONDS[lfoRate] {
             lfo.freeRatePeriod = secs
-            lfo.rateTicks = max(1, Int(secs * max(20, bpm) * Double(PPQN) / 60.0))
+            lfo.rateTicks = max(1, Int(secs * max(AppState.minBpm, bpm) * Double(PPQN) / 60.0))
         } else {
             lfo.freeRatePeriod = nil
             lfo.rateTicks = RATE_TICKS[lfoRate] ?? (4 * PPQN)

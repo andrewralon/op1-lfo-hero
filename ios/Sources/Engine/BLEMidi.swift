@@ -48,6 +48,8 @@ final class BLEMidi: NSObject, ObservableObject {
     var onClock:    (() -> Void)?
     var onStart:    (() -> Void)?
     var onContinue: (() -> Void)?
+    /// The sender's timestamp of a clock tick (13-bit ms), delivered just before `onClock`.
+    var onClockStamp: ((Int) -> Void)?
     var onStop:     (() -> Void)?
     var onCC:       ((Int, Int, Int) -> Void)?   // channel, cc, value
 
@@ -201,7 +203,7 @@ final class BLEMidi: NSObject, ObservableObject {
     /// app computed a BPM from microsecond intervals (observed: 640000 BPM).
     private func parse(_ data: Data) {
         BleMidiPacket.parse(data, onClock: onClock, onStart: onStart, onStop: onStop,
-                            onContinue: onContinue, onCC: onCC)
+                            onContinue: onContinue, onClockStamp: onClockStamp, onCC: onCC)
     }
 }
 
@@ -230,14 +232,18 @@ enum BleMidiPacket {
                       onStart: (() -> Void)?,
                       onStop: (() -> Void)?,
                       onContinue: (() -> Void)? = nil,
+                      onClockStamp: ((Int) -> Void)? = nil,
                       onCC: ((Int, Int, Int) -> Void)?) {
         guard data.count >= 3 else { return }   // header + timestamp + at least one status
         var i = 1                               // skip the header
         var status: UInt8 = 0                   // running status, survives between messages
+        let stampHigh = Int(data[0] & 0x3F) << 7    // the header carries the top 6 bits of the timestamp
+        var stampMs = 0
 
         while i < data.count {
             // Exactly one timestamp byte precedes every message, including real-time ones.
             if data[i] & 0x80 != 0 {
+                stampMs = stampHigh | Int(data[i] & 0x7F)   // this message's timestamp (13-bit ms)
                 i += 1
                 guard i < data.count else { return }
             }
@@ -247,7 +253,9 @@ enum BleMidiPacket {
                 // System real-time: one byte, no data, and it does not disturb running status.
                 if b >= 0xF8 {
                     switch b {
-                    case 0xF8: onClock?()
+                    case 0xF8:
+                        onClockStamp?(stampMs)
+                        onClock?()
                     case 0xFA: onStart?()
                     case 0xFB: onContinue?()
                     case 0xFC: onStop?()

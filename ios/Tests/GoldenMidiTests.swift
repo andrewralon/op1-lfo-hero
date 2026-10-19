@@ -8,6 +8,7 @@ final class RecordingDestination: MidiDestination {
     var onClock: (() -> Void)?
     var onStart: (() -> Void)?
     var onContinue: (() -> Void)?
+    var onClockStamp: ((Int) -> Void)?
     var onStop:  (() -> Void)?
     func send(_ bytes: [UInt8]) { packets.append(bytes) }
     func reset() { packets.removeAll() }

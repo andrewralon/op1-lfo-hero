@@ -15,8 +15,73 @@ final class ClockEngine {
 
     // MARK: - Slave (listening) state
     private var slaveTick = 0
+    /// Within this many BPM of a whole number, the tempo shown snaps to it.
+    static let bpmSnapTolerance = 0.15
+    /// A new tempo replaces the one on screen only if it differs by at least this much, which is
+    /// more than the arrival jitter of the ticks (BLE delivers them in bursts).
+    static let bpmHysteresis = 0.15
+
+    /// The tempo to show for a freshly smoothed reading. The 96-tick average still wobbles by a
+    /// tenth or two from jitter, and republishing at every 0.05 made a steady 80 BPM flicker between
+    /// 79.9, 80.0 and 80.1. A tempo near a whole number snaps to it (devices are normally set to
+    /// whole BPM), and a reading within the hysteresis of the one already shown is ignored.
+    static func stabilizedBpm(candidate: Double, current: Double) -> Double {
+        // Scale with the tempo: the readout wobbles by a fixed fraction of it, so 0.15 BPM is right at
+        // 80 and far too tight at 400 (measured 2026-10-18: ±0.3 BPM at 400 over Bluetooth).
+        let tolerance = max(bpmSnapTolerance, candidate * 0.0015)
+        let hysteresis = max(bpmHysteresis, candidate * 0.0015)
+        let nearestWhole = candidate.rounded()
+        let snapped = abs(candidate - nearestWhole) <= tolerance
+            ? nearestWhole : (candidate * 10).rounded() / 10
+        return abs(snapped - current) >= hysteresis ? snapped : current
+    }
+
+    /// The sender's own timestamp (13-bit milliseconds) of the clock tick about to be handled, set by
+    /// `onClockStamp` just before `onClock`. Only Bluetooth supplies one.
+    private var pendingSenderStampMs: Int?
+    private var lastSenderStampMs: Int?
+
+    /// Seconds between two ticks by the *sender's* clock, or nil if the stamps cannot be trusted
+    /// (no previous stamp, or an interval no real tempo produces, such as the all-zero stamps a
+    /// device that does not stamp sends). The 13-bit counter wraps every 8192 ms.
+    ///
+    /// Why: over Bluetooth the ticks arrive in bursts and stalls, so timing them by arrival gave a
+    /// per-tick spread of 5.7 ms and a tempo that wobbled by +/-0.2 BPM; the TX-6's own stamps are
+    /// spread by 0.4 ms (measured 2026-10-18 at 80 BPM, same run, both sources).
+    static func senderInterval(stampMs: Int, lastMs: Int?) -> Double? {
+        guard let lastMs else { return nil }
+        let delta = (stampMs - lastMs + 8192) % 8192
+        guard delta >= 2, delta < 2000 else { return nil }
+        return Double(delta) / 1000.0
+    }
+
+    /// The BPM box is told of a new tempo at most this often (seconds). The tempo itself is filtered per
+    /// tick; this only limits the display, which was redrawn on every tick while a tempo was moving.
+    static let bpmDisplayInterval = 0.25
+    /// A change this large (a deliberate jump, not jitter or a drag) is shown at once.
+    static let bpmImmediateChange = 0.02
+    private var lastBpmPublishTime: Double = 0
+    private var lastPublishedBpm: Double = 0
+
+    /// Whether to update the BPM box now. Yes for the first tempo, for a change of 2% or more, and
+    /// otherwise only if it has changed and the display interval has passed since the last update.
+    static func shouldPublishBpm(now: Double, lastPublishTime: Double, current: Double, lastPublished: Double) -> Bool {
+        guard current != lastPublished else { return false }
+        guard lastPublishTime > 0, lastPublished > 0 else { return true }
+        if abs(current / lastPublished - 1) >= bpmImmediateChange { return true }
+        return now - lastPublishTime >= bpmDisplayInterval
+    }
+
     private var bpmHistory: [Double] = []
     private let smoothN = 96  // larger window = smoother BPM display over BLE/USB jitter
+    private let smoothSeconds = 3.0
+    /// The window when the ticks are timed by the sender's stamps (see handleSlaveTick).
+    private let stampedWindowTicks = 32
+    private let stampedWindowSeconds = 1.0
+    /// A tempo change shows as the last `stepRecentTicks` ticks disagreeing with the window by this much.
+    private let stepRecentTicks = 12
+    private let stepChange = 0.02
+    private var historySeconds = 0.0
     private var lastTickTime: Double = 0
 
     // MARK: - Master (generating) state
@@ -123,6 +188,10 @@ final class ClockEngine {
             self?.lastExternalTickTime = CACurrentMediaTime()
             self?.handleSlaveTick()
         }
+        router?.onClockStamp = { [weak self] ms in
+            guard let self else { return }
+            self.lock.lock(); self.pendingSenderStampMs = ms; self.lock.unlock()
+        }
         router?.onStart = { [weak self] in self?.handleStart() }
         // A device resuming from where it stopped sends Continue, not Start. For the app both
         // mean "the transport is running now" — the OP-1 sends Start only after a double stop.
@@ -138,30 +207,69 @@ final class ClockEngine {
         lock.lock()
         slaveTick += 1
         let tick = slaveTick
+        let stamp = pendingSenderStampMs
+        pendingSenderStampMs = nil
+        let stampedInterval = stamp.flatMap { Self.senderInterval(stampMs: $0, lastMs: lastSenderStampMs) }
+        if let stamp { lastSenderStampMs = stamp }
         // Track tape position in real time: 1 SPP unit = 6 ticks at 24 PPQN
         if isPlaying && slaveTick % 6 == 0 { sppPos += 1 }
         if lastTickTime > 0 {
-            let interval = now - lastTickTime
+            // By the sender's stamps when it supplies usable ones, otherwise by arrival time.
+            let interval = stampedInterval ?? (now - lastTickTime)
             // Defence in depth against a burst of ticks sharing one arrival time. BLE delivers a
             // whole packet at once, so several ticks can look microseconds apart and drag the
             // average to an absurd tempo. 5 ms is ~500 BPM at 24 PPQN, far above anything real;
             // 2 s is ~1.25 BPM. Anything outside that is a transport artefact, not a tempo.
-            guard interval > 0.005, interval < 2.0 else {
+            // The 5 ms floor is for *arrival* bursts. A stamped interval was already validated by
+            // `senderInterval`, and filtering it here dropped the exact-5 ms intervals that 400 BPM
+            // produces (6.25 ms ticks on 1 ms stamps), which biased the tempo low.
+            guard stampedInterval != nil || (interval > 0.005 && interval < 2.0) else {
                 lastTickTime = now
                 lock.unlock()
                 tickCallback?(tick)
                 return
             }
             bpmHistory.append(interval)
-            if bpmHistory.count > smoothN { bpmHistory.removeFirst() }
+            historySeconds += interval
+            // The averaging window. Timed by arrival the ticks carry ~5 ms of noise, so that needs 96
+            // ticks and 3 s. By the sender's stamps the noise is about 0.1% of the tempo per second, so
+            // 32 ticks and 1 s is enough, and the long window only made the display slow to follow a
+            // tempo change. At least `minSeconds` matters at fast tempos: 32 ticks is 0.2 s at 400 BPM,
+            // where the 1 ms stamp resolution is +/-0.5% of the window.
+            let stamped = stampedInterval != nil
+            let minTicks = stamped ? stampedWindowTicks : smoothN
+            let minSeconds = stamped ? stampedWindowSeconds : smoothSeconds
+            while bpmHistory.count > minTicks, historySeconds - bpmHistory[0] >= minSeconds {
+                historySeconds -= bpmHistory.removeFirst()
+            }
+            // A real tempo change is not jitter (jitter is ~0.1%): when the last stretch of ticks differs
+            // from the window by more than `stepChange`, restart the average from those ticks so the
+            // display follows at once instead of ramping over the whole window.
+            if stamped, bpmHistory.count > 2 * stepRecentTicks {
+                let recent = bpmHistory.suffix(stepRecentTicks)
+                let recentSum = recent.reduce(0, +)
+                let recentAvg = recentSum / Double(stepRecentTicks)
+                let windowAvg = historySeconds / Double(bpmHistory.count)
+                if abs(recentAvg / windowAvg - 1) > stepChange {
+                    bpmHistory = Array(recent)
+                    historySeconds = recentSum
+                }
+            }
             if bpmHistory.count >= 8 {
                 let avg = bpmHistory.reduce(0, +) / Double(bpmHistory.count)
                 let newBpm = 60.0 / (Double(PPQN) * avg)
                 // Only publish when the change is visible at 1-decimal display precision
-                if abs(newBpm - bpm) >= 0.05 {
-                    bpm = newBpm
+                let shown = ClockEngine.stabilizedBpm(candidate: newBpm, current: bpm)
+                if shown != bpm { bpm = shown }
+                // `bpm` is the filtered tempo and updates freely; what the BPM box is told is rate
+                // limited, so a tempo that is itself moving does not redraw it on every tick.
+                if ClockEngine.shouldPublishBpm(now: now, lastPublishTime: lastBpmPublishTime,
+                                                current: bpm, lastPublished: lastPublishedBpm) {
+                    lastBpmPublishTime = now
+                    lastPublishedBpm = bpm
+                    let publishing = bpm
                     lock.unlock()
-                    bpmCallback?(newBpm)
+                    bpmCallback?(publishing)
                 } else {
                     lock.unlock()
                 }
@@ -193,7 +301,7 @@ final class ClockEngine {
         disableClock()
         lock.lock()
         isClockMaster = true
-        masterBpm = max(20, min(300, startBpm))
+        masterBpm = max(AppState.minBpm, min(AppState.maxBpm, startBpm))
         bpm = masterBpm
         masterTickCount = 0
         lock.unlock()
@@ -221,7 +329,9 @@ final class ClockEngine {
         lock.lock()
         isClockMaster = false
         bpm = 0   // sentinel: no slave data; cleared when first OP-1 ticks arrive
-        bpmHistory.removeAll()
+        bpmHistory.removeAll(); historySeconds = 0
+        lastBpmPublishTime = 0; lastPublishedBpm = 0
+        lastSenderStampMs = nil; pendingSenderStampMs = nil
         lastTickTime = 0
         slaveTick = 0
         lock.unlock()
@@ -229,7 +339,7 @@ final class ClockEngine {
 
     func setMasterBpm(_ newBpm: Double) {
         guard isClockMaster else { return }
-        let clamped = max(20, min(300, newBpm))
+        let clamped = max(AppState.minBpm, min(AppState.maxBpm, newBpm))
         lock.lock(); masterBpm = clamped; bpm = clamped; lock.unlock()
         scheduleMasterTimer(bpm: clamped)
         bpmCallback?(clamped)
@@ -239,7 +349,7 @@ final class ClockEngine {
     /// The running timer adapts its period on the next tick via fireMasterTick.
     func updateMasterBpm(_ newBpm: Double) {
         guard isClockMaster else { return }
-        let clamped = max(20, min(300, newBpm))
+        let clamped = max(AppState.minBpm, min(AppState.maxBpm, newBpm))
         lock.lock(); masterBpm = clamped; bpm = clamped; lock.unlock()
         bpmCallback?(clamped)
     }

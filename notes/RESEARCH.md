@@ -1407,6 +1407,35 @@ it. Only the app's own tape prev/next buttons, which send an SPP, move the tape 
 Same as `main`: it also sent `0xFB` after the first play, and `0xFA` only on the first play of a
 session (equivalent at position 0). Not verified by running the 1.0 build.
 
+## Clock over Bluetooth: time the ticks by the sender's stamps (2026-10-18)
+
+Over BLE the 24-PPQN clock ticks reach the app in bursts and stalls, so timing them by **arrival** gives a
+noisy tempo. Measured on a TX-6 over BLE (iPad Pro, `clock src = int`, `clock out = on`):
+
+| tempo | tick spread by arrival | tick spread by the sender's stamp | per-second tempo by arrival (5th-95th pct) | by stamp |
+|---|---|---|---|---|
+| 60 BPM | sd 5.25 ms, intervals up to 60 ms | sd 0.47 ms (41-43 ms) | 59.61 to 60.55 | 59.981 to 60.038 |
+| 80 BPM | sd 5.7 ms, intervals 7.6-68 ms (one 537 ms stall) | sd 0.43 ms (30-32 ms) | 79.73 to 80.17 | 80.000 to 80.000 |
+| 400 BPM | sd 5.2 ms on a 6.25 ms tick, intervals 0.1-55 ms | sd 0.43 ms (5-7 ms) | 396.3 to 403.0 | 399.70 to 400.20 |
+
+USB is already tight (sd 0.23 ms), so it keeps arrival timing.
+
+**The spec** (BLE-MIDI 1.0, read from the PDF): every MIDI status byte, System Real-Time included, "must be
+preceded by a timestamp byte"; timestamps are 13-bit milliseconds (wrap at 8192), "issued by the sender in a
+monotonically increasing fashion", "in the sender's clock domain"; they exist because messages "must be
+buffered and transmitted each BLE connection interval" and carry "the render time and event spacing". The
+correlation with the receiver's clock "is not addressed in this document", but tempo only needs the
+**differences** between stamps. Ableton's manual warns stamp accuracy "can vary widely" by hardware, so a tick
+whose stamp cannot be a real tempo falls back to arrival time (`ClockEngine.senderInterval`: 2 ms to 2 s).
+BlueZ ignores the stamps; Apple asks accessories to request a 15 ms connection interval or less.
+
+Three bugs the 400 BPM run exposed: stamped intervals of exactly 5 ms (6.25 ms ticks on 1 ms stamps) were
+thrown away as arrival bursts, biasing the tempo low; a 96-tick window is only 0.6 s at 400 BPM, where 1 ms
+of stamp resolution is +/-0.17% of it (the window is now at least 1 s, or 3 s without stamps); and the app
+ignored any tempo above 300, so 400 read 300.0 (one ceiling now, `AppState.maxBpm`, 440). The BPM box is
+also told of a new tempo at most 4 times a second, because a tempo that is itself moving otherwise redrew it
+on every tick.
+
 ## Open questions — answer on hardware
 
 - [ ] Do the pinned FX-bus channels (ch 8/9) actually land?

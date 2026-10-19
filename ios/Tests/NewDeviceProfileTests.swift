@@ -1677,3 +1677,180 @@ final class StaleBluetoothDevicesTests: XCTestCase {
         XCTAssertEqual(stale, [a])
     }
 }
+
+/// The tempo shown while slaved to a device must not flicker with the ticks' arrival jitter.
+final class SlaveTempoStabilityTests: XCTestCase {
+
+    /// Seen 2026-10-18 with a TX-6 at 80 BPM (clock out on): the readout flipped between 79.9,
+    /// 80.0 and 80.1 and could not be read.
+    func testAJitteryReadingAroundAWholeTempoShowsItExactly() {
+        var shown = 80.0
+        for reading in [79.93, 80.04, 80.11, 79.88, 80.07, 80.13, 79.91, 80.02] {
+            shown = ClockEngine.stabilizedBpm(candidate: reading, current: shown)
+            XCTAssertEqual(shown, 80.0, "reading \(reading) must not move the display")
+        }
+    }
+
+    func testTheFirstReadingIsShownRounded() {
+        XCTAssertEqual(ClockEngine.stabilizedBpm(candidate: 79.94, current: 0), 80.0)
+        XCTAssertEqual(ClockEngine.stabilizedBpm(candidate: 120.06, current: 0), 120.0)
+    }
+
+    func testARealTempoChangeComesThroughAtOnce() {
+        XCTAssertEqual(ClockEngine.stabilizedBpm(candidate: 90.02, current: 80.0), 90.0)
+        XCTAssertEqual(ClockEngine.stabilizedBpm(candidate: 79.0, current: 80.0), 79.0)
+    }
+
+    /// A TX-6 was measured at exactly 400 BPM over Bluetooth; the app showed 300.0 because a reading above
+    /// 300 was ignored. The single ceiling covers every TE device, and still rejects nonsense.
+    func testATempoFromADeviceIsAcceptedUpToTheHighestTEMaximum() {
+        XCTAssertTrue(AppState.acceptsIncomingBpm(400))
+        XCTAssertTrue(AppState.acceptsIncomingBpm(440), "an OP-1 Field at its 440 maximum")
+        XCTAssertFalse(AppState.acceptsIncomingBpm(640_000), "the old timestamp bug read this")
+        XCTAssertFalse(AppState.acceptsIncomingBpm(19.9))
+        XCTAssertEqual(AppState.maxBpm, 440, "one ceiling, the highest of TE's own limits")
+    }
+
+    func testAGenuineFractionalTempoIsNotForcedToAWholeNumber() {
+        XCTAssertEqual(ClockEngine.stabilizedBpm(candidate: 119.5, current: 0), 119.5)
+        XCTAssertEqual(ClockEngine.stabilizedBpm(candidate: 80.3, current: 80.0), 80.3)
+    }
+
+    /// The thresholds scale with the tempo: +/-0.3 BPM is ordinary jitter at 400 and must not flicker.
+    func testJitterAtAFastTempoStaysPut() {
+        var shown = 400.0
+        for reading in [399.7, 400.3, 399.8, 400.2, 399.6, 400.35] {
+            shown = ClockEngine.stabilizedBpm(candidate: reading, current: shown)
+            XCTAssertEqual(shown, 400.0)
+        }
+    }
+
+    func testARealChangeAtAFastTempoStillComesThrough() {
+        XCTAssertEqual(ClockEngine.stabilizedBpm(candidate: 410.0, current: 400.0), 410.0)
+    }
+
+    func testJitterAroundAFractionalTempoStaysPut() {
+        var shown = 80.3
+        for reading in [80.22, 80.36, 80.28, 80.33] {
+            shown = ClockEngine.stabilizedBpm(candidate: reading, current: shown)
+            XCTAssertEqual(shown, 80.3)
+        }
+    }
+}
+
+/// Over Bluetooth the tempo is read from the sender's own tick timestamps, not from when the ticks
+/// happened to arrive. Measured 2026-10-18 with a TX-6 at 80 BPM: arrival timing spread 5.7 ms per
+/// tick (tempo +/-0.2 BPM, one stall of 537 ms), the TX-6's stamps 0.4 ms.
+final class SenderStampedClockTests: XCTestCase {
+
+    /// Stored properties, never locals: `ClockEngine` is main-actor isolated, and releasing one as a
+    /// local at the end of a test method crashes the Swift runtime (swift_task_deinitOnExecutor), the
+    /// same as `Controller` did. They live as long as the test case, like the other test classes.
+    private var destination: RecordingDestination!
+    private var clock: ClockEngine!
+
+    override func setUp() {
+        super.setUp()
+        destination = RecordingDestination()
+        clock = ClockEngine()
+        clock.router = destination
+        clock.disableClock()                           // slaved to the device
+    }
+
+    // MARK: the interval between two stamps
+
+    func testTheIntervalIsTheDifferenceOfTheStampsInSeconds() {
+        XCTAssertEqual(ClockEngine.senderInterval(stampMs: 1281, lastMs: 1250)!, 0.031, accuracy: 1e-9)
+    }
+
+    func testTheThirteenBitCounterWrapsAt8192() {
+        XCTAssertEqual(ClockEngine.senderInterval(stampMs: 20, lastMs: 8180)!, 0.032, accuracy: 1e-9)
+    }
+
+    func testStampsThatCannotBeATempoAreNotTrusted() {
+        XCTAssertNil(ClockEngine.senderInterval(stampMs: 100, lastMs: nil), "no previous stamp")
+        XCTAssertNil(ClockEngine.senderInterval(stampMs: 500, lastMs: 500), "a device that stamps everything 0")
+        XCTAssertNil(ClockEngine.senderInterval(stampMs: 501, lastMs: 500), "1 ms is a stamp that barely moves")
+        XCTAssertNotNil(ClockEngine.senderInterval(stampMs: 505, lastMs: 500), "5 ms is 500 BPM and is accepted")
+        XCTAssertNil(ClockEngine.senderInterval(stampMs: 3000, lastMs: 500), "2.5 s is ~1 BPM")
+    }
+
+    // MARK: the stamp reaches the clock
+
+    func testAParsedBluetoothPacketDeliversTheTimestampOfEveryTick() {
+        var stamps: [Int] = []
+        var ticks = 0
+        // header 0x89 = top bits of 1234 (9), then (timestamp 0xD2 = low 82, message 0xF8), twice;
+        // the second tick is 15 ms later: timestamp low 97 -> 1249
+        let packet = Data([0x89, 0xD2, 0xF8, 0xE1, 0xF8])
+        BleMidiPacket.parse(packet, onClock: { ticks += 1 }, onStart: nil, onStop: nil,
+                            onClockStamp: { stamps.append($0) }, onCC: nil)
+        XCTAssertEqual(stamps, [1234, 1249])
+        XCTAssertEqual(ticks, 2)
+    }
+
+    /// 80 BPM is a tick every 31.25 ms. The stamps below are that, floored to whole milliseconds, and
+    /// the ticks are fed back to back, so their arrival intervals are microseconds: the old
+    /// arrival-timed code ignores every one of them. The stamps must give exactly 80.
+    /// 400 BPM is a tick every 6.25 ms, so 1 ms stamps give intervals of 5, 6 and 7 ms. The 5 ms ones
+    /// used to be thrown away as "arrival bursts", biasing the tempo low (the app showed 397.4 to
+    /// 400.0, never above). Measured 2026-10-18 on a TX-6 over Bluetooth.
+    func testAFastTempoIsNotBiasedByTheFiveMillisecondIntervals() {
+        var t = 0.0
+        for k in 0..<2000 {                       // alternating 5 and 7 ms: a mean of 6 ms = 416.67 BPM
+            t += (k % 2 == 0) ? 5 : 7
+            destination.onClockStamp?(Int(t) % 8192)
+            destination.onClock?()
+        }
+        XCTAssertEqual(clock.bpm, 416.67, accuracy: 1.0, "was ~410 when the 5 ms intervals were dropped")
+    }
+
+    /// A real change must show at once, not ramp over the window: 80 then 90 BPM by the senders' stamps.
+    func testATempoChangeShowsWithinAFewTicksNotAfterTheWholeWindow() {
+        var t = 0.0
+        for _ in 0..<200 { t += 31.25; destination.onClockStamp?(Int(t) % 8192); destination.onClock?() }
+        XCTAssertEqual(clock.bpm, 80.0)
+        let ms = 60_000.0 / (24 * 90)                       // 90 BPM: 27.78 ms per tick
+        for _ in 0..<30 { t += ms; destination.onClockStamp?(Int(t) % 8192); destination.onClock?() }
+        XCTAssertEqual(clock.bpm, 90.0, accuracy: 1.5, "30 ticks (0.8 s) after the change; the long window took 3 s")
+    }
+
+    // MARK: how often the BPM box is told
+
+    func testTheFirstTempoIsShownAtOnce() {
+        XCTAssertTrue(ClockEngine.shouldPublishBpm(now: 10, lastPublishTime: 0, current: 120, lastPublished: 0))
+    }
+
+    func testNothingIsPublishedWhenTheTempoHasNotChanged() {
+        XCTAssertFalse(ClockEngine.shouldPublishBpm(now: 99, lastPublishTime: 1, current: 120, lastPublished: 120))
+    }
+
+    /// A tempo that is moving must not redraw the box on every tick: 4 updates a second at most.
+    func testASmallChangeWaitsForTheDisplayInterval() {
+        XCTAssertFalse(ClockEngine.shouldPublishBpm(now: 10.10, lastPublishTime: 10.0, current: 120.4, lastPublished: 120),
+                       "0.1 s since the last update")
+        XCTAssertTrue(ClockEngine.shouldPublishBpm(now: 10.26, lastPublishTime: 10.0, current: 120.4, lastPublished: 120),
+                      "0.26 s: due")
+    }
+
+    func testADeliberateJumpIsShownAtOnce() {
+        XCTAssertTrue(ClockEngine.shouldPublishBpm(now: 10.01, lastPublishTime: 10.0, current: 160, lastPublished: 120),
+                      "33% is a jump, not jitter")
+    }
+
+    func testFourHundredBPMReadsFourHundred() {
+        for k in 0..<3000 {
+            destination.onClockStamp?(Int(Double(k) * 6.25) % 8192)
+            destination.onClock?()
+        }
+        XCTAssertEqual(clock.bpm, 400.0)
+    }
+
+    func testTheTempoComesFromTheSendersStampsNotFromArrival() {
+        for k in 0..<200 {
+            destination.onClockStamp?(Int(Double(k) * 31.25) % 8192)
+            destination.onClock?()
+        }
+        XCTAssertEqual(clock.bpm, 80.0, "was 0 (ignored) with arrival timing")
+    }
+}

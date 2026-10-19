@@ -11,6 +11,7 @@ protocol MidiDestination: AnyObject {
     var onClock: (() -> Void)? { get set }
     var onStart: (() -> Void)? { get set }
     var onContinue: (() -> Void)? { get set }
+    var onClockStamp: ((Int) -> Void)? { get set }
     var onStop:  (() -> Void)? { get set }
 }
 
@@ -43,6 +44,7 @@ final class MidiRouter: MidiDestination {
     var onClock: (() -> Void)?
     var onStart: (() -> Void)?
     var onContinue: (() -> Void)?
+    var onClockStamp: ((Int) -> Void)?
     var onStop:  (() -> Void)?
     var onCC:    ((Int, Int, Int) -> Void)?
 
@@ -58,6 +60,7 @@ final class MidiRouter: MidiDestination {
 
         ble.onClock = { [weak self] in self?.forwardIfActive(.ble) { self?.onClock?() } }
         ble.onStart = { [weak self] in self?.forwardIfActive(.ble) { self?.onStart?() } }
+        ble.onClockStamp = { [weak self] ms in self?.forwardIfActive(.ble) { self?.onClockStamp?(ms) } }
         ble.onContinue = { [weak self] in self?.forwardIfActive(.ble) { self?.onContinue?() } }
         ble.onStop  = { [weak self] in self?.forwardIfActive(.ble) { self?.onStop?()  } }
         ble.onCC    = { [weak self] ch, cc, v in

@@ -75,7 +75,7 @@ private struct BpmScrubber: View {
     }
 
     private var live: Double {
-        max(20, min(300, base - accumulated))
+        max(AppState.minBpm, min(AppState.maxBpm, base - accumulated))
     }
 
     private var strokeColor: Color {
@@ -162,7 +162,7 @@ private struct BpmScrubber: View {
 
     private func commitEdit() {
         if let val = Double(editText) {
-            let rounded = ((max(20, min(300, val))) * 10).rounded() / 10
+            let rounded = ((max(AppState.minBpm, min(AppState.maxBpm, val))) * 10).rounded() / 10
             base = rounded
             app.setBpm(rounded)
         }

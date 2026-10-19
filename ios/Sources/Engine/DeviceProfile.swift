@@ -349,7 +349,7 @@ struct DeviceProfile: Identifiable, Hashable {
 
     /// Clamp an LFO's raw output into the range this parameter can actually take.
     func clamp(_ spec: ParamSpec, track: Int, raw: Double) -> Double {
-        if spec.role == .tempo { return Swift.max(20, Swift.min(300, raw)) }
+        if spec.role == .tempo { return Swift.max(AppState.minBpm, Swift.min(AppState.maxBpm, raw)) }
         return Swift.max(0, Swift.min(127, raw.rounded()))
     }
 
