@@ -63,6 +63,14 @@ Build and upload to TestFlight
 
 Upload screenshots from fastlane/screenshots/ to App Store Connect (no capture)
 
+### ios upload_media
+
+```sh
+[bundle exec] fastlane ios upload_media
+```
+
+Upload screenshots and app previews together (replaces what is on App Store Connect; no capture)
+
 ### ios previews
 
 ```sh

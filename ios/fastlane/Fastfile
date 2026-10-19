@@ -109,6 +109,30 @@ platform :ios do
     )
   end
 
+  desc "Upload screenshots and app previews together (replaces what is on App Store Connect; no capture)"
+  lane :upload_media do
+    ENV["FASTLANE_ENABLE_BETA_DELIVER_SYNC_SCREENSHOTS"] = "1"
+    begin
+      deliver(
+        skip_metadata: true,
+        skip_binary_upload: true,
+        sync_screenshots: true,
+        overwrite_screenshots: true,
+        overwrite_preview_videos: true,
+        force: true,
+        precheck_include_in_app_purchases: false
+      )
+    rescue FastlaneCore::Interface::FastlaneError => e
+      # After the video uploads, deliver sets the preview's poster frame, and App Store Connect
+      # rejects that ("Asset Not in Complete state! can't update Image!") even once the asset reads
+      # COMPLETE; retrying for 5 minutes did not help (fastlane 2.236.1 and 2.241.1). The video
+      # and the screenshots do arrive, so treat that one error as a warning and set the poster
+      # frame in App Store Connect by hand. Any other error still fails the lane.
+      raise unless e.message.include?("Asset Not in Complete state")
+      UI.important("Previews uploaded, but App Store Connect refused the poster frame; pick it in the web UI.")
+    end
+  end
+
   desc "Upload app preview videos from fastlane/app_previews/ to App Store Connect"
   lane :previews do
     deliver(
