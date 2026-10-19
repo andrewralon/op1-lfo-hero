@@ -245,3 +245,6 @@ ios/fastlane/metadata/review_information/
 
 # local release checklist, not for the repo
 notes/RELEASE_READINESS.md
+
+# App preview videos are large; keep them local (fastlane previews uploads from this folder)
+ios/fastlane/app_previews/**/*.mov
