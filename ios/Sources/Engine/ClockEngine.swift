@@ -60,15 +60,26 @@ final class ClockEngine {
     static let bpmDisplayInterval = 0.25
     /// A change this large (a deliberate jump, not jitter or a drag) is shown at once.
     static let bpmImmediateChange = 0.02
+    /// The anti-jitter smoothing (the averaging window, the step detection, the snap and the hysteresis),
+    /// switched OFF for ticks timed by the sender's own timestamps. A BLE-MIDI stamp is accurate to about
+    /// 0.4 ms, so each tick's own interval is already a clean tempo and every smoothing step only added
+    /// lag (measured on a TX-6 over Bluetooth, 2026-10-18: the display now locks onto a new tempo at once
+    /// instead of arriving within 1-2 BPM and settling over a second). The logic is kept, not deleted:
+    /// set true to restore it. It always applies to ticks timed by arrival (USB, or a device with no
+    /// usable stamps), where per-tick timing is not clean enough to show raw. The 4/s display limit
+    /// applies either way.
+    var antiJitter = false
+
     private var lastBpmPublishTime: Double = 0
     private var lastPublishedBpm: Double = 0
 
     /// Whether to update the BPM box now. Yes for the first tempo, for a change of 2% or more, and
     /// otherwise only if it has changed and the display interval has passed since the last update.
-    static func shouldPublishBpm(now: Double, lastPublishTime: Double, current: Double, lastPublished: Double) -> Bool {
+    static func shouldPublishBpm(now: Double, lastPublishTime: Double, current: Double, lastPublished: Double,
+                                 allowImmediate: Bool = true) -> Bool {
         guard current != lastPublished else { return false }
         guard lastPublishTime > 0, lastPublished > 0 else { return true }
-        if abs(current / lastPublished - 1) >= bpmImmediateChange { return true }
+        if allowImmediate, abs(current / lastPublished - 1) >= bpmImmediateChange { return true }
         return now - lastPublishTime >= bpmDisplayInterval
     }
 
@@ -226,6 +237,21 @@ final class ClockEngine {
             guard stampedInterval != nil || (interval > 0.005 && interval < 2.0) else {
                 lastTickTime = now
                 lock.unlock()
+                tickCallback?(tick)
+                return
+            }
+            if !antiJitter, stampedInterval != nil {
+                // Anti-jitter off and the tick is sender-stamped: its own interval is the tempo, nothing
+                // averaged, snapped or held back (only the display rate below).
+                bpm = (60.0 / (Double(PPQN) * interval) * 10).rounded() / 10
+                let value = bpm
+                let publish = ClockEngine.shouldPublishBpm(now: now, lastPublishTime: lastBpmPublishTime,
+                                                           current: value, lastPublished: lastPublishedBpm,
+                                                           allowImmediate: false)
+                if publish { lastBpmPublishTime = now; lastPublishedBpm = value }
+                lock.unlock()
+                if publish { bpmCallback?(value) }
+                lastTickTime = now
                 tickCallback?(tick)
                 return
             }

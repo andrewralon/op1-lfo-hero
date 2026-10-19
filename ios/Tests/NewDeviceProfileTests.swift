@@ -1755,6 +1755,7 @@ final class SenderStampedClockTests: XCTestCase {
         clock = ClockEngine()
         clock.router = destination
         clock.disableClock()                           // slaved to the device
+        clock.antiJitter = true                        // these exercise the smoothing, which is off by default
     }
 
     // MARK: the interval between two stamps
@@ -1852,5 +1853,59 @@ final class SenderStampedClockTests: XCTestCase {
             destination.onClock?()
         }
         XCTAssertEqual(clock.bpm, 80.0, "was 0 (ignored) with arrival timing")
+    }
+}
+
+/// With the anti-jitter smoothing off (the default), a sender-stamped tick's own interval is the tempo.
+/// Measured on a TX-6 over Bluetooth, 2026-10-18: the stamps are accurate to 0.4 ms, so the smoothing only
+/// added lag, and the display locks onto a new tempo at once.
+final class RawStampedTempoTests: XCTestCase {
+    private var destination: RecordingDestination!
+    private var clock: ClockEngine!
+
+    override func setUp() {
+        super.setUp()
+        destination = RecordingDestination()
+        clock = ClockEngine()
+        clock.router = destination
+        clock.disableClock()
+        XCTAssertFalse(clock.antiJitter, "off by default")
+    }
+
+    func testEachTicksOwnStampedIntervalIsTheTempo() {
+        var t = 0
+        func tick(_ interval: Int) {
+            t += interval
+            destination.onClockStamp?(t % 8192)
+            destination.onClock?()
+        }
+        for _ in 0..<10 { tick(31) }
+        XCTAssertEqual(clock.bpm, 80.6, "60 / (24 * 0.031): nothing averaged")
+        tick(32)
+        XCTAssertEqual(clock.bpm, 78.1, "the very next tick moves it: no window, no hysteresis")
+    }
+
+    /// The display limit stays: the box is told once, however many ticks arrive in an instant.
+    func testTheDisplayIsStillLimitedToFourUpdatesASecond() {
+        var told = 0
+        clock.bpmCallback = { _ in told += 1 }
+        var t = 0
+        for k in 0..<200 {
+            t += (k % 2 == 0) ? 31 : 32
+            destination.onClockStamp?(t % 8192)
+            destination.onClock?()
+        }
+        XCTAssertEqual(told, 1, "the ticks were fed back to back, well inside one 0.25 s interval")
+    }
+
+    func testTheSmoothingCanBeSwitchedBackOn() {
+        clock.antiJitter = true
+        var t = 0
+        for k in 0..<200 {
+            t += (k % 2 == 0) ? 31 : 32
+            destination.onClockStamp?(t % 8192)
+            destination.onClock?()
+        }
+        XCTAssertEqual(clock.bpm, 80.0, accuracy: 1.0, "averaged: 31.5 ms is 79.4 BPM, snapped and held")
     }
 }

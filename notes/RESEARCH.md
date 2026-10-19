@@ -1436,6 +1436,12 @@ ignored any tempo above 300, so 400 read 300.0 (one ceiling now, `AppState.maxBp
 also told of a new tempo at most 4 times a second, because a tempo that is itself moving otherwise redrew it
 on every tick.
 
+**Then the smoothing came off.** With stamps accurate to 0.4 ms, every smoothing step (the window, the step
+detection, the snap, the hysteresis) only added lag: raw per-tick timing from the stamps, with only the
+4-a-second display limit, locked onto a new tempo at once, where the smoothed version arrived within 1-2 BPM
+and took about a second to settle. `ClockEngine.antiJitter = false` for sender-stamped ticks; the logic is
+kept (set it true to restore it) and still applies to ticks timed by arrival.
+
 ## Open questions — answer on hardware
 
 - [ ] Do the pinned FX-bus channels (ch 8/9) actually land?
