@@ -9,6 +9,7 @@ final class HelpSettingsUITests: XCTestCase {
 
     func testHelpModalOpensAndDismisses() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["--uitest-reset"]   // also keeps the first-run walkthrough away
         app.launch()
 
         let helpButton = app.buttons["helpButton"]
@@ -27,6 +28,7 @@ final class HelpSettingsUITests: XCTestCase {
     @MainActor func testParamPickerLandscape() throws {
         XCUIDevice.shared.orientation = .landscapeLeft
         let app = XCUIApplication()
+        app.launchArguments = ["--uitest-reset"]   // also keeps the first-run walkthrough away
         app.launch()
         let helpButton = app.buttons["helpButton"]
         XCTAssertTrue(helpButton.waitForExistence(timeout: 8))
@@ -43,6 +45,7 @@ final class HelpSettingsUITests: XCTestCase {
     func testParamPickerOpens() throws {
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
+        app.launchArguments = ["--uitest-reset"]   // also keeps the first-run walkthrough away
         app.launch()
 
         // Wait past splash, then tap the parameter picker button (bold text label)
@@ -62,6 +65,7 @@ final class HelpSettingsUITests: XCTestCase {
 
     func testSettingsModalOpensAndDismisses() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["--uitest-reset"]   // also keeps the first-run walkthrough away
         app.launch()
 
         let settingsButton = app.buttons["settingsButton"]
@@ -84,6 +88,7 @@ final class HelpSettingsUITests: XCTestCase {
         // that is not whatever the simulator happens to have saved. Track strips are narrowest
         // on the 6-track devices, which is where layout problems show up first.
         let profile = ProcessInfo.processInfo.environment["UITEST_PROFILE"]
+        app.launchArguments = ["--uitest-reset"]   // also keeps the first-run walkthrough away
         if let profile {
             app.launchArguments = ["--uitest-reset", "--uitest-profile", profile]
         }
@@ -101,6 +106,7 @@ final class HelpSettingsUITests: XCTestCase {
     func testPortraitLayout() throws {
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
+        app.launchArguments = ["--uitest-reset"]   // also keeps the first-run walkthrough away
         app.launch()
         let helpButton = app.buttons["helpButton"]
         XCTAssertTrue(helpButton.waitForExistence(timeout: 8))

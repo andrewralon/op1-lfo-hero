@@ -234,6 +234,8 @@ final class AppState: ObservableObject {
     static func migratedParamId(_ id: String) -> String { legacyParamIdMap[id] ?? id }
 
     private func loadSettings() {
+        // TourController reads the same flag (and --uitest-tour) to keep the walkthrough out of
+        // the UI tests.
         if CommandLine.arguments.contains("--uitest-reset") {
             KeychainStore.delete(account: settingsKey)
             UserDefaults.standard.removeObject(forKey: settingsKey)

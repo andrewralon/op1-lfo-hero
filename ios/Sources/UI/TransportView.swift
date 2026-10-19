@@ -11,13 +11,18 @@ struct TransportBarView: View {
 
             Spacer()
 
+            // Tagged one by one: the walkthrough's transport step spans all four.
             TransBtn(symbol: "play.fill",  active: false) { app.play() }
+                .tourAnchor(.transport)
             TransBtn(symbol: "stop.fill",  active: false)                                        { app.stop() }
+                .tourAnchor(.transport)
 
             Sep()
 
             ScrubBtn(symbol: app.profile.transport.prevSymbol, forward: false)
+                .tourAnchor(.transport)
             ScrubBtn(symbol: app.profile.transport.nextSymbol, forward: true)
+                .tourAnchor(.transport)
 
             Sep()
 
@@ -40,12 +45,14 @@ struct TransportBarView: View {
             // Devices that never emit MIDI clock can't be the tempo source.
             .disabled(!app.profile.caps.canBeClockMaster)
             .opacity(app.profile.caps.canBeClockMaster ? 1 : 0.4)
+            .tourAnchor(.tempoMode)
             .padding(.leading, isPad ? 14 : 10)
 
             // BPM scrubber — compact fixed width with uniform 6pt margin
             BpmScrubber()
                 .frame(width: isPad ? 130 : 82)
                 .frame(maxHeight: .infinity)
+                .tourAnchor(.bpm)
                 .padding(.vertical, isPad ? 8 : 6)
                 .padding(.horizontal, 6)
             Spacer()
@@ -232,6 +239,7 @@ struct TransportColumnView: View {
                 TransColBtn(symbol: "stop.fill",  active: false) { app.stop() }
             }
             .frame(maxHeight: .infinity)
+            .tourAnchor(.transport)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -242,6 +250,7 @@ struct TransportColumnView: View {
                 ScrubColBtn(symbol: app.profile.transport.nextSymbol, forward: true)
             }
             .frame(maxHeight: .infinity)
+            .tourAnchor(.transport)
 
             Rectangle().fill(C.bg3).frame(height: 1)
 
@@ -264,12 +273,14 @@ struct TransportColumnView: View {
                 // Devices that never emit MIDI clock can't be the tempo source.
                 .disabled(!app.profile.caps.canBeClockMaster)
                 .opacity(app.profile.caps.canBeClockMaster ? 1 : 0.4)
+                .tourAnchor(.tempoMode)
 
                 Rectangle().fill(C.bg3).frame(width: 1)
 
                 BpmScrubber()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(6)
+                    .tourAnchor(.bpm)
             }
             .frame(maxHeight: .infinity)
         }

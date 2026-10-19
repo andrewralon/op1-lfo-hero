@@ -16,6 +16,8 @@ struct TrackStripView: View {
                             set: { app.setVolume(track: track, value: $0) })
         let pan   = Binding(get: { app.pans[track] ?? 0 },
                             set: { app.setPan(track: track, value: $0) })
+        // The walkthrough points at one strip only.
+        let tagged = track == app.profile.trackIndices.first
 
         VStack(spacing: 0) {
 
@@ -30,6 +32,8 @@ struct TrackStripView: View {
             }
             .buttonStyle(ImmediateButtonStyle())
             .accessibilityIdentifier("muteButton\(track)")
+            .accessibilityValue(muted ? "muted" : "unmuted")
+            .tourAnchor(.mutePad, when: tagged)
 
             if isLandscape {
                 // ── Landscape: pan knob left of fader, tops aligned ──────────
@@ -44,6 +48,7 @@ struct TrackStripView: View {
                             .padding(.leading, m.stripInnerPad)
                             .padding(.trailing, m.panFaderGap)
                             .accessibilityIdentifier("panKnob\(track)")
+                            .tourAnchor(.panKnob, when: tagged)
                     }
 
                     // No leading padding: the knob's trailing `panFaderGap` already separates
@@ -56,6 +61,7 @@ struct TrackStripView: View {
                         .padding(.trailing, m.stripInnerPad)
                         .padding(.leading, hasPan ? 0 : m.stripInnerPad)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .tourAnchor(.volumeFader, when: tagged)
                 }
                 .frame(maxHeight: .infinity)
             } else {
@@ -70,6 +76,7 @@ struct TrackStripView: View {
                         .padding(.top, m.panVPadTop)
                         .padding(.bottom, m.panVPadTop * 0.5)
                         .accessibilityIdentifier("panKnob\(track)")
+                        .tourAnchor(.panKnob, when: tagged)
                 }
 
                 VolumeFaderView(
@@ -78,6 +85,7 @@ struct TrackStripView: View {
                 ) { app.setVolume(track: track, value: $0) }
                     .padding(.vertical, 8)
                     .frame(maxHeight: .infinity)
+                    .tourAnchor(.volumeFader, when: tagged)
                 Spacer(minLength: 0)
             }
         }

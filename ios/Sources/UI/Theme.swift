@@ -72,6 +72,24 @@ struct DarkButton: ButtonStyle {
     }
 }
 
+/// Light capsule used for the settings / help action buttons ("replay walkthrough", "reset to
+/// defaults"). One style so the same button looks the same wherever it appears.
+struct CapsuleButtonStyle: ButtonStyle {
+    @Environment(\.horizontalSizeClass) private var hSize
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: hSize == .regular ? 15 : 13, weight: .semibold))
+            .foregroundColor(C.bg)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 20)
+            .padding(.vertical, 5)
+            .background(C.text.opacity(configuration.isPressed ? 0.7 : 1))
+            .clipShape(Capsule())
+    }
+}
+
 // Section divider with uppercase label (matches desktop panel separators)
 struct SectionDivider: View {
     let label: String

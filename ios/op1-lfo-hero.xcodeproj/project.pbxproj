@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		4795F3EA185146A3B08825F25A220B31 /* AppPreviewUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3009F425A432421994D6531CF8F18855 /* AppPreviewUITests.swift */; };
 		F3D1001B2FF000000000001B /* MultiDeviceUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D1001A2FF000000000001A /* MultiDeviceUITests.swift */; };
+		F3D100372FF0000000000037 /* TourUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100362FF0000000000036 /* TourUITests.swift */; };
 		4B2D1C66F4F73C31243ED771 /* HelpSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */; };
 		71BEA300AD3743FA9B870E02 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D11E2853B035905A9EAF4CE6 /* Foundation.framework */; };
 		CB702C2BCF38D9ECF9C48486 /* SplashScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E24B5EECD649B0D8B5B840 /* SplashScreenView.swift */; };
@@ -24,6 +25,7 @@
 		F303F7D32FDE4BC80060AA2D /* LFOPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C02FDE4BC80060AA2D /* LFOPanelView.swift */; };
 		F303F7D42FDE4BC80060AA2D /* AutomationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7B92FDE4BC80060AA2D /* AutomationEngine.swift */; };
 		F303F7D52FDE4BC80060AA2D /* PanKnobView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C12FDE4BC80060AA2D /* PanKnobView.swift */; };
+		F3D100332FF0000000000033 /* TourOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100322FF0000000000032 /* TourOverlayView.swift */; };
 		F303F7D62FDE4BC80060AA2D /* BLEMidi.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7BA2FDE4BC80060AA2D /* BLEMidi.swift */; };
 		F303F7D72FDE4BC80060AA2D /* WaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7C62FDE4BC80060AA2D /* WaveformView.swift */; };
 		F303F7D82FDE4BC80060AA2D /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = F303F7BD2FDE4BC80060AA2D /* Models.swift */; };
@@ -37,7 +39,9 @@
 		F3BF244C2FE3A926009FFE84 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F3BF244B2FE3A926009FFE84 /* PrivacyInfo.xcprivacy */; };
 		F3D100112FF0000000000011 /* DeviceProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100102FF0000000000010 /* DeviceProfile.swift */; };
 		F3D100132FF0000000000013 /* DeviceProfiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100122FF0000000000012 /* DeviceProfiles.swift */; };
+		F3D100312FF0000000000031 /* TourController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100302FF0000000000030 /* TourController.swift */; };
 		F3D100152FF0000000000015 /* DeviceProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100142FF0000000000014 /* DeviceProfileTests.swift */; };
+		F3D100352FF0000000000035 /* TourControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100342FF0000000000034 /* TourControllerTests.swift */; };
 		F3D100192FF0000000000019 /* NewDeviceProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100182FF0000000000018 /* NewDeviceProfileTests.swift */; };
 		F3D100172FF0000000000017 /* SettingsMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100162FF0000000000016 /* SettingsMigrationTests.swift */; };
 		F3D100232FF0000000000023 /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3D100222FF0000000000022 /* KeychainStoreTests.swift */; };
@@ -68,6 +72,7 @@
 		D11E2853B035905A9EAF4CE6 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		3009F425A432421994D6531CF8F18855 /* AppPreviewUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppPreviewUITests.swift; path = UITests/AppPreviewUITests.swift; sourceTree = "<group>"; };
 		F3D1001A2FF000000000001A /* MultiDeviceUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MultiDeviceUITests.swift; path = UITests/MultiDeviceUITests.swift; sourceTree = "<group>"; };
+		F3D100362FF0000000000036 /* TourUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TourUITests.swift; path = UITests/TourUITests.swift; sourceTree = "<group>"; };
 		D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HelpSettingsUITests.swift; path = UITests/HelpSettingsUITests.swift; sourceTree = "<group>"; };
 		F303F79E2FDE4A770060AA2D /* op1-lfo-hero.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "op1-lfo-hero.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F303F7B82FDE4BC80060AA2D /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -80,6 +85,7 @@
 		F303F7BF2FDE4BC80060AA2D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		F303F7C02FDE4BC80060AA2D /* LFOPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LFOPanelView.swift; sourceTree = "<group>"; };
 		F303F7C12FDE4BC80060AA2D /* PanKnobView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanKnobView.swift; sourceTree = "<group>"; };
+		F3D100322FF0000000000032 /* TourOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TourOverlayView.swift; sourceTree = "<group>"; };
 		F303F7C22FDE4BC80060AA2D /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		F303F7C32FDE4BC80060AA2D /* TrackStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackStripView.swift; sourceTree = "<group>"; };
 		F303F7C42FDE4BC80060AA2D /* TransportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportView.swift; sourceTree = "<group>"; };
@@ -97,7 +103,9 @@
 		F3D100022FF0000000000002 /* op1-lfo-heroTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "op1-lfo-heroTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F3D100102FF0000000000010 /* DeviceProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceProfile.swift; sourceTree = "<group>"; };
 		F3D100122FF0000000000012 /* DeviceProfiles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceProfiles.swift; sourceTree = "<group>"; };
+		F3D100302FF0000000000030 /* TourController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TourController.swift; sourceTree = "<group>"; };
 		F3D100142FF0000000000014 /* DeviceProfileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DeviceProfileTests.swift; path = Tests/DeviceProfileTests.swift; sourceTree = "<group>"; };
+		F3D100342FF0000000000034 /* TourControllerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = TourControllerTests.swift; path = Tests/TourControllerTests.swift; sourceTree = "<group>"; };
 		F3D100182FF0000000000018 /* NewDeviceProfileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NewDeviceProfileTests.swift; path = Tests/NewDeviceProfileTests.swift; sourceTree = "<group>"; };
 		F3D100162FF0000000000016 /* SettingsMigrationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsMigrationTests.swift; path = Tests/SettingsMigrationTests.swift; sourceTree = "<group>"; };
 		F3D100222FF0000000000022 /* KeychainStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = KeychainStoreTests.swift; path = Tests/KeychainStoreTests.swift; sourceTree = "<group>"; };
@@ -131,6 +139,7 @@
 				3009F425A432421994D6531CF8F18855 /* AppPreviewUITests.swift */,
 				D77FD5F83C1FFBBF5C597385 /* HelpSettingsUITests.swift */,
 				F3D1001A2FF000000000001A /* MultiDeviceUITests.swift */,
+				F3D100362FF0000000000036 /* TourUITests.swift */,
 				F350020D2FE371CE00C6E1AF /* SnapshotHelper.swift */,
 				F350020F2FE371D800C6E1AF /* ScreenshotTests.swift */,
 			);
@@ -142,6 +151,7 @@
 			children = (
 				F3D1000C2FF000000000000C /* GoldenMidiTests.swift */,
 				F3D100142FF0000000000014 /* DeviceProfileTests.swift */,
+				F3D100342FF0000000000034 /* TourControllerTests.swift */,
 				F3D100162FF0000000000016 /* SettingsMigrationTests.swift */,
 				F3D100222FF0000000000022 /* KeychainStoreTests.swift */,
 				F3D100162FF000000000BE02 /* BleMidiParserTests.swift */,
@@ -192,6 +202,7 @@
 				F303F7BC2FDE4BC80060AA2D /* Controller.swift */,
 				F3D100102FF0000000000010 /* DeviceProfile.swift */,
 				F3D100122FF0000000000012 /* DeviceProfiles.swift */,
+				F3D100302FF0000000000030 /* TourController.swift */,
 				F303F7E22FDE4BC80060AA2D /* MidiRouter.swift */,
 				F303F7BD2FDE4BC80060AA2D /* Models.swift */,
 				F303F7E02FDE4BC80060AA2D /* USBMidi.swift */,
@@ -206,6 +217,7 @@
 				F303F7BF2FDE4BC80060AA2D /* ContentView.swift */,
 				F303F7C02FDE4BC80060AA2D /* LFOPanelView.swift */,
 				F303F7C12FDE4BC80060AA2D /* PanKnobView.swift */,
+				F3D100322FF0000000000032 /* TourOverlayView.swift */,
 				F303F7C22FDE4BC80060AA2D /* Theme.swift */,
 				F303F7C32FDE4BC80060AA2D /* TrackStripView.swift */,
 				F303F7C42FDE4BC80060AA2D /* TransportView.swift */,
@@ -361,6 +373,7 @@
 				4795F3EA185146A3B08825F25A220B31 /* AppPreviewUITests.swift in Sources */,
 				4B2D1C66F4F73C31243ED771 /* HelpSettingsUITests.swift in Sources */,
 				F3D1001B2FF000000000001B /* MultiDeviceUITests.swift in Sources */,
+				F3D100372FF0000000000037 /* TourUITests.swift in Sources */,
 				F350020E2FE371CE00C6E1AF /* SnapshotHelper.swift in Sources */,
 				F35002102FE371D800C6E1AF /* ScreenshotTests.swift in Sources */,
 			);
@@ -376,6 +389,7 @@
 				F303F7CD2FDE4BC80060AA2D /* Controller.swift in Sources */,
 				F3D100112FF0000000000011 /* DeviceProfile.swift in Sources */,
 				F3D100132FF0000000000013 /* DeviceProfiles.swift in Sources */,
+				F3D100312FF0000000000031 /* TourController.swift in Sources */,
 				F303F7CE2FDE4BC80060AA2D /* AppState.swift in Sources */,
 				F303F7CF2FDE4BC80060AA2D /* ClockEngine.swift in Sources */,
 				F303F7D02FDE4BC80060AA2D /* VolumeFaderView.swift in Sources */,
@@ -384,6 +398,7 @@
 				F303F7D32FDE4BC80060AA2D /* LFOPanelView.swift in Sources */,
 				F303F7D42FDE4BC80060AA2D /* AutomationEngine.swift in Sources */,
 				F303F7D52FDE4BC80060AA2D /* PanKnobView.swift in Sources */,
+				F3D100332FF0000000000033 /* TourOverlayView.swift in Sources */,
 				F303F7D62FDE4BC80060AA2D /* BLEMidi.swift in Sources */,
 				F303F7E32FDE4BC80060AA2D /* MidiRouter.swift in Sources */,
 				F303F7D72FDE4BC80060AA2D /* WaveformView.swift in Sources */,
@@ -400,6 +415,7 @@
 			files = (
 				F3D1000D2FF000000000000D /* GoldenMidiTests.swift in Sources */,
 				F3D100152FF0000000000015 /* DeviceProfileTests.swift in Sources */,
+				F3D100352FF0000000000035 /* TourControllerTests.swift in Sources */,
 				F3D100172FF0000000000017 /* SettingsMigrationTests.swift in Sources */,
 				F3D100232FF0000000000023 /* KeychainStoreTests.swift in Sources */,
 				F3D100172FF000000000BE01 /* BleMidiParserTests.swift in Sources */,

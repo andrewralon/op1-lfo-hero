@@ -42,6 +42,7 @@ struct LFOPanelView: View {
     var needsSideBySide: Bool = false
 
     @EnvironmentObject var app: AppState
+    @EnvironmentObject private var tour: TourController
     @Environment(\.metrics) private var m
     @State private var selectedLfoID: UUID? = nil
     @State private var editorSnapshot: EditorSnapshot? = nil
@@ -147,6 +148,7 @@ struct LFOPanelView: View {
             CompactPicker(options: app.profile.pickerParams, selection: $app.lfoParam,
                           label: { $0.name }, accessibilityId: "paramPicker")
         }
+        .tourAnchor(.paramPicker)
     }
 
     @ViewBuilder private var waveRow: some View {
@@ -159,6 +161,7 @@ struct LFOPanelView: View {
             CompactPicker(options: Array(LfoWave.allCases), selection: $app.lfoWave,
                           label: { $0.rawValue }, accessibilityId: "wavePicker")
         }
+        .tourAnchor(.wavePicker)
     }
 
     @ViewBuilder private var rateBox: some View {
@@ -177,6 +180,7 @@ struct LFOPanelView: View {
                accessibilityId: "rateScrub")
             .frame(width: m.rateW)
         }
+        .tourAnchor(.speedBox)
     }
 
     @ViewBuilder private var centerBox: some View {
@@ -192,6 +196,7 @@ struct LFOPanelView: View {
                        accessibilityId: "centerScrub")
                 .frame(width: m.depthW)
         }
+        .tourAnchor(.centerBox)
     }
 
     @ViewBuilder private var depthBox: some View {
@@ -202,6 +207,7 @@ struct LFOPanelView: View {
             ScrubValue(value: $app.lfoDepth, range: 0...99, accessibilityId: "depthScrub")
                 .frame(width: m.depthW)
         }
+        .tourAnchor(.depthBox)
     }
 
     @ViewBuilder private var repeatBtn: some View {
@@ -272,6 +278,7 @@ struct LFOPanelView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { cancelChipEdit() }
+        .tourAnchor(.chipArea)
     }
 
     @ViewBuilder private var helpBtn: some View {
@@ -330,15 +337,18 @@ struct LFOPanelView: View {
                                                   disabled: app.lfoParam.isMasterOnly || app.masterOn > 0) {
                                     app.cycleTrack(t)
                                 }
+                                .tourAnchor(.trackToggle, when: t == app.profile.trackIndices.first)
                             case .master:
                                 MasterToggleButton(state: app.masterOn,
                                                    disabled: !app.lfoParam.isMasterCapable) {
                                     app.cycleMaster()
                                 }
+                                .tourAnchor(.masterToggle)
                             case .preview:
                                 PreviewToggleButton(active: app.isPreview) {
                                     app.togglePreview()
                                 }
+                                .tourAnchor(.preview)
                             }
                         }
                     }
@@ -400,6 +410,7 @@ struct LFOPanelView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
                     .clockWaitingBanner()
+                    .tourAnchor(.waveform)
                     .padding(m.lfoPanelPad)
 
                     HStack(spacing: 0) {
@@ -411,6 +422,7 @@ struct LFOPanelView: View {
                             trashBtn
                         }
                         .frame(width: m.actionColW)
+                        .tourAnchor(.startButtons)
 
                         Rectangle().fill(C.bg3).frame(width: 1)
                         lfoListScroll.frame(maxHeight: .infinity)
@@ -422,6 +434,7 @@ struct LFOPanelView: View {
                             settingsBtn
                         }
                         .frame(width: m.helpColW)
+                        .tourAnchor(.helpSettings)
                     }
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -443,6 +456,7 @@ struct LFOPanelView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
                 .clockWaitingBanner()
+                .tourAnchor(.waveform)
                 .padding(8)
 
                 HStack(spacing: 0) {
@@ -454,6 +468,7 @@ struct LFOPanelView: View {
                         trashBtn
                     }
                     .frame(width: m.actionColW)
+                    .tourAnchor(.startButtons)
 
                     Rectangle().fill(C.bg3).frame(width: 1)
                     lfoListScroll
@@ -465,6 +480,7 @@ struct LFOPanelView: View {
                         settingsBtn
                     }
                     .frame(width: m.helpColW)
+                    .tourAnchor(.helpSettings)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(maxHeight: .infinity)
@@ -505,6 +521,9 @@ struct LFOPanelView: View {
             get: { m.isIpad && showSettings },
             set: { if !$0 { showSettings = false } }
         )) { SettingsView() }
+        // The walkthrough never sits over a sheet, and replay waits for these to close.
+        .onChange(of: showHelp)     { _, shown in tour.sheet(shown) }
+        .onChange(of: showSettings) { _, shown in tour.sheet(shown) }
     }
 }
 
