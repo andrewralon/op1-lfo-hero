@@ -290,8 +290,10 @@ struct ContentView: View {
             .background(C.bg)
             .preferredColorScheme(.dark)
         }
-        .onAppear { tour.profileChanged(app.profile.caps) }
-        .onChange(of: app.profile.id) { _, _ in tour.profileChanged(app.profile.caps) }
+        .onAppear { tour.profileChanged(app.tourCaps) }
+        // Fires when the device changes and when one is first connected or picked, since either
+        // can add or remove steps.
+        .onChange(of: app.tourDevice?.id) { _, _ in tour.profileChanged(app.tourCaps) }
     }
 }
 
@@ -567,35 +569,41 @@ enum HelpCopy {
         }
     }
 
-    static func tourText(_ a: TourAnchor, profile: DeviceProfile) -> String {
-        let dev = profile.displayName.lowercased()
-        let clk = profile.caps.clockLabel
+    /// `device` is nil until the app knows which device the user has (see `AppState.tourDevice`);
+    /// the wording is then neutral rather than naming a device that was only remembered.
+    static func tourText(_ a: TourAnchor, device: DeviceProfile?) -> String {
+        let dev = device?.displayName.lowercased() ?? "device"
+        let clk = device?.caps.clockLabel ?? "device"
         switch a {
         case .welcome:
-            return "op1 lfo hero sends beat-synced lfos to your \(dev). this quick tour shows what each control does and how to use it. you can replay it any time in settings."
+            // Every supported device, not just the connected one: a first-time user may not have
+            // connected anything yet. "a, b, or c" from the registry, so a new profile joins in.
+            let names = DeviceRegistry.all.map { $0.displayName }
+            let list = names.count > 1
+                ? names.dropLast().joined(separator: ", ") + ", or " + names.last!
+                : names.joined()
+            return "op1 lfo hero sends beat-synced lfos to your \(list). this quick tour shows what each control does and how to use it. you can replay it any time in settings."
         case .statusBar:
             // Two tap targets: the connection (left) and the tempo mode (right).
-            return profile.caps.canBeClockMaster
-                ? "two buttons. left: midi connection, tap to pick a device. right: tempo source, tap to switch between \(clk) (beat match) and app (midi sync)."
-                : "left: midi connection, tap to pick a device. right: tempo source, which is always the app on the \(dev), but some devices can control it."
+            return "two buttons. left: midi connection (usb-c and ble), tap to pick and connect to a device. right: tempo source, tap to switch between app (midi sync) and \(clk) (beat match)."
         case .mutePad:
             return "tap a track's colored number pad to mute or unmute it."
         case .panKnob:
-            return "drag up/down on a knob to pan right/left. let go near the top to snap to center."
+            return "drag up/down on a track's knob to pan right/left."
         case .volumeFader:
             return "drag up/down to set a track's volume. drag sideways while scrubbing for fine control."
         case .transport:
-            return "play and stop the \(dev)'s tape. the arrows move the tape back and forward."
+            return "play and stop the \(dev)'s tape. left/right arrows (op-1 field and tp-7) move tape backward and forward. -/+ (tx-6) change tempo bpm."
         case .bpm:
             return "drag up/down to scrub the tempo. double-tap or long-press to type an exact bpm."
         case .tempoMode:
-            return "tap to switch the clock source: \(clk) (beat match) or app (midi sync). then set the \(dev) to match."
+            return "tap to switch the tempo source: app (midi sync) or \(clk) (beat match). then set the \(dev) to match."
         case .trackToggle:
             return "choose which tracks the lfo drives. tap to cycle off → on → inverted."
         case .masterToggle:
-            return "applies the lfo to a master parameter, like tempo, instead of one track. tap to cycle off → on → inverted."
+            return "applies the lfo parameter to master, not a track. only avilable for some parameters. tap to cycle off → on → inverted."
         case .preview:
-            return "hear a preview of the lfo live as you change settings, before creating an lfo."
+            return "preview the lfo live while changing settings, so you can hear the effect before creating an lfo."
         case .paramPicker:
             return "choose what the lfo changes. tap the bolt icon to step to the next parameter without opening the list."
         case .wavePicker:
@@ -609,7 +617,7 @@ enum HelpCopy {
         case .waveform:
             return "show the active lfos as wave shapes. it overlays each curve in its track's color."
         case .startButtons:
-            return "create an lfo from current settings that loops (repeat) or runs once (one-shot). or delete all lfos."
+            return "create an lfo from current settings that loops (repeat) or runs once (1x). or delete all lfos."
         case .chipArea:
             return "lfo chips created as loop or 1x are shown here. tap chips to pause, long-press to edit (and again to save changes), or tap × to delete."
         case .helpSettings:
@@ -657,7 +665,7 @@ struct HelpView: View {
         (HelpCopy.title(.speedBox), Text("drag up/down on a box to scrub its value. tap the speed (timer) icon to step to the next speed value one at a time. speed sets lfo speed, depth sets its range, center sets its midpoint.")),
         (HelpCopy.title(.waveform), Text("when no lfo chips are running, shows the current editor settings as a preview. when chips are active, shows all running lfo curves overlaid, colored per track.")),
         (HelpCopy.title(.startButtons), Text("start the lfo looping, start it once, or delete all currently active lfos.")),
-        (HelpCopy.title(.chipArea), Text("lfos are shown as 'chips' showing 'track/master·parameter·wave·speed·center±depth·repeat/loop'.\n\(Text("tap").bold()) — toggle the lfo on/off without stopping it.\n\(Text("long-press").bold()) — enter edit mode; adjust controls to update the chip live, then long-press again to commit.\n\(Text("×").bold()) — stop and remove that lfo.\n\(Text("tap empty space").bold()) — cancel the current edit.")),
+        (HelpCopy.title(.chipArea), Text("lfos are shown as 'chips' showing 'track/master·parameter·wave·speed·center±depth·repeat/loop'.\n\(Text("tap").bold()) — toggle the lfo on/off without stopping it.\n\(Text("long-press").bold()) — enter edit mode; adjust controls to update the chip live, then long-press again to save changes.\n\(Text("tap anywhere else").bold()) — cancel the current edit.\n\(Text("×").bold()) — stop and delete the lfo.")),
         (HelpCopy.title(.statusBar), Text(app.profile.caps.canBeClockMaster
             ? "two buttons. left: current midi connection; tap it to choose a usb or ble midi device. right: tempo source; tap it to switch the clock source, the same as the metronome icon."
             : "left: current midi connection; tap it to choose a usb or ble midi device. right: tempo source, which is always the app on the \(dev)."))
@@ -679,6 +687,13 @@ struct HelpView: View {
                         Text("op1 lfo hero")
                             .font(.system(size: 20, weight: .bold, design: .monospaced))
                             .foregroundColor(C.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        Spacer(minLength: 8)
+                        // Right-aligned under the nav bar's "done", in line with the header.
+                        Button("show walkthrough") { tour.replay(); dismiss() }
+                            .buttonStyle(CapsuleButtonStyle())
+                            .accessibilityIdentifier("replayTourFromHelp")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
@@ -702,12 +717,6 @@ struct HelpView: View {
                             Divider()
                         }
                     }
-
-                    Button("replay walkthrough") { tour.replay(); dismiss() }
-                        .buttonStyle(CapsuleButtonStyle())
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, isPad ? 24 : 18)
-                        .accessibilityIdentifier("replayTourFromHelp")
 
                     // Wave footer
                     ColorfulSplashWave(phase: wavePhase)
@@ -776,6 +785,11 @@ struct SettingsView: View {
                         Text("op1 lfo hero")
                             .font(.system(size: 20, weight: .bold, design: .monospaced))
                             .foregroundColor(C.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        Spacer(minLength: 8)
+                        // Right-aligned under the nav bar's "done", in line with the header.
+                        replayTourBtn
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
@@ -812,11 +826,7 @@ struct SettingsView: View {
                         $cleanupOneShots
                     )
 
-                    // One line when both fit, stacked when they don't (large Dynamic Type).
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) { replayTourBtn; resetBtn }
-                        VStack(spacing: 12) { replayTourBtn; resetBtn }
-                    }
+                    resetBtn
                     .frame(maxWidth: .infinity)
                     .padding(.horizontal, isPad ? 24 : 16)
                     .padding(.vertical, isPad ? 16 : 12)
@@ -897,16 +907,14 @@ struct SettingsView: View {
 
     /// Starts once this sheet has closed. Deliberately not part of reset to defaults.
     private var replayTourBtn: some View {
-        capsuleButton("replay walkthrough") { tour.replay(); dismiss() }
+        Button("show walkthrough") { tour.replay(); dismiss() }
+            .buttonStyle(CapsuleButtonStyle())
             .accessibilityIdentifier("replayTourButton")
     }
 
     private var resetBtn: some View {
-        capsuleButton("reset to defaults") { resetToDefaults() }
-    }
-
-    private func capsuleButton(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(title, action: action).buttonStyle(CapsuleButtonStyle())
+        Button("reset to defaults") { resetToDefaults() }
+            .buttonStyle(CapsuleButtonStyle())
     }
 
     private func resetToDefaults() {

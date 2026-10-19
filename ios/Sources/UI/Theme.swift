@@ -72,7 +72,7 @@ struct DarkButton: ButtonStyle {
     }
 }
 
-/// Light capsule used for the settings / help action buttons ("replay walkthrough", "reset to
+/// Light capsule used for the settings / help action buttons ("show walkthrough", "reset to
 /// defaults"). One style so the same button looks the same wherever it appears.
 struct CapsuleButtonStyle: ButtonStyle {
     @Environment(\.horizontalSizeClass) private var hSize

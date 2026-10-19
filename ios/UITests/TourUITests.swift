@@ -130,6 +130,18 @@ final class TourUITests: XCTestCase {
         XCTAssertEqual(tp7.staticTexts["tourTitle"].label, "volume")
     }
 
+    /// No device connected and none picked in settings: the app only *remembers* a device, so the
+    /// tour keeps every step and talks about "the device" instead of naming one.
+    @MainActor func testNoKnownDeviceGetsNeutralTour() throws {
+        let app = launch(["--uitest-reset", "--uitest-tour"])
+        XCTAssertTrue(app.otherElements["tourCard"].waitForExistence(timeout: 8))
+        XCTAssertEqual(counter(app).1, "20")
+        while app.staticTexts["tourTitle"].label != "transport" { tapNext(app) }
+        let body = app.otherElements["tourCard"].staticTexts.matching(
+            NSPredicate(format: "label CONTAINS 'the device'")).firstMatch
+        XCTAssertTrue(body.exists, "transport hint should say \"the device\", not a model name")
+    }
+
     // MARK: - No MIDI under the tour
 
     /// The overlay swallows every touch: a tap on the spotlit mute pad must not mute it.

@@ -183,12 +183,12 @@ private struct TourOverlayView: View {
                 cardButton("skip", id: "tourSkipButton", color: C.dim) { tour.skip() }
                     .frame(width: m.tourCardSideW, alignment: .trailing)
             }
-            Text(HelpCopy.tourText(step, profile: app.profile))
+            Text(HelpCopy.tourText(step, device: app.tourDevice))
                 .font(.system(size: m.tourBodyFont))
                 .foregroundColor(C.text)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 0) {
-                cardButton("later", id: "tourLaterButton", color: C.text) { tour.later() }
+                cardButton("later", id: "tourLaterButton", color: C.dim) { tour.later() }
                 Spacer(minLength: 0)
                 cardButton("back", id: "tourBackButton",
                            color: tour.isFirstStep ? C.dim.opacity(0.4) : C.text) { tour.back() }

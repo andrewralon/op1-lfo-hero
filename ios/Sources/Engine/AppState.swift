@@ -375,6 +375,20 @@ final class AppState: ObservableObject {
     /// but its name matched no known device. Surfaced in the status bar.
     @Published private(set) var profileIsAssumed = false
 
+    /// The device the first-run walkthrough should talk about, or nil when none is known yet.
+    ///
+    /// `profile` is the last device the app remembered (it survives relaunches and reinstalls), so
+    /// with nothing connected it can name a device the user no longer has. The tour only trusts
+    /// it once the user has chosen a device in settings, or a recognised one is connected.
+    var tourDevice: DeviceProfile? {
+        if profileOverrideId != "auto" || (isConnected && !profileIsAssumed) { return profile }
+        return nil
+    }
+
+    /// Capabilities that decide which tour steps exist. With no known device every step is kept,
+    /// so a first-time user sees the whole tour.
+    var tourCaps: DeviceCapabilities { tourDevice?.caps ?? DeviceCapabilities() }
+
     /// Pick the profile: an explicit override wins; otherwise the connected endpoint's name;
     /// otherwise keep whatever is already loaded (never silently reset the user's device).
     func resolveProfile() { resolveProfile(active: router.activeTransport) }

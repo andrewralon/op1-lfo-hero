@@ -41,7 +41,7 @@ struct LFOHeroApp: App {
                     withAnimation(.easeOut(duration: 0.4)) { showSplash = false }
                     // After the fade, not during it. MIDI auto-connect carries on underneath.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        tour.startIfNeeded(caps: appState.profile.caps)
+                        tour.startIfNeeded(caps: appState.tourCaps)
                     }
                 }
             }
