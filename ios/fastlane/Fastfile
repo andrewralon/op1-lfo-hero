@@ -157,7 +157,23 @@ platform :ios do
   end
 
   desc "Full release: build + upload metadata + screenshots + submit for review"
-  lane :release do
+  lane :release do |options|
+    # `fastlane release build:29` submits a build that is already on App Store Connect (the one that
+    # was tested on TestFlight) instead of building a new one. Without it, this builds the next
+    # build number and uploads it.
+    if options[:build]
+      deliver(
+        submit_for_review: true,
+        automatic_release: false,
+        skip_screenshots: true,
+        skip_binary_upload: true,
+        build_number: options[:build].to_s,
+        force: true,
+        precheck_include_in_app_purchases: false
+      )
+      next
+    end
+
     match(type: "appstore", readonly: true)
 
     # See the note in the `beta` lane above — xcarg override, not
