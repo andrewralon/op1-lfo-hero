@@ -321,6 +321,47 @@ xcrun simctl list devices available | grep Booted
 xcrun simctl list devices available | grep iPhone
 ```
 
+### App Store screenshots and previews — the standard way
+
+Capture at each device's **native** resolution, and fill every slot App Store Connect requires.
+`ios/fastlane/capture_screenshots.sh` does all of it: three simulators, size-checked, then it
+replaces `ios/fastlane/screenshots/en-US/` (never a half-updated set). Look at every image in
+`/tmp/claude-ss/` afterwards, then `cd ios && fastlane upload_media overwrite:false`.
+
+| Slot (App Store Connect name) | Simulator | Pixels | Set |
+|---|---|---|---|
+| iPhone Dynamic Island (medium) — **required** | `iPhone 17` | 1206×2622 | `APP_IPHONE_61` |
+| iPhone Face ID (large) — required unless a Dynamic Island (large) set is given | `iPhone 13 Pro Max Screenshots` | 1284×2778 | `APP_IPHONE_65` |
+| iPad 13" — **required** | `iPad Pro 13-inch Screenshots` | 2064×2752 | `APP_IPAD_PRO_3GEN_129` |
+
+The two custom-named simulators are plain clones with those names, created once per machine:
+
+```bash
+xcrun simctl create "iPhone 13 Pro Max Screenshots" "iPhone 13 Pro Max"   # 1284x2778
+xcrun simctl create "iPad Pro 13-inch Screenshots"  "iPad Pro 13-inch (M5)" # 2064x2752
+```
+
+Learned the hard way on 1.1.0:
+
+- **Filling only the 6.5" slot is not enough.** The iPhone tab shows the medium slot, which stays
+  greyed ("Using Existing Assets", 0 of 10) until it has uploads of its own.
+- **The file name prefix is the device set** for previews: `IPHONE_61_preview_1.mov` (886×1920),
+  `IPHONE_65_preview_1.mov` (886×1920), `IPAD_PRO_3GEN_129_preview_1.mov` (1200×1600).
+  Record the iPhone one on the iPhone 17 and the iPad one on the 13" iPad simulator.
+- **`overwrite_preview_videos` deletes the previews in EVERY device set**, not just the ones you
+  have files for, and Apple then reprocesses all of them (up to 24 hours). Always pass
+  `overwrite:false` unless you mean it; deliver then skips any file whose checksum is already there.
+- **A poster-frame error after a preview upload is expected.** deliver sets the poster frame as soon
+  as `videoUrl` is non-nil, but App Store Connect returns `""` while the video is processing, and
+  rejects the update ("Asset Not in Complete state! can't update Image!"). `assetDeliveryState` reads
+  `COMPLETE` as soon as the upload ends, which is not "processed". The lanes in `Fastfile` treat
+  exactly that error as a warning; pick the poster frame in the web UI once processing finishes.
+  An empty cloud tile in the UI during that time is normal.
+- **Screenshots are replaced on every upload** (`sync_screenshots` + `overwrite_screenshots`), so the
+  `screenshots/en-US` folder must always hold *all* the sets, which is what the script produces.
+- `fastlane upload_screenshots` also uploads previews (it cannot skip them); prefer `upload_media`.
+- Preview videos are large and gitignored (`ios/fastlane/app_previews/**/*.mov`); keep them local.
+
 ### App Store Preview video recording
 
 App Store Connect wants 15-30 s, max 30 fps, H.264, and 886x1920 portrait for the large iPhone sizes. `simctl` records the simulator's native 1284x2778 and starts before the app does, so trim and rescale with ffmpeg afterwards (add a silent AAC track, as the earlier previews have):

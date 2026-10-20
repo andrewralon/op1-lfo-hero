@@ -109,8 +109,8 @@ platform :ios do
     )
   end
 
-  desc "Upload screenshots and app previews together (replaces what is on App Store Connect; no capture)"
-  lane :upload_media do
+  desc "Upload screenshots and app previews together (no capture). Screenshots are replaced; overwrite:false keeps existing previews"
+  lane :upload_media do |options|
     ENV["FASTLANE_ENABLE_BETA_DELIVER_SYNC_SCREENSHOTS"] = "1"
     begin
       deliver(
@@ -118,7 +118,9 @@ platform :ios do
         skip_binary_upload: true,
         sync_screenshots: true,
         overwrite_screenshots: true,
-        overwrite_preview_videos: true,
+        # overwrite:false keeps the previews already on App Store Connect (deliver skips a file
+        # whose checksum matches); the default deletes the previews in EVERY device set first.
+        overwrite_preview_videos: options[:overwrite] != false && options[:overwrite] != "false",
         force: true,
         precheck_include_in_app_purchases: false
       )
