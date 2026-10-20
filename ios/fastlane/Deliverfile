@@ -5,5 +5,5 @@ metadata_path("./fastlane/metadata")
 screenshots_path("./fastlane/screenshots")
 app_previews_path("./fastlane/app_previews")
 
-automatic_release(false)
+automatic_release(true)
 submit_for_review(false)
