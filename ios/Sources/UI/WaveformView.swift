@@ -123,7 +123,7 @@ struct MultiWaveformView: View {
     private func buildPath(lfo: LfoClip, size: CGSize) -> Path {
         let displayTicks: Int
         if let secs = lfo.freeRatePeriod {
-            displayTicks = max(1, Int(secs * max(20, bpm) * Double(PPQN) / 60.0))
+            displayTicks = max(1, Int(secs * max(AppState.minBpm, bpm) * Double(PPQN) / 60.0))
         } else {
             displayTicks = lfo.rateTicks
         }

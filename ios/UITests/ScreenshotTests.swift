@@ -10,7 +10,7 @@ final class ScreenshotTests: XCTestCase {
 
     func testScreenshots() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["--uitest-reset"]
+        app.launchArguments = ["--uitest-reset", "--uitest-spoof-connected"]
         app.launch()
 
         let helpButton = app.buttons["helpButton"]
@@ -64,6 +64,43 @@ final class ScreenshotTests: XCTestCase {
         XCTAssertTrue(app.navigationBars["settings"].waitForExistence(timeout: 5))
         try save("04_settings")
         app.buttons["done"].tap()
+    }
+
+    /// 6-track layouts, pinned with --uitest-profile so no hardware is needed.
+    func testSixTrackScreenshots() throws {
+        for (profile, shot) in [("tx6", "05_tx6_chips"), ("tp7", "06_tp7_chips")] {
+            let app = XCUIApplication()
+            app.launchArguments = ["--uitest-reset", "--uitest-profile", profile, "--uitest-spoof-connected"]
+            app.launch()
+            XCTAssertTrue(app.buttons["helpButton"].waitForExistence(timeout: 8))
+            sleep(1)
+
+            // chip 1: track 1, volume, square, depth 10
+            selectPicker(app, picker: "wavePicker", option: "square")
+            bumpRate(app, by: 2)
+            scrub(app, identifier: "depthScrub", to: 10)
+            app.buttons["repeatButton"].tap()
+            sleep(1)
+
+            // chip 2: tracks 3 + 5 (5 inverted), volume, sine
+            app.buttons["track1Button"].tap()
+            Thread.sleep(forTimeInterval: 0.35)
+            app.buttons["track1Button"].tap()
+            Thread.sleep(forTimeInterval: 0.4)
+            app.buttons["track3Button"].tap()
+            Thread.sleep(forTimeInterval: 0.4)
+            app.buttons["track5Button"].tap()
+            Thread.sleep(forTimeInterval: 0.35)
+            app.buttons["track5Button"].tap()
+            Thread.sleep(forTimeInterval: 0.4)
+            selectPicker(app, picker: "wavePicker", option: "sine")
+            bumpRate(app, by: 2)
+            scrub(app, identifier: "depthScrub", to: 30)
+            app.buttons["repeatButton"].tap()
+            sleep(2)
+            try save(shot)
+            app.terminate()
+        }
     }
 
     // MARK: - Helpers

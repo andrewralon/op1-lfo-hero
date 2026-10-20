@@ -34,6 +34,20 @@
                ReferencedContainer = "container:op1-lfo-hero.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F3D100012FF0000000000001"
+               BuildableName = "op1-lfo-heroTests.xctest"
+               BlueprintName = "op1-lfo-heroTests"
+               ReferencedContainer = "container:op1-lfo-hero.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -58,6 +72,16 @@
                BlueprintIdentifier = "EE6DB896AE67FB18A6CE5EBE"
                BuildableName = "op1-lfo-heroUITests.xctest"
                BlueprintName = "op1-lfo-heroUITests"
+               ReferencedContainer = "container:op1-lfo-hero.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F3D100012FF0000000000001"
+               BuildableName = "op1-lfo-heroTests.xctest"
+               BlueprintName = "op1-lfo-heroTests"
                ReferencedContainer = "container:op1-lfo-hero.xcodeproj">
             </BuildableReference>
          </TestableReference>

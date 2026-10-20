@@ -63,13 +63,21 @@ Build and upload to TestFlight
 
 Upload screenshots from fastlane/screenshots/ to App Store Connect (no capture)
 
+### ios upload_media
+
+```sh
+[bundle exec] fastlane ios upload_media
+```
+
+Upload screenshots and app previews together (replaces what is on App Store Connect; no capture)
+
 ### ios previews
 
 ```sh
 [bundle exec] fastlane ios previews
 ```
 
-Upload app preview videos from fastlane/app_previews/ to App Store Connect
+Upload app preview videos from fastlane/app_previews/ to App Store Connect. overwrite:false keeps what is already there (deliver skips files whose checksum matches); the default deletes the previews in EVERY device set first, so it restarts Apple's processing for all of them
 
 ### ios release
 

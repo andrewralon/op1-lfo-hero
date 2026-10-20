@@ -1,10 +1,48 @@
 import SwiftUI
 
+/// Shown over the waveform when the app is slaved to a device that is sending no clock: in slave
+/// mode the device's ticks drive every LFO, so without them they all stop with no other sign. A tap
+/// switches to the app's own clock. Lives here, not only in the BPM box's small "no clk", because
+/// this is where someone looks when their LFOs aren't moving.
+private struct ClockWaitingBanner: ViewModifier {
+    @EnvironmentObject var app: AppState
+    @Environment(\.metrics) private var m
+
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .top) {
+            if app.lfosWaitingForClock {
+                Button { app.enableClock() } label: {
+                    // Say why: not connected at all is a different fix from connected but silent
+                    // (an op-1 in the wrong tempo mode).
+                    let device = app.profile.caps.clockLabel
+                    Text(app.isConnected
+                         ? "lfos paused — no clock from \(device). tap to use the app clock"
+                         : "lfos paused — \(device) not connected. tap to use the app clock")
+                        .font(.system(size: m.lfoChipFont, weight: .semibold, design: .monospaced))
+                        .foregroundColor(C.yellow)
+                        .multilineTextAlignment(.center)
+                        .padding(m.lfoPanelPad)
+                        .frame(maxWidth: .infinity)
+                        .background(C.bg.opacity(0.88))
+                        .overlay(Rectangle().stroke(C.yellow.opacity(0.8), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("clockWaitingBanner")
+            }
+        }
+    }
+}
+
+private extension View {
+    func clockWaitingBanner() -> some View { modifier(ClockWaitingBanner()) }
+}
+
 struct LFOPanelView: View {
     var needsCombinedLfoRow: Bool = false
     var needsSideBySide: Bool = false
 
     @EnvironmentObject var app: AppState
+    @EnvironmentObject private var tour: TourController
     @Environment(\.metrics) private var m
     @State private var selectedLfoID: UUID? = nil
     @State private var editorSnapshot: EditorSnapshot? = nil
@@ -14,16 +52,23 @@ struct LFOPanelView: View {
     @State private var showSettings = false
 
     private func snapCenter() {
-        if app.lfoParam == .tempo {
+        if app.lfoParam.role == .tempo {
             app.lfoCenter = app.bpm
             return
         }
-        guard let track = (1...4).first(where: { (app.trackOn[$0] ?? 0) > 0 }) else { return }
-        switch app.lfoParam {
-        case .volume: app.lfoCenter = app.volumes[track] ?? 90
+        // A declared neutral point wins, and must be applied before the track lookup below —
+        // master-only parameters (pitch bend among them) have no track and would return early.
+        if let centre = app.lfoParam.defaultCenter {
+            app.lfoCenter = centre
+            return
+        }
+        guard let track = app.profile.trackIndices.first(where: { (app.trackOn[$0] ?? 0) > 0 })
+        else { return }
+        switch app.lfoParam.role {
+        case .volume: app.lfoCenter = app.volumes[track] ?? app.profile.defaultVolume
         case .pan:    app.lfoCenter = (Double((app.pans[track] ?? 0) + 64) * 99 / 127).rounded()
         case .mute:   app.lfoCenter = (app.mutes[track] ?? false) ? 99 : 0
-        default: break
+        case .tempo, .generic: break
         }
     }
 
@@ -66,12 +111,21 @@ struct LFOPanelView: View {
         return all[(idx + 1) % all.count]
     }
 
+    /// Parameters come from the active device's profile rather than a fixed enum, so the
+    /// cycle button steps through that list instead of `CaseIterable`.
+    private func cycleNextParam(_ value: ParamSpec) -> ParamSpec {
+        let all = app.profile.pickerParams
+        guard !all.isEmpty else { return value }
+        guard let idx = all.firstIndex(of: value) else { return all[0] }
+        return all[(idx + 1) % all.count]
+    }
+
     private var waveTracks: [(Color, Bool)] {
         let trackDisabled = app.lfoParam.isMasterOnly || app.masterOn > 0
         let masterDisabled = !app.lfoParam.isMasterCapable
         var result: [(Color, Bool)] = []
         if !trackDisabled {
-            for t in 1...4 {
+            for t in app.profile.trackIndices {
                 let s = app.trackOn[t] ?? 0
                 if s > 0 { result.append((C.track(t), s == 2)) }
             }
@@ -86,13 +140,15 @@ struct LFOPanelView: View {
 
     @ViewBuilder private var paramRow: some View {
         HStack(spacing: m.controlHSpacing) {
-            Button { app.lfoParam = cycleNext(app.lfoParam) } label: {
+            Button { app.lfoParam = cycleNextParam(app.lfoParam) } label: {
                 Image(systemName: "bolt.fill")
                     .font(.system(size: m.iconSize))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
-            CompactPicker(options: Array(Parameter.allCases), selection: $app.lfoParam, accessibilityId: "paramPicker")
+            CompactPicker(options: app.profile.pickerParams, selection: $app.lfoParam,
+                          label: { $0.name }, accessibilityId: "paramPicker")
         }
+        .tourAnchor(.paramPicker)
     }
 
     @ViewBuilder private var waveRow: some View {
@@ -102,8 +158,10 @@ struct LFOPanelView: View {
                     .font(.system(size: m.iconSize))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
-            CompactPicker(options: Array(LfoWave.allCases), selection: $app.lfoWave, accessibilityId: "wavePicker")
+            CompactPicker(options: Array(LfoWave.allCases), selection: $app.lfoWave,
+                          label: { $0.rawValue }, accessibilityId: "wavePicker")
         }
+        .tourAnchor(.wavePicker)
     }
 
     @ViewBuilder private var rateBox: some View {
@@ -122,6 +180,7 @@ struct LFOPanelView: View {
                accessibilityId: "rateScrub")
             .frame(width: m.rateW)
         }
+        .tourAnchor(.speedBox)
     }
 
     @ViewBuilder private var centerBox: some View {
@@ -132,11 +191,12 @@ struct LFOPanelView: View {
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
             ScrubValue(value: $app.lfoCenter,
-                       range: app.lfoParam == .tempo ? 20...300 : 0...99,
-                       decimals: app.lfoParam == .tempo ? 1 : 0,
+                       range: app.lfoParam.role == .tempo ? 20...300 : 0...99,
+                       decimals: app.lfoParam.role == .tempo ? 1 : 0,
                        accessibilityId: "centerScrub")
                 .frame(width: m.depthW)
         }
+        .tourAnchor(.centerBox)
     }
 
     @ViewBuilder private var depthBox: some View {
@@ -147,6 +207,7 @@ struct LFOPanelView: View {
             ScrubValue(value: $app.lfoDepth, range: 0...99, accessibilityId: "depthScrub")
                 .frame(width: m.depthW)
         }
+        .tourAnchor(.depthBox)
     }
 
     @ViewBuilder private var repeatBtn: some View {
@@ -195,7 +256,12 @@ struct LFOPanelView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(app.activeLfos) { lfo in
-                    ActiveLfoChip(lfo: lfo, selected: selectedLfoID == lfo.id) {
+                    // Resolve the parameter here so the chip view stays independent of profiles.
+                    let spec = app.profile.param(lfo.paramId)
+                    ActiveLfoChip(lfo: lfo,
+                                  paramShort: spec?.short ?? lfo.paramId,
+                                  isTempo: spec?.role == .tempo,
+                                  selected: selectedLfoID == lfo.id) {
                         // Long press: enter edit or commit if already selected
                         if selectedLfoID == lfo.id { commitChipEdit() }
                         else { enterChipEdit(lfo) }
@@ -212,6 +278,7 @@ struct LFOPanelView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { cancelChipEdit() }
+        .tourAnchor(.chipArea)
     }
 
     @ViewBuilder private var helpBtn: some View {
@@ -234,25 +301,57 @@ struct LFOPanelView: View {
         .accessibilityIdentifier("settingsButton")
     }
 
+    // MARK: - Toggle button row layout
+
+    /// One button in the LFO target row.
+    private enum ToggleSlot: Hashable {
+        case track(Int), master, preview
+    }
+
+    /// The target buttons, chunked into however many rows the current layout needs.
+    /// Master and preview always trail the last row.
+    private var toggleButtonRows: [[ToggleSlot]] {
+        let slots = app.profile.trackIndices.map { ToggleSlot.track($0) } + [.master, .preview]
+        let perRow = max(1, m.toggleBtnPerRow)
+        return stride(from: 0, to: slots.count, by: perRow).map {
+            Array(slots[$0 ..< min($0 + perRow, slots.count)])
+        }
+    }
+
     // MARK: - Body
 
     var body: some View {
         VStack(spacing: 0) {
 
             // ── 1. Track + master toggle buttons ─────────────────────────────
-            HStack(spacing: m.toggleBtnSpacing) {
-                ForEach(1...4, id: \.self) { t in
-                    TrackToggleButton(track: t,
-                                      state: app.trackOn[t] ?? 0,
-                                      disabled: app.lfoParam.isMasterOnly || app.masterOn > 0) {
-                        app.cycleTrack(t)
+            // Wraps onto a second row when a 6-track device won't fit one row at the
+            // 44pt minimum touch target (iPhone portrait) — see LayoutMetrics.toggleBtnRows.
+            VStack(spacing: m.toggleBtnSpacing) {
+                ForEach(Array(toggleButtonRows.enumerated()), id: \.offset) { _, row in
+                    HStack(spacing: m.toggleBtnSpacing) {
+                        ForEach(row, id: \.self) { slot in
+                            switch slot {
+                            case .track(let t):
+                                TrackToggleButton(track: t,
+                                                  state: app.trackOn[t] ?? 0,
+                                                  disabled: app.lfoParam.isMasterOnly || app.masterOn > 0) {
+                                    app.cycleTrack(t)
+                                }
+                                .tourAnchor(.trackToggle)
+                            case .master:
+                                MasterToggleButton(state: app.masterOn,
+                                                   disabled: !app.lfoParam.isMasterCapable) {
+                                    app.cycleMaster()
+                                }
+                                .tourAnchor(.masterToggle)
+                            case .preview:
+                                PreviewToggleButton(active: app.isPreview) {
+                                    app.togglePreview()
+                                }
+                                .tourAnchor(.preview)
+                            }
+                        }
                     }
-                }
-                MasterToggleButton(state: app.masterOn, disabled: !app.lfoParam.isMasterCapable) {
-                    app.cycleMaster()
-                }
-                PreviewToggleButton(active: app.isPreview) {
-                    app.togglePreview()
                 }
             }
             .frame(maxWidth: .infinity)
@@ -310,6 +409,8 @@ struct LFOPanelView: View {
                     .background(C.bg2)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
+                    .clockWaitingBanner()
+                    .tourAnchor(.waveform)
                     .padding(m.lfoPanelPad)
 
                     HStack(spacing: 0) {
@@ -321,6 +422,7 @@ struct LFOPanelView: View {
                             trashBtn
                         }
                         .frame(width: m.actionColW)
+                        .tourAnchor(.startButtons)
 
                         Rectangle().fill(C.bg3).frame(width: 1)
                         lfoListScroll.frame(maxHeight: .infinity)
@@ -332,6 +434,7 @@ struct LFOPanelView: View {
                             settingsBtn
                         }
                         .frame(width: m.helpColW)
+                        .tourAnchor(.helpSettings)
                     }
                     .frame(maxWidth: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -352,6 +455,8 @@ struct LFOPanelView: View {
                 .background(C.bg2)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(C.border, lineWidth: 0.5))
+                .clockWaitingBanner()
+                .tourAnchor(.waveform)
                 .padding(8)
 
                 HStack(spacing: 0) {
@@ -363,6 +468,7 @@ struct LFOPanelView: View {
                         trashBtn
                     }
                     .frame(width: m.actionColW)
+                    .tourAnchor(.startButtons)
 
                     Rectangle().fill(C.bg3).frame(width: 1)
                     lfoListScroll
@@ -374,6 +480,7 @@ struct LFOPanelView: View {
                         settingsBtn
                     }
                     .frame(width: m.helpColW)
+                    .tourAnchor(.helpSettings)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(maxHeight: .infinity)
@@ -414,6 +521,9 @@ struct LFOPanelView: View {
             get: { m.isIpad && showSettings },
             set: { if !$0 { showSettings = false } }
         )) { SettingsView() }
+        // The tutorial never sits over a sheet, and replay waits for these to close.
+        .onChange(of: showHelp)     { _, shown in tour.sheet(shown) }
+        .onChange(of: showSettings) { _, shown in tour.sheet(shown) }
     }
 }
 
@@ -432,12 +542,12 @@ private struct TrackToggleLiveUpdateModifier: ViewModifier {
 
 // MARK: - Compact picker
 
-private struct CompactPicker<T>: View
-    where T: Identifiable & RawRepresentable & Hashable,
-          T.RawValue == String
-{
+/// Options are supplied with a label closure rather than constrained to a String-backed enum,
+/// so device-specific parameter lists (`[ParamSpec]`) work alongside `LfoWave`.
+private struct CompactPicker<T>: View where T: Identifiable & Hashable {
     let options: [T]
     @Binding var selection: T
+    let label: (T) -> String
     var accessibilityId: String? = nil
     @State private var show = false
     @Environment(\.metrics) private var m
@@ -446,8 +556,8 @@ private struct CompactPicker<T>: View
     var body: some View {
         Button { show = true } label: {
             ZStack(alignment: .leading) {
-                ForEach(options) { opt in Text(opt.rawValue).opacity(0) }
-                Text(selection.rawValue).foregroundColor(.white)
+                ForEach(options) { opt in Text(label(opt)).opacity(0) }
+                Text(label(selection)).foregroundColor(.white)
             }
             .font(.system(size: m.pickerFont, weight: .bold))
             .padding(.horizontal, m.scrubH * 0.31)
@@ -465,7 +575,7 @@ private struct CompactPicker<T>: View
                     Button {
                         selection = opt; show = false
                     } label: {
-                        Text(opt.rawValue)
+                        Text(label(opt))
                             .font(.system(size: m.pickerFont, weight: .bold))
                             .foregroundColor(selection == opt ? .accentColor : C.text)
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -487,6 +597,11 @@ private struct CompactPicker<T>: View
             }
             .padding(.vertical, 8)
 
+            // Cap the popover so a long list (the TX-6 has ~30 parameters) can never grow past
+            // the screen — without this the tail of the list is unreachable in portrait.
+            let naturalH = CGFloat(options.count) * 44 + 40
+            let cappedH  = min(naturalH, m.screen.height * 0.6)
+
             Group {
                 if m.isLandscape {
                     // Landscape: UIKit caps to available height; ScrollView lets user reach cut-off items
@@ -495,13 +610,20 @@ private struct CompactPicker<T>: View
                             .onAppear { proxy.scrollTo(selection.id, anchor: .center) }
                     }
                     .frame(minWidth: w, idealWidth: w, maxWidth: w,
-                           idealHeight: CGFloat(options.count) * 44 + 40,
-                           maxHeight: CGFloat(options.count) * 44 + 40)
-                } else {
-                    // Portrait / iPad: VStack has a natural height — UIHostingController
+                           idealHeight: naturalH, maxHeight: naturalH)
+                } else if naturalH <= cappedH {
+                    // Portrait / iPad, short list: VStack has a natural height — UIHostingController
                     // measures it directly, so UIKit sizes the popover to exactly fit the
                     // content with no blank space.
                     itemList.frame(width: w)
+                } else {
+                    // Portrait, long list: same scrolling treatment as landscape.
+                    ScrollViewReader { proxy in
+                        ScrollView(showsIndicators: true) { itemList.frame(minWidth: w - 20) }
+                            .onAppear { proxy.scrollTo(selection.id, anchor: .center) }
+                    }
+                    .frame(minWidth: w, idealWidth: w, maxWidth: w,
+                           idealHeight: cappedH, maxHeight: cappedH)
                 }
             }
             .presentationCompactAdaptation(.popover)
@@ -590,6 +712,9 @@ private struct ScrubValue: View {
 
 private struct ActiveLfoChip: View {
     let lfo: LfoClip
+    /// Resolved by the caller from the active profile — the chip does not look up parameters.
+    let paramShort: String
+    let isTempo: Bool
     let selected: Bool
     let onSelect: () -> Void
     let onToggleEnabled: () -> Void
@@ -598,11 +723,11 @@ private struct ActiveLfoChip: View {
 
     private func chipLabel() -> Text {
         let t = lfo.track == 0 ? "m" : "\(lfo.track)"
-        let dCenter = lfo.parameter == .tempo ? Int(lfo.centerValue.rounded()) : Int(midiToUI(lfo.centerValue))
-        let dDepth  = lfo.parameter == .tempo ? Int(lfo.depth.rounded())       : Int(midiToUI(lfo.depth))
+        let dCenter = isTempo ? Int(lfo.centerValue.rounded()) : Int(midiToUI(lfo.centerValue))
+        let dDepth  = isTempo ? Int(lfo.depth.rounded())       : Int(midiToUI(lfo.depth))
         var result = Text(t)
         if lfo.inverted { result = result + Text(Image(systemName: "arrow.up.arrow.down")) }
-        result = result + Text("·\(lfo.parameter.shortName)·\(lfo.wave.shortName)")
+        result = result + Text("·\(paramShort)·\(lfo.wave.shortName)")
         result = result + Text("·\(lfo.rateLabel)·\(dCenter)±\(dDepth)·")
         result = result + Text(Image(systemName: lfo.loop ? "repeat" : "arrow.right.to.line"))
         return result

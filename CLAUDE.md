@@ -1,6 +1,16 @@
 # CLAUDE.md
 
-Custom MIDI LFOs (low-frequency oscillators) for the Teenage Engineering OP-1 Field. Generates beat-synced automation curves for per-track volume/pan/mute/FX and master FX/compressor, plus MIDI clock master/slave sync with the OP-1.
+Custom MIDI LFOs (low-frequency oscillators) for Teenage Engineering field-system devices. Generates beat-synced automation curves for per-track volume/pan/mute/FX and master FX, plus MIDI clock master/slave sync.
+
+**Supported devices** (iOS app; one at a time). Each is a data-only `DeviceProfile` — adding a device means adding a profile literal, not new branches:
+
+| Device | tracks | channels | notes |
+|---|---|---|---|
+| OP-1 Field | 4 | tracks 0-3, master ch 0 | clock master/slave, tape SPP transport |
+| TX-6 | 6 | tracks 0-5, master ch 6, FX I/II ch 7/8 | ~17 params per channel; FX buses fold into the master (m) target |
+| TP-7 | 6 | tracks 0-5, global ch 0 | field recorder: no pan; input gain on channels 1-3 only |
+
+Auto-detected from the MIDI endpoint name, with a manual override in settings. See `notes/RESEARCH.md` for the full CC tables and the list of hardware questions still open.
 
 ## Three implementations in this repo
 
@@ -21,7 +31,9 @@ Build new features in `ios/` first. Treat `src/` as a reference for protocol/alg
   - `ClockEngine.swift` — MIDI clock master (generates 24 PPQN via `DispatchSourceTimer`) or slave (smooths incoming clock ticks into a BPM reading)
   - `AutomationEngine.swift` — evaluates LFO waveforms per clock tick, dispatches CC messages via `Controller`
   - `Controller.swift` — turns UI actions into MIDI CC messages
-  - `Models.swift` — `LfoWave`, `Parameter`, `LfoClip`, PPQN/rate constants, MIDI↔UI value conversion (see OP-1 MIDI scale note below)
+  - `Models.swift` — `LfoWave`, `LfoClip`, PPQN/rate constants, MIDI↔UI value conversion (see scale note below)
+  - `DeviceProfile.swift` — the device abstraction: `ParamSpec`, `ChannelRule`, `ValueEncoding`, `TransportMap`, `DeviceCapabilities`, `DeviceRegistry`
+  - `DeviceProfiles.swift` — the OP-1 / TX-6 / TP-7 profile literals (all CC numbers live here and nowhere else)
 - `UI/` — SwiftUI views, one file per major control: `TrackStripView`, `PanKnobView`, `VolumeFaderView`, `TransportView`, `LFOPanelView`, `WaveformView`, `SplashScreenView`, plus `Theme.swift` for shared colors/styles
 - `ios/UITests/` — XCUITest target
 
@@ -46,6 +58,8 @@ python -m src.app
   - Track 2 = `#bb9933` (ochre)
   - Track 3 = `#848c94` (blue-gray)
   - Track 4 = `#ff6a00` (orange)
+  - Track 5 = `#c25fa0` (magenta) — 6-channel devices only (TX-6 / TP-7)
+  - Track 6 = `#3fb0a8` (teal) — 6-channel devices only
 - Dark theme throughout — near-black backgrounds (iOS `Theme.swift`: `#111111` / `#1a1a1a` / `#2a2a2a`, with `#454545` reserved for borders that need more contrast)
 - **All UI text is lowercase** — labels, button text, status messages (e.g. "scanning…", "no device found", "tempo mode:", window title "op1 lfo hero"). Match this in any new strings.
 - Green (`#4ec94e`-ish) marks active/centered/selected state (e.g. pan knob indicator is green at dead-center, white/text-colored off-center).
@@ -113,16 +127,26 @@ Do **not** scale hairline borders or dividers. A `lineWidth: 1` border looks vis
 
 #### Standard gap reference
 
-**6pt** is the validated visual distance between major UI elements or groups. Its derived percentages are:
+**6pt** is the validated visual distance between major UI elements or groups, for spacing between
+*zones*. Use `screen.width * 0.015` (portrait) / `0.007` (landscape) — ~6pt on iPhone, ~10-15pt on
+iPad.
 
-| Device | Layout | Formula | ~pts |
+`trackGapUnit` is **not** that constant, despite what this section used to claim. It is much
+tighter, because it is applied three times per column boundary (each strip's own padding on both
+sides plus the `HStack` spacing):
+
+| Layout | Formula | iPhone | iPad |
 |---|---|---|---|
-| iPhone | portrait | `screen.width * 0.015` | ~6pt |
-| iPhone | landscape | `screen.width * 0.007` | ~6pt |
-| iPad | portrait | `screen.width * 0.015` | ~15pt |
-| iPad | landscape | `screen.width * 0.007` | ~10pt |
+| portrait | `screen.width * 0.005` | ~2pt | ~5pt |
+| landscape | `screen.width * 0.0024` | ~2pt | ~3pt |
 
-The reference implementation is `trackGapUnit` in `LayoutMetrics`. Reuse these constants for any new spacing between zones or element groups.
+Read the value out of `LayoutMetrics` rather than from this table before doing arithmetic with it
+— quoting the old 0.007 here made a layout bug look 4x worse than it was.
+
+**Do not size text against `trackColW`.** It is the *nominal* column and subtracts none of those
+gaps, so it overstates the real width by ~5%. `stripContentW` is what a strip's content actually
+gets, and `faderColW` is what is left after the pan knob in landscape — see `volValueFont`, which
+was clipping digits because it was derived from the column instead of the space they occupy.
 
 ### Rules
 
@@ -194,6 +218,43 @@ Never use `List` inside a `NavigationStack` inside a `.sheet` (or `.fullScreenCo
 
 **Fix:** replace `List { ... }` with `ScrollView { VStack { ... } }`. Style section headers manually with `Text(...).font(.subheadline)` and `Divider()`. See `HelpView`, `DevicePickerView`, and `SettingsView` in `ContentView.swift` for examples.
 
+## MIDI cannot be tested in the simulator
+
+The iOS Simulator has **no MIDI at all**. Verified by probing CoreMIDI from a test running in
+the simulator with a TP-7 attached to the host Mac and visible to it:
+
+```
+MIDIGetNumberOfDestinations() = 0
+MIDIGetNumberOfSources()      = 0
+```
+
+It does not bridge the host's USB MIDI devices, and it has no Bluetooth radio. So the simulator
+can verify layout, navigation and anything that reads a `DeviceProfile` — but never that bytes
+reach a device.
+
+Anything involving real MIDI has to run on physical hardware:
+
+| | |
+|---|---|
+| `iPad Pro Dawg` (iPad8,9) | **USB-C** — connects the OP-1 / TX-6 / TP-7 directly |
+| `iPhone Dawg` (iPhone12,3) | Lightning — needs an adapter for USB MIDI, or use BLE |
+
+For byte-level verification without hardware, use `RecordingDestination` in the unit tests: it
+implements `MidiDestination` and records the exact wire bytes. That is how the OP-1 golden byte
+table works.
+
+### Confirming delivery to real hardware
+
+Nothing can observe the bytes the app sends to a physical device: a CoreMIDI client only sees
+what the device *transmits*, and the OP-1 Field (USB and BLE, every mode tested) transmits no CC
+and echoes none of what it receives. An earlier on-device listener test assumed an echo and could
+never pass; it was removed (see "Hardware findings — OP-1 Field transmit behavior" in
+`notes/RESEARCH.md`).
+
+So delivery is confirmed by watching the device react. Use `notes/HARDWARE_CHECKLIST.md` for the
+OP-1 pass and the `tools/midi/` probes (below) to send from a Mac. `mirrorsIncomingCC` is `false`
+for all three devices — do not assume any of them reports state back.
+
 ## Screenshots and simulator testing
 
 All testing/Xcode/simulator screenshots go in `/tmp/claude-ss/`. Create the directory if it doesn't exist (`mkdir -p /tmp/claude-ss`) before writing. Use this path in `xcrun simctl io` commands, UITest screenshot saves, and any other screenshot output.
@@ -205,20 +266,30 @@ Use XCUITest (not `cliclick` coordinate math) to drive the simulator — accessi
 **Known accessibility identifiers:**
 - `helpButton` — opens HelpView sheet
 - `settingsButton` — opens SettingsView sheet
+- `deviceOverridePicker` — device selection segmented control in SettingsView
+- `panKnob1` … `panKnob<n>` — per-track pan knob (absent on devices with `caps.hasPan == false`)
 - `paramPicker` — parameter CompactPicker button
 - `wavePicker` — wave shape CompactPicker button
-- `track1Button` / `track2Button` / `track3Button` / `track4Button` — track toggle buttons
+- `track1Button` … `track<n>Button` — track toggle buttons (4 on the OP-1, 6 on the TX-6/TP-7)
 - `masterButton` — master track toggle button
 - `previewButton` — preview (P) toggle button
 - `repeatButton` — looping LFO start button (↻)
 - `oneShotButton` — one-shot LFO start button (→|)
 - `trashButton` — delete all chips button
+- `tourCard`, `tourTitle`, `tourCounter` — first-run tutorial hint card, its title and its `n / total` counter
+- `tourSkipButton` (top right) / `tourLaterButton` / `tourBackButton` / `tourNextButton` (bottom row) — the card's buttons (`tourNextButton` reads "start" on the welcome card and "done" on the last step; `tourBackButton` is disabled on the first)
+- `replayTourButton` (settings) / `replayTourFromHelp` (help) — the "show tutorial" button in each sheet's header, restarts the tutorial at step 1
+- `muteButton1` … `muteButton<n>` — mute pads; `value` is `muted` / `unmuted`
 
-**Reset app state in UITests** — pass `--uitest-reset` as a launch argument to clear UserDefaults before the test:
+**Reset app state in UITests** — pass `--uitest-reset` as a launch argument to clear UserDefaults before the test. It also marks the first-run tutorial done, because the tutorial's overlay swallows every tap — **every UI test must pass `--uitest-reset`** (or `--uitest-tour` to test the tutorial itself), including tests that otherwise want no setup. Add `--uitest-profile <id>` (`op1` / `tx6` / `tp7`) to pin the device, so 6-track layouts can be tested with no hardware attached:
 ```swift
-app.launchArguments = ["--uitest-reset"]
+app.launchArguments = ["--uitest-reset", "--uitest-profile", "tx6"]
 app.launch()
 ```
+
+**Spoof a connection for screenshots and previews** with `--uitest-spoof-connected`: the simulator has no Bluetooth, so the status bar would read a yellow "bluetooth off". The flag makes it read a green `<device> (ble)` for the pinned `--uitest-profile` (default OP-1 Field). Display only — no transport is touched.
+
+**Segmented controls in the settings sheet** need settling: a tap made while the sheet is still animating in is silently dropped by UIKit. Tap, verify `isSelected`, and retry — see `selectDevice` in `MultiDeviceUITests`.
 
 **Run specific tests from the command line:**
 ```bash
@@ -250,7 +321,59 @@ xcrun simctl list devices available | grep Booted
 xcrun simctl list devices available | grep iPhone
 ```
 
+### App Store screenshots and previews — the standard way
+
+Capture at each device's **native** resolution, and fill every slot App Store Connect requires.
+`ios/fastlane/capture_screenshots.sh` does all of it: three simulators, size-checked, then it
+replaces `ios/fastlane/screenshots/en-US/` (never a half-updated set). Look at every image in
+`/tmp/claude-ss/` afterwards, then `cd ios && fastlane upload_media overwrite:false`.
+
+| Slot (App Store Connect name) | Simulator | Pixels | Set |
+|---|---|---|---|
+| iPhone Dynamic Island (medium) — **required** | `iPhone 17` | 1206×2622 | `APP_IPHONE_61` |
+| iPhone Face ID (large) — required unless a Dynamic Island (large) set is given | `iPhone 13 Pro Max Screenshots` | 1284×2778 | `APP_IPHONE_65` |
+| iPad 13" — **required** | `iPad Pro 13-inch Screenshots` | 2064×2752 | `APP_IPAD_PRO_3GEN_129` |
+
+The two custom-named simulators are plain clones with those names, created once per machine:
+
+```bash
+xcrun simctl create "iPhone 13 Pro Max Screenshots" "iPhone 13 Pro Max"   # 1284x2778
+xcrun simctl create "iPad Pro 13-inch Screenshots"  "iPad Pro 13-inch (M5)" # 2064x2752
+```
+
+Learned the hard way on 1.1.0:
+
+- **Filling only the 6.5" slot is not enough.** The iPhone tab shows the medium slot, which stays
+  greyed ("Using Existing Assets", 0 of 10) until it has uploads of its own.
+- **The file name prefix is the device set** for previews: `IPHONE_61_preview_1.mov` (886×1920),
+  `IPHONE_65_preview_1.mov` (886×1920), `IPAD_PRO_3GEN_129_preview_1.mov` (1200×1600).
+  Record the iPhone one on the iPhone 17 and the iPad one on the 13" iPad simulator.
+- **`overwrite_preview_videos` deletes the previews in EVERY device set**, not just the ones you
+  have files for, and Apple then reprocesses all of them (up to 24 hours). Always pass
+  `overwrite:false` unless you mean it; deliver then skips any file whose checksum is already there.
+- **A poster-frame error after a preview upload is expected.** deliver sets the poster frame as soon
+  as `videoUrl` is non-nil, but App Store Connect returns `""` while the video is processing, and
+  rejects the update ("Asset Not in Complete state! can't update Image!"). `assetDeliveryState` reads
+  `COMPLETE` as soon as the upload ends, which is not "processed". The lanes in `Fastfile` treat
+  exactly that error as a warning; pick the poster frame in the web UI once processing finishes.
+  An empty cloud tile in the UI during that time is normal.
+- **Screenshots are replaced on every upload** (`sync_screenshots` + `overwrite_screenshots`), so the
+  `screenshots/en-US` folder must always hold *all* the sets, which is what the script produces.
+- `fastlane upload_screenshots` also uploads previews (it cannot skip them); prefer `upload_media`.
+- Preview videos are large and gitignored (`ios/fastlane/app_previews/**/*.mov`); keep them local.
+
 ### App Store Preview video recording
+
+App Store Connect wants 15-30 s, max 30 fps, H.264, and 886x1920 portrait for the large iPhone sizes. `simctl` records the simulator's native 1284x2778 and starts before the app does, so trim and rescale with ffmpeg afterwards (add a silent AAC track, as the earlier previews have):
+
+```bash
+ffmpeg -ss <main ui appears> -to <last change + ~4.5s> -i preview.mov \
+  -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -map 0:v -map 1:a -shortest \
+  -vf "scale=886:1920:flags=lanczos,fps=30,format=yuv420p" -c:v libx264 -profile:v high -level 4.0 \
+  -b:v 10M -maxrate 12M -bufsize 20M -movflags +faststart -c:a aac -b:a 256k out.mov
+```
+
+`ffmpeg -vf "select='gt(scene,0.01)',showinfo"` lists scene-change times, which find the cut points. `AppPreviewUITests` has a `pace` constant for slowing the whole demo down.
 
 Use `--codec h264` (not the default HEVC) and stop with SIGINT so the file is properly finalized:
 
@@ -315,6 +438,61 @@ xcrun devicectl device install app \
 ```bash
 xcrun xctrace list devices 2>&1 | grep -E "(iPad|iPhone)"
 ```
+
+**`devicectl install` will happily ship a stale binary.** It installs whatever is in DerivedData,
+so if the build failed the install still reports `App installed:` — with the *previous* build. A
+locked device produces exactly this:
+
+```
+error: Timed out waiting for all destinations matching the provided destination specifier
+       iPhone Dawg may need to be unlocked
+```
+
+Always confirm `** BUILD SUCCEEDED **` before installing. To be certain the binary is new:
+
+```bash
+ls -l ~/Library/Developer/Xcode/DerivedData/op1-lfo-hero-*/Build/Products/Debug-iphoneos/op1-lfo-hero.app/op1-lfo-hero
+```
+
+## Running the tests
+
+Unit tests only (fast — the whole suite is well under a second):
+
+```bash
+cd ios
+xcodebuild test \
+  -project op1-lfo-hero.xcodeproj \
+  -scheme op1-lfo-hero \
+  -destination 'id=<simulator-udid>' \
+  -only-testing:op1-lfo-heroTests 2>&1 | grep -E "error:|Executed .* tests"
+```
+
+**A launch failure is not a test failure — just rerun.** This appears intermittently and has
+nothing to do with the code:
+
+```
+Simulator device failed to launch com.andrewralon.op1-lfo-hero
+Application failed preflight checks … RequestDenied … Busy
+```
+
+It usually succeeds on the next attempt. Don't start editing tests over it; check for real
+`error:` lines first — a genuine failure names a file, a line and an assertion.
+
+## Hardware MIDI probes (`tools/midi/`)
+
+Standalone Swift tools for measuring what a device actually does, since the simulator has no MIDI
+and by-ear testing has repeatedly produced wrong conclusions. `./build.sh` compiles them all. See
+`tools/midi/README.md` for the full list and the traps.
+
+Before running anything that measures:
+
+- The TP-7 must be in **`sync`** mode and its **tape rolling** — it transmits clock only while
+  moving, and `off`/`cue` transmit nothing at all while still *receiving* CC, which looks exactly
+  like broken hardware.
+- To prove a receive path works independently of all that, use **`ctrl`** mode and press buttons:
+  it transmits unconditionally. (It also refuses incoming MIDI, so it cannot be used for control.)
+- `./mididiag` first if anything looks wrong. Unplugging leaves stale same-named endpoints behind,
+  and binding to one is indistinguishable from a device that has stopped transmitting.
 
 ## MIDI reference
 

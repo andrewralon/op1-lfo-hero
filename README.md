@@ -93,7 +93,7 @@ Each of the four tracks corresponds to an OP-1 Field mixer channel (tracks 1-4 =
 
 #### Volume fader
 - Vertical slider, range 0-99 (maps to MIDI 0-127)
-- Default: **90**
+- Default: **99**
 - The filled portion below the handle turns red to show the current level
 - The numeric value is shown below the fader
 - Drag or click to adjust; sends CC 7

@@ -5,12 +5,31 @@ final class AutomationEngine {
     weak var controller: Controller?
 
     // Called on clock thread with (track, parameter, midiValue)
-    var updateCallback:   ((Int, Parameter, Double) -> Void)?
+    var updateCallback:   ((Int, ParamSpec, Double) -> Void)?
     // Called on clock thread when a one-shot LFO completes
     var finishedCallback: ((LfoClip) -> Void)?
 
     private var lfos: [LfoClip] = []
     private let lock = NSLock()
+
+    // Active device profile. Kept under its own lock because `lock` is already held while
+    // evaluating clips, and the profile is read from inside those critical sections.
+    private var _profile: DeviceProfile = .op1Field
+    private let profileLock = NSLock()
+
+    var profile: DeviceProfile {
+        profileLock.lock(); defer { profileLock.unlock() }
+        return _profile
+    }
+
+    func setProfile(_ p: DeviceProfile) {
+        profileLock.lock(); _profile = p; profileLock.unlock()
+    }
+
+    /// True when this clip drives the app's own tempo rather than a MIDI CC.
+    private func isTempo(_ lfo: LfoClip, _ p: DeviceProfile) -> Bool {
+        p.param(lfo.paramId)?.role == .tempo
+    }
 
     // Per-clip mutable state tracked by UUID (all accessed under lock)
     private var startTicks:      [UUID: Int]    = [:]
@@ -21,6 +40,14 @@ final class AutomationEngine {
     private var randomValue:     [UUID: Double] = [:]   // held output for current step
     private var disabledClipIDs: Set<UUID>      = []
 
+    /// Clock tick at which each chip's cycle begins. Absent means 0, i.e. the cycle is locked to
+    /// the clock grid (`tickCount % rateTicks`). A play event re-origins every active chip so it
+    /// starts again from the beginning of its wave; the global tick counter is never reset
+    /// (resetting it snapped LFOs to their centre — see ClockEngine.handleStart).
+    private var chipPhaseOrigin: [UUID: Int] = [:]
+    private var previewPhaseOrigin = 0
+    private var restartPending = false
+
     // Preview LFOs — run continuously, never appear in activeLfos
     private var previewLfos:        [LfoClip] = []
     private var previewLastSent:    [UUID: Double] = [:]
@@ -28,6 +55,13 @@ final class AutomationEngine {
     private var previewRandStep:    [UUID: Int]    = [:]
     private var previewRandState:   [UUID: UInt64] = [:]
     private var previewRandValue:   [UUID: Double] = [:]
+
+    /// The first preview clip seen for each (track, parameter). Its `originalValue` is what the
+    /// parameter should go back to when preview stops targeting it. Kept across the clip
+    /// rebuilds that every slider tweak causes (each rebuild mints new UUIDs), so the value
+    /// recorded is the one from *before* the preview first touched the parameter.
+    private struct PreviewTarget: Hashable { let track: Int; let paramId: String }
+    private var previewOriginals: [PreviewTarget: LfoClip] = [:]
 
     func add(_ lfo: LfoClip) {
         lock.lock(); lfos.append(lfo); lock.unlock()
@@ -42,6 +76,7 @@ final class AutomationEngine {
         randomStep.removeValue(forKey: lfo.id)
         randomState.removeValue(forKey: lfo.id)
         randomValue.removeValue(forKey: lfo.id)
+        chipPhaseOrigin.removeValue(forKey: lfo.id)
         disabledClipIDs.remove(lfo.id)
         lock.unlock()
     }
@@ -51,8 +86,17 @@ final class AutomationEngine {
         lfos.removeAll()
         startTicks.removeAll(); freeRateStart.removeAll(); lastSent.removeAll()
         randomStep.removeAll(); randomState.removeAll(); randomValue.removeAll()
+        chipPhaseOrigin.removeAll()
         disabledClipIDs.removeAll()
         lock.unlock()
+    }
+
+    /// Restart every active LFO from the start of its cycle on the next clock tick. Called when
+    /// play is pressed on the app (app is master) or arrives from the device (device is master).
+    /// Paused chips are left alone, and a one-shot that already finished is no longer in the
+    /// engine, so neither is replayed.
+    func restartAll() {
+        lock.lock(); restartPending = true; lock.unlock()
     }
 
     func setEnabled(_ id: UUID, enabled: Bool) {
@@ -68,6 +112,12 @@ final class AutomationEngine {
     func setPreview(_ clips: [LfoClip]) {
         lock.lock()
         previewLfos = clips
+        let targets = Set(clips.map { PreviewTarget(track: $0.track, paramId: $0.paramId) })
+        let departing = takeDepartingPreviewTargets(keeping: targets)
+        for clip in clips {
+            let t = PreviewTarget(track: clip.track, paramId: clip.paramId)
+            if previewOriginals[t] == nil { previewOriginals[t] = clip }
+        }
         let ids = Set(clips.map { $0.id })
         previewLastSent  = previewLastSent.filter  { ids.contains($0.key) }
         freePreviewStart  = freePreviewStart.filter  { ids.contains($0.key) }
@@ -75,14 +125,45 @@ final class AutomationEngine {
         previewRandState = previewRandState.filter { ids.contains($0.key) }
         previewRandValue = previewRandValue.filter { ids.contains($0.key) }
         lock.unlock()
+        restore(departing)
     }
 
+    /// Stops previewing and puts every previewed parameter back to the value it had before.
     func clearPreview() {
         lock.lock()
         previewLfos.removeAll()
         previewLastSent.removeAll(); freePreviewStart.removeAll()
         previewRandStep.removeAll(); previewRandState.removeAll(); previewRandValue.removeAll()
+        let departing = takeDepartingPreviewTargets(keeping: [])
         lock.unlock()
+        restore(departing)
+    }
+
+    /// The value `track`'s `paramId` had before preview first touched it, or nil if it isn't
+    /// being previewed. The app's live state can't answer this: it follows the running LFO.
+    func previewOriginalValue(track: Int, paramId: String) -> Double? {
+        lock.lock(); defer { lock.unlock() }
+        return previewOriginals[PreviewTarget(track: track, paramId: paramId)]?.originalValue
+    }
+
+    /// Removes and returns the recorded clip for every previewed target not in `keeping`.
+    /// Caller holds `lock`. A target an enabled chip is already driving is dropped without a
+    /// restore — the chip owns that parameter now, and a restore would only glitch it.
+    private func takeDepartingPreviewTargets(keeping: Set<PreviewTarget>) -> [LfoClip] {
+        var out: [LfoClip] = []
+        for (target, clip) in previewOriginals where !keeping.contains(target) {
+            previewOriginals.removeValue(forKey: target)
+            let drivenByChip = lfos.contains {
+                $0.track == target.track && $0.paramId == target.paramId
+                    && !disabledClipIDs.contains($0.id)
+            }
+            if !drivenByChip { out.append(clip) }
+        }
+        return out
+    }
+
+    private func restore(_ clips: [LfoClip]) {
+        for clip in clips { dispatch(lfo: clip, value: clip.originalValue) }
     }
 
     // Replace a clip's settings in-place without resetting its phase.
@@ -104,6 +185,21 @@ final class AutomationEngine {
 
         lock.lock()
         let current = lfos  // snapshot while locked
+        if restartPending {
+            restartPending = false
+            for lfo in current where !disabledClipIDs.contains(lfo.id) {
+                chipPhaseOrigin[lfo.id] = tickCount
+                startTicks[lfo.id] = tickCount
+                if lfo.freeRatePeriod != nil { freeRateStart[lfo.id] = now }
+                lastSent.removeValue(forKey: lfo.id)   // the first value must be sent even if equal
+                randomStep.removeValue(forKey: lfo.id)
+                randomState.removeValue(forKey: lfo.id)
+                randomValue.removeValue(forKey: lfo.id)
+            }
+            previewPhaseOrigin = tickCount
+            previewLastSent.removeAll(); freePreviewStart.removeAll()
+            previewRandStep.removeAll(); previewRandState.removeAll(); previewRandValue.removeAll()
+        }
         for lfo in current where startTicks[lfo.id] == nil {
             startTicks[lfo.id] = tickCount
         }
@@ -135,7 +231,10 @@ final class AutomationEngine {
                 lock.unlock()
                 let elapsed = tickCount - start
                 if !lfo.loop && elapsed >= lfo.rateTicks { finished.append(lfo); continue }
-                phase = Double(tickCount % lfo.rateTicks) / Double(lfo.rateTicks)
+                lock.lock()
+                let origin = chipPhaseOrigin[lfo.id] ?? 0
+                lock.unlock()
+                phase = Double(cycleTick(tickCount - origin, lfo.rateTicks)) / Double(lfo.rateTicks)
             }
 
             let value = evaluate(lfo, phase: phase)
@@ -170,7 +269,10 @@ final class AutomationEngine {
                 lock.unlock()
                 pPhase = ((now - start) / period).truncatingRemainder(dividingBy: 1.0)
             } else {
-                pPhase = Double(tickCount % lfo.rateTicks) / Double(lfo.rateTicks)
+                lock.lock()
+                let origin = previewPhaseOrigin
+                lock.unlock()
+                pPhase = Double(cycleTick(tickCount - origin, lfo.rateTicks)) / Double(lfo.rateTicks)
             }
             let pValue = evaluatePreview(lfo, phase: pPhase)
 
@@ -185,6 +287,11 @@ final class AutomationEngine {
     }
 
     // MARK: - Private
+
+    /// `ticks` modulo `cycle`, never negative.
+    private func cycleTick(_ ticks: Int, _ cycle: Int) -> Int {
+        ((ticks % cycle) + cycle) % cycle
+    }
 
     private func evaluatePreview(_ lfo: LfoClip, phase: Double) -> Double {
         var y: Double
@@ -205,8 +312,8 @@ final class AutomationEngine {
             y = lfo.wave.value(at: phase)
         }
         if lfo.inverted { y = -y }
-        if lfo.parameter == .tempo {
-            return max(20, min(300, lfo.centerValue + y * lfo.depth))
+        if isTempo(lfo, profile) {
+            return max(AppState.minBpm, min(AppState.maxBpm, lfo.centerValue + y * lfo.depth))
         }
         return max(0, min(127, (lfo.centerValue + y * lfo.depth).rounded()))
     }
@@ -232,37 +339,19 @@ final class AutomationEngine {
 
         if lfo.inverted { y = -y }
 
-        if lfo.parameter == .tempo {
-            return max(20, min(300, lfo.centerValue + y * lfo.depth))
+        if isTempo(lfo, profile) {
+            return max(AppState.minBpm, min(AppState.maxBpm, lfo.centerValue + y * lfo.depth))
         }
         return max(0, min(127, (lfo.centerValue + y * lfo.depth).rounded()))
     }
 
     private func dispatch(lfo: LfoClip, value: Double) {
-        guard let ctrl = controller else { return }
-        let iv = Int(value)
-        switch lfo.parameter {
-        case .volume: ctrl.setVolume(track: lfo.track, value: iv)
-        case .pan:    ctrl.setPan(track: lfo.track, value: iv)
-        case .mute:   iv >= 64 ? ctrl.mute(track: lfo.track) : ctrl.unmute(track: lfo.track)
-        case .tempo:      break  // tempo modulation handled in AppState via updateCallback
-        case .par1:       ctrl.setPar(track: lfo.track, param: 1, value: iv)
-        case .par2:       ctrl.setPar(track: lfo.track, param: 2, value: iv)
-        case .par3:       ctrl.setPar(track: lfo.track, param: 3, value: iv)
-        case .par4:       ctrl.setPar(track: lfo.track, param: 4, value: iv)
-        case .envA: ctrl.setEnv(track: lfo.track, param: 1, value: iv)
-        case .envD: ctrl.setEnv(track: lfo.track, param: 2, value: iv)
-        case .envS: ctrl.setEnv(track: lfo.track, param: 3, value: iv)
-        case .envR: ctrl.setEnv(track: lfo.track, param: 4, value: iv)
-        case .fx1:        ctrl.setFx(track: lfo.track, param: 1, value: iv)
-        case .fx2:        ctrl.setFx(track: lfo.track, param: 2, value: iv)
-        case .fx3:        ctrl.setFx(track: lfo.track, param: 3, value: iv)
-        case .fx4:        ctrl.setFx(track: lfo.track, param: 4, value: iv)
-        case .lfo1:       ctrl.setPatchLfo(track: lfo.track, param: 1, value: iv)
-        case .lfo2:       ctrl.setPatchLfo(track: lfo.track, param: 2, value: iv)
-        case .lfo3:       ctrl.setPatchLfo(track: lfo.track, param: 3, value: iv)
-        case .lfo4:       ctrl.setPatchLfo(track: lfo.track, param: 4, value: iv)
-        }
-        updateCallback?(lfo.track, lfo.parameter, value)
+        let p = profile
+        // A clip saved for a different device must never reach this one's MIDI channels —
+        // possible for a moment while a profile switch is in flight.
+        guard lfo.deviceId == p.id, let spec = p.param(lfo.paramId) else { return }
+        // A `.virtualTempo` binding sends nothing; AppState retunes the clock via updateCallback.
+        controller?.send(spec: spec, track: lfo.track, value: value, profile: p)
+        updateCallback?(lfo.track, spec, value)
     }
 }

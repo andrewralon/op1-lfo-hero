@@ -1,1 +1,1 @@
-initial release.
+now works with the teenage engineering tx-6 and tp-7, plus the op-1 field. six-track layouts, device auto-detect, and a manual device picker in settings. settings are now stored more safely. a bunch of timing and transport fixes.

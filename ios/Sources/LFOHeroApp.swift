@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct LFOHeroApp: App {
     @StateObject private var appState = AppState()
+    @StateObject private var tour = TourController()
     @State private var showSplash = true
 
     init() {
@@ -19,6 +20,7 @@ struct LFOHeroApp: App {
             ZStack {
                 ContentView()
                     .environmentObject(appState)
+                    .environmentObject(tour)
                     .onAppear {
                         UIApplication.shared.isIdleTimerDisabled = appState.isConnected
                     }
@@ -37,6 +39,10 @@ struct LFOHeroApp: App {
             .onAppear {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
                     withAnimation(.easeOut(duration: 0.4)) { showSplash = false }
+                    // After the fade, not during it. MIDI auto-connect carries on underneath.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        tour.startIfNeeded(caps: appState.tourCaps)
+                    }
                 }
             }
         }

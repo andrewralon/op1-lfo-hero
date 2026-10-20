@@ -15,8 +15,87 @@ final class ClockEngine {
 
     // MARK: - Slave (listening) state
     private var slaveTick = 0
+    /// Within this many BPM of a whole number, the tempo shown snaps to it.
+    static let bpmSnapTolerance = 0.15
+    /// A new tempo replaces the one on screen only if it differs by at least this much, which is
+    /// more than the arrival jitter of the ticks (BLE delivers them in bursts).
+    static let bpmHysteresis = 0.15
+
+    /// The tempo to show for a freshly smoothed reading. The 96-tick average still wobbles by a
+    /// tenth or two from jitter, and republishing at every 0.05 made a steady 80 BPM flicker between
+    /// 79.9, 80.0 and 80.1. A tempo near a whole number snaps to it (devices are normally set to
+    /// whole BPM), and a reading within the hysteresis of the one already shown is ignored.
+    static func stabilizedBpm(candidate: Double, current: Double) -> Double {
+        // Scale with the tempo: the readout wobbles by a fixed fraction of it, so 0.15 BPM is right at
+        // 80 and far too tight at 400 (measured 2026-10-18: ±0.3 BPM at 400 over Bluetooth).
+        let tolerance = max(bpmSnapTolerance, candidate * 0.0015)
+        let hysteresis = max(bpmHysteresis, candidate * 0.0015)
+        let nearestWhole = candidate.rounded()
+        let snapped = abs(candidate - nearestWhole) <= tolerance
+            ? nearestWhole : (candidate * 10).rounded() / 10
+        return abs(snapped - current) >= hysteresis ? snapped : current
+    }
+
+    /// The sender's own timestamp (13-bit milliseconds) of the clock tick about to be handled, set by
+    /// `onClockStamp` just before `onClock`. Only Bluetooth supplies one.
+    private var pendingSenderStampMs: Int?
+    private var lastSenderStampMs: Int?
+
+    /// Seconds between two ticks by the *sender's* clock, or nil if the stamps cannot be trusted
+    /// (no previous stamp, or an interval no real tempo produces, such as the all-zero stamps a
+    /// device that does not stamp sends). The 13-bit counter wraps every 8192 ms.
+    ///
+    /// Why: over Bluetooth the ticks arrive in bursts and stalls, so timing them by arrival gave a
+    /// per-tick spread of 5.7 ms and a tempo that wobbled by +/-0.2 BPM; the TX-6's own stamps are
+    /// spread by 0.4 ms (measured 2026-10-18 at 80 BPM, same run, both sources).
+    static func senderInterval(stampMs: Int, lastMs: Int?) -> Double? {
+        guard let lastMs else { return nil }
+        let delta = (stampMs - lastMs + 8192) % 8192
+        guard delta >= 2, delta < 2000 else { return nil }
+        return Double(delta) / 1000.0
+    }
+
+    /// The BPM box is told of a new tempo at most this often (seconds). The tempo itself is filtered per
+    /// tick; this only limits the display, which was redrawn on every tick while a tempo was moving.
+    static let bpmDisplayInterval = 0.25
+    /// A change this large (a deliberate jump, not jitter or a drag) is shown at once.
+    static let bpmImmediateChange = 0.02
+    /// The anti-jitter smoothing (the averaging window, the step detection, the snap and the hysteresis).
+    /// ON. It was switched off for sender-stamped (BLE) ticks on 2026-10-18 to see the raw tempo: it locked
+    /// onto a change at once, but showed the stamps' own wobble (1 ms resolution plus the source's tick
+    /// timing, ~0.1%: 386.9 / 387.7 at 387 BPM) and was judged less steady than the smoothed readout. false
+    /// shows each tick's stamped interval over ~0.5 s (`rawSpanSeconds`) with nothing else filtered. The
+    /// 4/s display limit applies either way.
+    var antiJitter = true
+
+    private var lastBpmPublishTime: Double = 0
+    private var lastPublishedBpm: Double = 0
+
+    /// Whether to update the BPM box now. Yes for the first tempo, for a change of 2% or more, and
+    /// otherwise only if it has changed and the display interval has passed since the last update.
+    static func shouldPublishBpm(now: Double, lastPublishTime: Double, current: Double, lastPublished: Double,
+                                 allowImmediate: Bool = true) -> Bool {
+        guard current != lastPublished else { return false }
+        guard lastPublishTime > 0, lastPublished > 0 else { return true }
+        if allowImmediate, abs(current / lastPublished - 1) >= bpmImmediateChange { return true }
+        return now - lastPublishTime >= bpmDisplayInterval
+    }
+
     private var bpmHistory: [Double] = []
     private let smoothN = 96  // larger window = smoother BPM display over BLE/USB jitter
+    private let smoothSeconds = 3.0
+    /// The window when the ticks are timed by the sender's stamps (see handleSlaveTick).
+    private let stampedWindowTicks = 32
+    /// Raw (anti-jitter off) mode: time one reading spans. Stamps are whole ms, so one interval at 400 BPM
+    /// (6.25 ms) reads 6 or 7 ms = 416.7 or 357.1. Spanning ~0.5 s of ticks cancels it (+/-1 ms of 500 = 0.2%).
+    private let rawSpanSeconds = 0.5
+    private let rawSpanMinTicks = 8
+    private var rawIntervals: [Double] = []
+    private let stampedWindowSeconds = 1.0
+    /// A tempo change shows as the last `stepRecentTicks` ticks disagreeing with the window by this much.
+    private let stepRecentTicks = 12
+    private let stepChange = 0.02
+    private var historySeconds = 0.0
     private var lastTickTime: Double = 0
 
     // MARK: - Master (generating) state
@@ -29,9 +108,50 @@ final class ClockEngine {
     // MARK: - Transport state
     // sppPos is in MIDI Song Position Pointer units (1/16 notes = 6 ticks at 24 PPQN)
     private var sppPos = 0
-    // hasStarted: true after first Start (0xFA) is sent; subsequent play() sends Continue (0xFB)
-    // Mirrors Python MidiClockGenerator._has_started — reset only on goto_start (double-stop)
-    private var hasStarted = false
+    // Play always sends Continue (0xFB) so the tape picks up where it left off. Only an explicit
+    // rewind makes the next play send Start (0xFA), which per the MIDI spec restarts from zero.
+    //
+    // Verified on a TP-7: 0xFA rewound to 0, 0xFB resumed. Sending Start on the first play of a
+    // session (the old behaviour) therefore rewound the user's tape once, unasked.
+    //
+    // OP-1 Field, midi sync (measured 2026-10-16): "where it left off" is the position of the
+    // last *synced* transport, not wherever the tape was moved by hand. A hand move is discarded
+    // when play arrives, and the first play of a fresh session starts at 0. A Song Position
+    // Pointer sent first does position the tape (SPP 100 at 110 BPM -> 13s 15 frames, and an SPP
+    // alone moves it with no clock or Continue). See notes/RESEARCH.md.
+    //
+    // Set by rewindToStart(), which the double-stop feature should call — see notes/FEATURES.md.
+    private var rewindPending = false
+
+    /// Seek speed as a **multiple of normal playback**, used by `.directionalTransport`.
+    /// 1.0 = normal speed, 2.0 = double (the TP-7's "chipmunks"), 0.5 = half.
+    ///
+    /// Expressed as a multiplier rather than a raw CC offset because the device holds this as a
+    /// persistent playback speed, and because the offset that means "1x" is device-specific
+    /// (the op's `unitSpeed` carries it). Defaults to 2x so the seek buttons feel like a
+    /// fast-forward rather than plain playback.
+    /// The ceiling is 16x because CC 18 runs out of room before that: at `deadZone 4 +
+    /// unitSpeed 4` the offset reaches its maximum of 63 at about 14.75x, and anything beyond
+    /// saturates rather than going faster.
+    var transportSpeed: Double = 2.0 {
+        didSet { transportSpeed = max(0.25, min(16.0, transportSpeed)) }
+    }
+
+    /// Nudge the app's own tempo, in BPM. Set by AppState.
+    ///
+    /// Only reached by `.ccRelative`, which only the TX-6 uses (the OP-1 seeks tape by SPP and
+    /// the TP-7 scrubs with CC 18), so no other device can be affected by it.
+    var appTempoNudge: ((Double) -> Void)?
+
+    /// Scrub ramp shape. Holding a seek button starts at `scrubStartSpeed` and reaches
+    /// `maxScrubSpeed` after `scrubRampSeconds`, then holds there. 14x is just under the point
+    /// where CC 18 saturates, so the top of the ramp is the fastest the tape can actually go.
+    var scrubStartSpeed = 1.0
+    var maxScrubSpeed = 14.0
+    var scrubRampSeconds = 1.5
+
+    /// Last direction sent by a `.directionalTransport` op: -1 reverse, 0 stopped, +1 forward.
+    private(set) var transportDirection = 0
 
     // Controls how far each arrow press moves the tape.
     // .measure = 16 SPP units (1 bar in 4/4) | .scrub = 4 SPP units (1 quarter note)
@@ -39,13 +159,57 @@ final class ClockEngine {
     var tapeArrowMode: TapeArrowMode = .measure
     private var tapeArrowStep: Int { tapeArrowMode == .measure ? 16 : 4 }
 
-    weak var router: MidiRouter? {
+    weak var router: (any MidiDestination)? {
         didSet { wireRouter() }
     }
 
+    deinit {
+        // A resumed DispatchSourceTimer traps in libdispatch if it is released while active,
+        // and a suspended one traps if cancelled without resuming first. Both timers have to
+        // be shut down explicitly.
+        scrubTimer?.cancel()
+        if masterTimerSuspended { masterTimer?.resume() }
+        masterTimer?.cancel()
+    }
+
+    /// When the device last sent a clock tick. Recorded for every tick, including while the app
+    /// is clock master — `handleSlaveTick` discards those, and the TP-7 forces app-master mode.
+    private var lastExternalTickTime: Double = 0
+
+    /// Whether the device's tape is rolling right now.
+    ///
+    /// In `sync` mode the TP-7 transmits clock only while the tape moves, so an arriving tick is
+    /// a direct "it is playing" signal — the only state this device ever reveals, since it
+    /// answers no queries. At 1x that is a tick every ~23 ms, so 250 ms of silence means stopped.
+    ///
+    /// This also makes the direction resync safe: its `0xFC` would rewind a *stopped* tape to
+    /// zero, and a live tick proves the tape is not stopped.
+    ///
+    /// False whenever the device is not in `sync` mode — there is no clock to hear, so the app
+    /// falls back to assuming nothing.
+    /// Seconds since the last clock tick arrived from the device, or nil if none ever has. Unlike
+    /// `deviceIsRolling` this is the raw age, for a "no clock" warning with its own threshold.
+    var secondsSinceExternalTick: Double? {
+        lastExternalTickTime > 0 ? CACurrentMediaTime() - lastExternalTickTime : nil
+    }
+
+    var deviceIsRolling: Bool {
+        lastExternalTickTime > 0 && CACurrentMediaTime() - lastExternalTickTime < 0.25
+    }
+
     private func wireRouter() {
-        router?.onClock = { [weak self] in self?.handleSlaveTick() }
+        router?.onClock = { [weak self] in
+            self?.lastExternalTickTime = CACurrentMediaTime()
+            self?.handleSlaveTick()
+        }
+        router?.onClockStamp = { [weak self] ms in
+            guard let self else { return }
+            self.lock.lock(); self.pendingSenderStampMs = ms; self.lock.unlock()
+        }
         router?.onStart = { [weak self] in self?.handleStart() }
+        // A device resuming from where it stopped sends Continue, not Start. For the app both
+        // mean "the transport is running now" — the OP-1 sends Start only after a double stop.
+        router?.onContinue = { [weak self] in self?.handleStart() }
         router?.onStop  = { [weak self] in self?.handleStop()  }
     }
 
@@ -57,20 +221,88 @@ final class ClockEngine {
         lock.lock()
         slaveTick += 1
         let tick = slaveTick
+        let stamp = pendingSenderStampMs
+        pendingSenderStampMs = nil
+        let stampedInterval = stamp.flatMap { Self.senderInterval(stampMs: $0, lastMs: lastSenderStampMs) }
+        if let stamp { lastSenderStampMs = stamp }
         // Track tape position in real time: 1 SPP unit = 6 ticks at 24 PPQN
         if isPlaying && slaveTick % 6 == 0 { sppPos += 1 }
         if lastTickTime > 0 {
-            let interval = now - lastTickTime
+            // By the sender's stamps when it supplies usable ones, otherwise by arrival time.
+            let interval = stampedInterval ?? (now - lastTickTime)
+            // Defence in depth against a burst of ticks sharing one arrival time. BLE delivers a
+            // whole packet at once, so several ticks can look microseconds apart and drag the
+            // average to an absurd tempo. 5 ms is ~500 BPM at 24 PPQN, far above anything real;
+            // 2 s is ~1.25 BPM. Anything outside that is a transport artefact, not a tempo.
+            // The 5 ms floor is for *arrival* bursts. A stamped interval was already validated by
+            // `senderInterval`, and filtering it here dropped the exact-5 ms intervals that 400 BPM
+            // produces (6.25 ms ticks on 1 ms stamps), which biased the tempo low.
+            guard stampedInterval != nil || (interval > 0.005 && interval < 2.0) else {
+                lastTickTime = now
+                lock.unlock()
+                tickCallback?(tick)
+                return
+            }
+            if !antiJitter, stampedInterval != nil {
+                // Anti-jitter off and the tick is sender-stamped: its interval is the tempo (spanned over
+                // `rawSpanSeconds` only to undo the 1 ms stamp rounding), nothing snapped or held back (only the display rate below).
+                rawIntervals.append(interval)
+                while rawIntervals.count > rawSpanMinTicks,
+                      rawIntervals.reduce(0, +) - rawIntervals[0] >= rawSpanSeconds { rawIntervals.removeFirst() }
+                let span = rawIntervals.reduce(0, +) / Double(rawIntervals.count)
+                bpm = (60.0 / (Double(PPQN) * span) * 10).rounded() / 10
+                let value = bpm
+                let publish = ClockEngine.shouldPublishBpm(now: now, lastPublishTime: lastBpmPublishTime,
+                                                           current: value, lastPublished: lastPublishedBpm,
+                                                           allowImmediate: false)
+                if publish { lastBpmPublishTime = now; lastPublishedBpm = value }
+                lock.unlock()
+                if publish { bpmCallback?(value) }
+                lastTickTime = now
+                tickCallback?(tick)
+                return
+            }
             bpmHistory.append(interval)
-            if bpmHistory.count > smoothN { bpmHistory.removeFirst() }
+            historySeconds += interval
+            // The averaging window. Timed by arrival the ticks carry ~5 ms of noise, so that needs 96
+            // ticks and 3 s. By the sender's stamps the noise is about 0.1% of the tempo per second, so
+            // 32 ticks and 1 s is enough, and the long window only made the display slow to follow a
+            // tempo change. At least `minSeconds` matters at fast tempos: 32 ticks is 0.2 s at 400 BPM,
+            // where the 1 ms stamp resolution is +/-0.5% of the window.
+            let stamped = stampedInterval != nil
+            let minTicks = stamped ? stampedWindowTicks : smoothN
+            let minSeconds = stamped ? stampedWindowSeconds : smoothSeconds
+            while bpmHistory.count > minTicks, historySeconds - bpmHistory[0] >= minSeconds {
+                historySeconds -= bpmHistory.removeFirst()
+            }
+            // A real tempo change is not jitter (jitter is ~0.1%): when the last stretch of ticks differs
+            // from the window by more than `stepChange`, restart the average from those ticks so the
+            // display follows at once instead of ramping over the whole window.
+            if stamped, bpmHistory.count > 2 * stepRecentTicks {
+                let recent = bpmHistory.suffix(stepRecentTicks)
+                let recentSum = recent.reduce(0, +)
+                let recentAvg = recentSum / Double(stepRecentTicks)
+                let windowAvg = historySeconds / Double(bpmHistory.count)
+                if abs(recentAvg / windowAvg - 1) > stepChange {
+                    bpmHistory = Array(recent)
+                    historySeconds = recentSum
+                }
+            }
             if bpmHistory.count >= 8 {
                 let avg = bpmHistory.reduce(0, +) / Double(bpmHistory.count)
                 let newBpm = 60.0 / (Double(PPQN) * avg)
                 // Only publish when the change is visible at 1-decimal display precision
-                if abs(newBpm - bpm) >= 0.05 {
-                    bpm = newBpm
+                let shown = ClockEngine.stabilizedBpm(candidate: newBpm, current: bpm)
+                if shown != bpm { bpm = shown }
+                // `bpm` is the filtered tempo and updates freely; what the BPM box is told is rate
+                // limited, so a tempo that is itself moving does not redraw it on every tick.
+                if ClockEngine.shouldPublishBpm(now: now, lastPublishTime: lastBpmPublishTime,
+                                                current: bpm, lastPublished: lastPublishedBpm) {
+                    lastBpmPublishTime = now
+                    lastPublishedBpm = bpm
+                    let publishing = bpm
                     lock.unlock()
-                    bpmCallback?(newBpm)
+                    bpmCallback?(publishing)
                 } else {
                     lock.unlock()
                 }
@@ -86,6 +318,7 @@ final class ClockEngine {
 
     private func handleStart() {
         isPlaying = true
+        onPlay?()
         // slaveTick is intentionally NOT reset here. Resetting it causes the LFO phase formula
         // (tickCount % rateTicks) to jump to ~0 on every loop boundary, snapping LFOs to
         // their center value. slaveTick stays monotonic so phases continue smoothly.
@@ -101,7 +334,7 @@ final class ClockEngine {
         disableClock()
         lock.lock()
         isClockMaster = true
-        masterBpm = max(20, min(300, startBpm))
+        masterBpm = max(AppState.minBpm, min(AppState.maxBpm, startBpm))
         bpm = masterBpm
         masterTickCount = 0
         lock.unlock()
@@ -129,7 +362,9 @@ final class ClockEngine {
         lock.lock()
         isClockMaster = false
         bpm = 0   // sentinel: no slave data; cleared when first OP-1 ticks arrive
-        bpmHistory.removeAll()
+        bpmHistory.removeAll(); historySeconds = 0; rawIntervals.removeAll()
+        lastBpmPublishTime = 0; lastPublishedBpm = 0
+        lastSenderStampMs = nil; pendingSenderStampMs = nil
         lastTickTime = 0
         slaveTick = 0
         lock.unlock()
@@ -137,7 +372,7 @@ final class ClockEngine {
 
     func setMasterBpm(_ newBpm: Double) {
         guard isClockMaster else { return }
-        let clamped = max(20, min(300, newBpm))
+        let clamped = max(AppState.minBpm, min(AppState.maxBpm, newBpm))
         lock.lock(); masterBpm = clamped; bpm = clamped; lock.unlock()
         scheduleMasterTimer(bpm: clamped)
         bpmCallback?(clamped)
@@ -147,7 +382,7 @@ final class ClockEngine {
     /// The running timer adapts its period on the next tick via fireMasterTick.
     func updateMasterBpm(_ newBpm: Double) {
         guard isClockMaster else { return }
-        let clamped = max(20, min(300, newBpm))
+        let clamped = max(AppState.minBpm, min(AppState.maxBpm, newBpm))
         lock.lock(); masterBpm = clamped; bpm = clamped; lock.unlock()
         bpmCallback?(clamped)
     }
@@ -196,37 +431,319 @@ final class ClockEngine {
 
     // MARK: - Transport commands
 
-    func play() {
+    /// What the transport buttons send. The OP-1 uses MIDI start/stop plus tape SPP seeks;
+    /// other devices use their own CCs. Set from the active profile by AppState.
+    var transport: TransportMap = DeviceProfile.op1Field.transport
+
+    /// When true, pressing play while already playing reverses direction instead of
+    /// re-sending play — matching the TP-7's own play button. Set from the device profile.
+    var playTogglesDirection = false
+
+    /// Fired when play starts: the user pressed play here, or the device sent Start. AppState
+    /// uses it to restart the LFOs from the beginning of their cycles.
+    var onPlay: (() -> Void)?
+
+    /// CC 18 units per 1x of added speed while the tape is rolling FORWARD (parked it is exactly 4).
+    static let rollingForwardUnitsPerX = 4.26
+    /// CC 18 units per 1x of reverse speed while the tape is rolling forward and being reversed:
+    /// speed = (64 - CC) / 3.76 - 1.
+    static let rollingReverseUnitsPerX = 3.76
+
+    /// `restartLFOs` is false when an LFO is the one pressing play (the `tp7.playPress` parameter):
+    /// an LFO that restarted itself by pressing play would climb back to its threshold and fire again
+    /// at a fraction of its period, forever. Only a press by the user restarts the LFOs.
+    func play(restartLFOs: Bool = true) {
+        // Matches the hardware: on a device whose play button reverses, a second press while
+        // rolling flips direction rather than restarting playback.
+        //
+        // `deviceIsRolling` covers the case where the tape was started from the device itself:
+        // without it the app believes it is stopped, so the first press is spent re-asserting
+        // play on an already-playing tape and appears to do nothing.
+        if playTogglesDirection && (isPlaying || deviceIsRolling) {
+            isPlaying = true
+            reverseDirection()
+            // Every play press restarts the LFOs, the one that reverses the tape included. Before
+            // this the reversing presses restarted them only by accident: the resync that precedes
+            // a reverse (0xFC then 0xFB) makes the TP-7 answer with a Start/Continue of its own, and
+            // the press that goes forward again sends only 0xFB, so it restarted nothing. Measured
+            // on a TP-7, 2026-10-18: presses forward, reverse, forward, reverse restarted LFOs on
+            // reverse, forward-after-reverse never.
+            if restartLFOs { onPlay?() }
+            return
+        }
+        // Ops run before `isPlaying` flips, so a `.toggleCC(whenPlaying:)` op sees the state
+        // the button was pressed in.
+        run(transport.play)
         isPlaying = true
-        if hasStarted {
+        if restartLFOs { onPlay?() }
+    }
+
+    /// Pitch-bend value that trims reverse playback to exactly 1x.
+    ///
+    /// CC 18 is too coarse to hit 1x on its own: 1x reverse falls at offset 7.5, and the nearest
+    /// integers are 14% slow (7) and 13% fast (8) — both audible, and both reported as such by
+    /// ear before being confirmed by measurement. Bend is the finer control, so reverse uses
+    /// offset 8 and pulls it back down with bend. Measured: offset 8 alone is 49.7 ticks/s,
+    /// bend 9700 brings it to 43.95 against a 44.0 target (0.1% error).
+    ///
+    /// Forward needs no equivalent — it releases CC 18 and sends Continue, so the device plays at
+    /// its own rate exactly.
+    var reverseTrimBend = 9700
+
+    /// Bend value meaning "no change", released when returning to forward.
+    private let centreBend = 8192
+
+    /// Whether `reverseTrimBend` is currently applied. Only release the bend if this engine set
+    /// it: bend is shared with the user-facing speed parameter, so recentring unconditionally
+    /// would silently undo a speed the user dialled in.
+    private var trimEngaged = false
+
+    /// Flip the tape direction. No-op on devices without a directional transport.
+    ///
+    /// Forward hands control back to the device's own transport rather than driving CC 18, so
+    /// it plays at exactly the normal rate. Reverse uses CC 18, since there is no other way to
+    /// play backwards.
+    func reverseDirection() {
+        guard hasMomentaryScrub else { return }   // no directional transport on this device
+        setDirection(forward: transportDirection < 0)
+    }
+
+    /// Drive the tape in an absolute direction, for the `direction` parameter.
+    ///
+    /// No-op when already going that way, so a sustained LFO value does not re-send the
+    /// stop/continue resync on every crossing. `transportDirection == 0` counts as forward: the
+    /// device is either playing forward under its own transport or parked, and neither needs
+    /// CC 18 to reach forward.
+    func setDirection(forward: Bool) {
+        guard hasMomentaryScrub else { return }
+        guard forward == (transportDirection < 0) else { return }   // already there
+
+        if forward {
+            // Currently reversing -> go forward. Release the reverse trim first, then CC 18, and
+            // let the device play at its own rate.
+            releaseTrim()
+            run(transport.stop.filter {
+                if case .directionalTransport = $0 { return true } else { return false }
+            })
             router?.send([0xFB])
+            isPlaying = true
         } else {
-            sppPos = 0
-            router?.send([0xFA])
-            hasStarted = true
+            // Currently forward or stopped -> reverse via CC 18 at 1x, then trim with bend.
+            let ops = transport.prev.filter {
+                if case .directionalTransport = $0 { return true } else { return false }
+            }
+            guard case .directionalTransport(let ch, let cc, let center, _, _, _) = ops.first else { return }
+
+            // Force a known direction first. CC 18 *adds* to whatever the transport is already
+            // doing, and the device never reports its state — so if the user reversed with the
+            // hardware play button, reversing again here would stack to about 3x rather than 1x.
+            // Stop-and-continue resets the internal transport to forward. Verified on hardware:
+            // sent back to back with no settling delay, and with no audible gap.
+            sendCC(ch: ch, cc: cc, val: center)
+            router?.send([0xFC])
+            router?.send([0xFB])
+
+            let saved = transportSpeed
+            transportSpeed = 1.0
+            run(ops)
+            transportSpeed = saved
+            // Only exact at 1x. A user-automated speed parameter writes the same bend channel
+            // and will overwrite this, which is the intended precedence.
+            sendBend(reverseTrimBend)
+            trimEngaged = true
         }
     }
 
     func stop() {
-        router?.send([0xFC])
+        // Bend persists across stop/play with no on-screen feedback, so a trim left applied
+        // would silently pitch-shift the next playback.
+        releaseTrim()
+        run(transport.stop)
         isPlaying = false
     }
 
-    func tapePrev() {
-        sppPos = max(0, sppPos - tapeArrowStep)
-        sendTapeSeek(cc: 82)
+    /// Arm a rewind: the next play sends Start (0xFA) instead of Continue, so the device
+    /// restarts from zero. Intended for the double-stop gesture.
+    func rewindToStart() {
+        lock.lock(); rewindPending = true; sppPos = 0; lock.unlock()
     }
 
-    func tapeNext() {
-        sppPos += tapeArrowStep
-        sendTapeSeek(cc: 83)
+    func tapePrev() { run(transport.prev) }
+    func tapeNext() { run(transport.next) }
+
+    // MARK: - Momentary scrubbing
+    //
+    // On devices whose seek is a persistent speed state (the TP-7's CC 18), holding a scrub
+    // button should move the reel only while held, and move faster the longer it is held —
+    // rather than latching a speed the user then has to cancel.
+
+    private var scrubTimer: DispatchSourceTimer?
+    private var scrubHeldSeconds = 0.0
+    private var speedBeforeScrub: Double?
+
+    /// True when the active profile seeks via a persistent speed state rather than a nudge.
+    var hasMomentaryScrub: Bool {
+        (transport.prev + transport.next).contains {
+            if case .directionalTransport = $0 { return true } else { return false }
+        }
     }
 
-    private func sendTapeSeek(cc: UInt8) {
-        let lo = UInt8(sppPos & 0x7F)
-        let hi = UInt8((sppPos >> 7) & 0x7F)
-        router?.send([0xB0, cc, 127])
-        router?.send([0xF2, lo, hi])
-        if isPlaying { router?.send([0xFB]) }
+    /// Begin scrubbing. Speed starts at `scrubStartSpeed` and ramps to `maxScrubSpeed`.
+    func beginScrub(forward: Bool) {
+        guard hasMomentaryScrub else {
+            // Nudge-style devices have nothing to hold; fire once.
+            forward ? tapeNext() : tapePrev()
+            return
+        }
+        endScrub(resend: false)
+        speedBeforeScrub = transportSpeed
+        scrubHeldSeconds = 0
+        transportSpeed = scrubStartSpeed
+        run(forward ? transport.next : transport.prev)
+
+        let t = DispatchSource.makeTimerSource(queue: masterQueue)
+        t.schedule(deadline: .now() + 0.15, repeating: .milliseconds(150))
+        t.setEventHandler { [weak self] in
+            guard let self else { return }
+            self.scrubHeldSeconds += 0.15
+            // Ramp start -> max over scrubRampSeconds held, then hold at the top.
+            let perSecond = (self.maxScrubSpeed - self.scrubStartSpeed) / self.scrubRampSeconds
+            let ramped = min(self.maxScrubSpeed,
+                             self.scrubStartSpeed + self.scrubHeldSeconds * perSecond)
+            guard abs(ramped - self.transportSpeed) > 0.05 else { return }
+            self.transportSpeed = ramped
+            self.run(forward ? self.transport.next : self.transport.prev)
+        }
+        t.resume()
+        scrubTimer = t
+    }
+
+    /// Release: stop the reel and restore the speed the user had configured.
+    func endScrub(resend: Bool = true) {
+        scrubTimer?.cancel()
+        scrubTimer = nil
+        scrubHeldSeconds = 0
+        if resend, hasMomentaryScrub, transportDirection != 0 {
+            // Return CC 18 to centre so the tape stops when the finger lifts.
+            run(transport.stop.filter {
+                if case .directionalTransport = $0 { return true } else { return false }
+            })
+        }
+        if let s = speedBeforeScrub { transportSpeed = s; speedBeforeScrub = nil }
+    }
+
+    /// Run an arbitrary op list — used by `.transport` parameters as well as the buttons.
+    func runOps(_ ops: [TransportOp]) { run(ops) }
+
+    private func run(_ ops: [TransportOp]) {
+        for op in ops {
+            switch op {
+            case .midiStartOrContinue:
+                if rewindPending {
+                    sppPos = 0
+                    router?.send([0xFA])   // Start = play from zero
+                    rewindPending = false
+                } else {
+                    router?.send([0xFB])   // Continue = resume from current position
+                }
+            case .midiStop:
+                router?.send([0xFC])
+            case .setDirection(let forward):
+                // Delegated for the same reason as .pressPlay: CC 18 is additive, so reaching a
+                // known direction needs the resync, not a raw value.
+                setDirection(forward: forward)
+            case .pressPlay:
+                // Delegate, never duplicate: this is the same entry point the UI button uses, so
+                // the parameter and the button cannot diverge. Safe from recursion because
+                // `transport.play` contains no `.pressPlay`. An LFO is pressing here, not the
+                // user, so it must not restart the LFOs (it would restart itself).
+                play(restartLFOs: false)
+            case .tapeNudge(let cc):
+                router?.send([0xB0, UInt8(cc), 127])
+                // The nudge halts the OP-1's transport; resume it if it was rolling, as a nudge
+                // on the device itself keeps playing.
+                if isPlaying { router?.send([0xFB]) }
+            case .tapeSeek(let cc, let steps):
+                sppPos = max(0, sppPos + steps * tapeArrowStep)
+                router?.send([0xB0, UInt8(cc), 127])
+                router?.send([0xF2, UInt8(sppPos & 0x7F), UInt8((sppPos >> 7) & 0x7F)])
+                if isPlaying { router?.send([0xFB]) }
+            case .cc(let ch, let cc, let value):
+                sendCC(ch: ch, cc: cc, val: value)
+            case .ccRelative(let ch, let cc, let delta):
+                // A tempo nudge has to go to whoever owns the clock. While the app is master the
+                // device is slaved to us and its own tempo is ignored, so sending the CC changes
+                // a number nothing is using — the buttons appear dead. Nudge the app's tempo
+                // instead and the device follows, so both displays move together.
+                if isClockMaster, let nudge = appTempoNudge {
+                    nudge(Double(delta))
+                    break
+                }
+                // Two's complement, not centred on 64: 1...63 count up, 127...65 count down.
+                // Measured on TE hardware — the TP-7's wheel sends 1,2,3 one way and
+                // 125,126,127 the other. Sending `64 + delta` made + read as -63 and - as +63,
+                // so the TX-6's tempo lurched the wrong way by a huge step on every press.
+                let d = max(-63, min(63, delta))
+                sendCC(ch: ch, cc: cc, val: d >= 0 ? d : 128 + d)
+            case .directionalTransport(let ch, let cc, let center, let deadZone, let unitSpeed, let direction):
+                // direction 0 releases the grab. Only send it if this control actually HAS the
+                // transport: on a TP-7 a redundant stop is read as "stop while already stopped",
+                // which rewinds to zero — so sending it unconditionally would lose the user's
+                // position every time they pressed stop on a normally-playing tape.
+                if direction == 0 && transportDirection == 0 { break }
+                // Persistent state — the device keeps moving at this speed until told otherwise.
+                // Affine, not proportional: the dead zone has to be cleared before any speed
+                // registers, so a plain `unitSpeed * multiplier` lands far too slow (offset 4 is
+                // x0.06, not x1).
+                //
+                // The dead zone belongs to the *playing* case only. It is the device's own +1x
+                // transport cancelling out against the CC 18 offset, not a motor threshold. With
+                // the tape parked there is none: speed = (value - 64) / 4, so offset 4 is 1x.
+                // Confirmed on a TP-7 2026-09-06 (notes/TP7_VS_TP7MIDI.md, test 1): CC 18 = 68
+                // held 10 s from a parked tape moved the counter 10.4 s. Applying the dead zone
+                // unconditionally made every scrub from a parked tape run one whole 1x too fast.
+                let rolling = isPlaying || deviceIsRolling
+                if rolling && direction > 0 {
+                    // Forward while rolling: the tape's own 1x adds to the CC, so the speed is
+                    // 1 + (CC - 64) / 4.26 and the CC for a wanted speed T is 64 + 4.26 * (T - 1).
+                    // CC 64 is plain playback (1x) and speeds under 1x sit below 64. Measured on a
+                    // TP-7 (firmware 1.1.11), a memo at 90 BPM, 2026-10-16: CC 68 / 72 / 76 / 80 gave
+                    // 1.94x / 2.87x / 3.81x / 4.75x, flat to +/-0.3 ticks/s over 10 s. The slope is
+                    // 6% off the reference repo's 4.0, which is exact for a parked tape.
+                    let delta = Int((ClockEngine.rollingForwardUnitsPerX * (transportSpeed - 1)).rounded())
+                    sendCC(ch: ch, cc: cc, val: center + delta)
+                } else if rolling && direction < 0 {
+                    // Reverse while rolling: the tape's forward 1x has to be cancelled first, so the
+                    // reverse speed T needs 3.76 * (T + 1) units below 64. Measured 2026-10-16 on the
+                    // same memo: CC 56 / 52 / 48 gave 1.13x / 2.19x / 3.25x, flat to +/-0.5 ticks/s,
+                    // with the counter confirmed counting down. A different slope from forward (4.26).
+                    let below = Int((ClockEngine.rollingReverseUnitsPerX * (transportSpeed + 1)).rounded())
+                    sendCC(ch: ch, cc: cc, val: center - below)
+                } else {
+                    let offset = (rolling ? deadZone : 0) + Int((Double(unitSpeed) * transportSpeed).rounded())
+                    sendCC(ch: ch, cc: cc, val: center + direction * max(1, offset))
+                }
+                transportDirection = direction
+            case .toggleCC(let ch, let cc, let value, let whenPlaying):
+                if isPlaying == whenPlaying { sendCC(ch: ch, cc: cc, val: value) }
+            }
+        }
+    }
+
+    /// Return bend to centre, but only if this engine applied the reverse trim.
+    private func releaseTrim() {
+        guard trimEngaged else { return }
+        trimEngaged = false
+        sendBend(centreBend)
+    }
+
+    /// 14-bit pitch bend on channel 1, the TP-7's fine playback-speed control.
+    private func sendBend(_ v: Int) {
+        let b = max(0, min(16383, v))
+        router?.send([0xE0, UInt8(b & 0x7F), UInt8((b >> 7) & 0x7F)])
+    }
+
+    private func sendCC(ch: Int, cc: Int, val: Int) {
+        router?.send([UInt8(0xB0 | (ch & 0x0F)), UInt8(cc), UInt8(max(0, min(127, val)))])
     }
 }

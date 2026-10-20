@@ -7,11 +7,21 @@ struct LayoutMetrics {
     let screen: CGSize
     let isLandscape: Bool
     let isIpad: Bool
+    /// How many mixer strips the active device has (4 on the OP-1, 6 on the TX-6 / TP-7).
+    /// Every column formula below divides by this rather than by a literal.
+    var trackCount: Int = 4
+    /// Whether the active device has a pan knob. In landscape the knob sits beside the fader and
+    /// takes most of the strip, so `faderColW` — and the digit size derived from it — depend on it.
+    var hasPan: Bool = true
 
     // ── Tier 1: structural — how the screen is divided into zones ───────────
 
-    /// Width of the transport column in landscape — sized so all 5 columns have equal content width.
-    var transportColW: CGFloat { (screen.width - 5 * trackGapUnit) / 5 }
+    /// Width of the transport column in landscape — sized so every column (tracks + transport)
+    /// has equal content width.
+    var transportColW: CGFloat {
+        let cols = CGFloat(trackCount + 1)
+        return (screen.width - cols * trackGapUnit) / cols
+    }
 
     /// Height of the mixer + track strips row.
     var tracksH: CGFloat {
@@ -23,10 +33,10 @@ struct LayoutMetrics {
     /// Height of the portrait transport bar (play/stop/BPM row).
     var transportBarH: CGFloat { screen.height * 0.10 }
 
-    /// Width of a single track column (4 tracks share the mixer width).
+    /// Width of a single track column (the device's tracks share the mixer width).
     var trackColW: CGFloat {
         let mixerW = isLandscape ? screen.width - transportColW : screen.width
-        return mixerW / 4
+        return mixerW / CGFloat(max(1, trackCount))
     }
 
     // ── Tier 2: LFO panel content ───────────────────────────────────────
@@ -44,14 +54,30 @@ struct LayoutMetrics {
         return max(h, 100)
     }
 
+    /// Buttons in the LFO target row: one per track, plus master and preview.
+    var toggleBtnCount: Int { trackCount + 2 }
+
+    /// iPhone portrait fits at most 6 buttons before the 44pt minimum touch target overflows
+    /// the screen width, so a 6-track device wraps onto a second row.
+    var toggleBtnRows: Int { (!isLandscape && !isIpad && toggleBtnCount > 6) ? 2 : 1 }
+
+    var toggleBtnPerRow: Int {
+        Int((Double(toggleBtnCount) / Double(toggleBtnRows)).rounded(.up))
+    }
+
     // Landscape uses larger fractions: single combined row means more lfoH per element.
     var toggleBtnSize: CGFloat    {
         if isLandscape { return max(lfoH * 0.22, 44) }
         if isIpad      { return max(lfoH * 0.13, 44) }
-        // iPhone portrait: fit 6 buttons + 5 gaps + 2 side margins within screen width
+        // iPhone portrait: fit one row of buttons + gaps + 2 side margins within screen width
         let margin  = 3 * trackGapUnit
         let spacing = max(lfoH * 0.012, 6)
-        return max((screen.width - 2 * margin - 5 * spacing) / 6, 44)
+        let n = CGFloat(max(1, toggleBtnPerRow))
+        let fit = (screen.width - 2 * margin - (n - 1) * spacing) / n
+        // A wrapped row has fewer buttons, which would otherwise make each one much larger.
+        // Cap at the width a full 6-button row gives so wrapping adds a row, not bulk.
+        let cap = (screen.width - 2 * margin - 5 * spacing) / 6
+        return max(min(fit, cap), 44)
     }
     /// Horizontal padding on the toggle button row — iPhone portrait only, to give side margins.
     var toggleBtnHPad: CGFloat    { !isLandscape && !isIpad ? 3 * trackGapUnit : 0 }
@@ -104,11 +130,76 @@ struct LayoutMetrics {
     // Estimated rendered height; used to size lfoH correctly.
     var statusBarH: CGFloat    { statusBarFont + 2 * statusBarVPad + 8 }
 
+    // ── Tier 2: first-run tutorial ───────────────────────────────────
+
+    /// Hint card width. Landscape has height to spare beside the target but not above it, so the
+    /// card is narrower there; iPad portrait would otherwise stretch a two-line hint to one.
+    var tourCardW: CGFloat {
+        if isLandscape { return screen.width * (isIpad ? 0.34 : 0.42) }
+        return screen.width * (isIpad ? 0.50 : 0.88)
+    }
+    /// Card text and padding all scale with the card, so the card keeps its proportions.
+    var tourCardPad: CGFloat      { tourCardW * 0.045 }
+    var tourTitleFont: CGFloat    { tourCardW * 0.046 }
+    var tourBodyFont: CGFloat     { tourCardW * 0.042 }
+    var tourBtnFont: CGFloat      { tourCardW * 0.042 }
+    var tourCounterFont: CGFloat  { tourCardW * 0.036 }
+    /// Width of the counter (left) and skip (right) either side of the centered title.
+    var tourCardSideW: CGFloat    { tourCardW * 0.2 }
+    /// How far the spotlight hole extends past the control it frames.
+    var tourSpotlightInset: CGFloat  { trackGapUnit * 2 }
+    var tourSpotlightRadius: CGFloat { tourSpotlightInset * 2 }
+    /// Gap between the hole and the card, and the card's minimum margin to the screen edge —
+    /// the standard 6pt zone gap.
+    var tourCardGap: CGFloat { isLandscape ? screen.width * 0.007 : screen.width * 0.015 }
+
     // ── Tier 2: track strip content ─────────────────────────────────────
 
-    /// Mute button number label font size.
-    var volValueFont: CGFloat    { isIpad ? 58 : 28 }
-    var volValueSpacing: CGFloat { volValueFont * 0.25 }
+    /// Clearance between a volume digit and the fader thumb it sits beside — half the thumb, so
+    /// the digit stops exactly where the thumb's widest point begins. Derived from the thumb
+    /// rather than the font, which is what it is actually protecting against and which breaks
+    /// the circular dependency with `volValueFont` below.
+    var volValueSpacing: CGFloat { faderThumbW / 2 }
+
+    /// Monospaced digit advance as a fraction of point size. SF Mono is 0.6em; used to work out
+    /// whether a digit fits the space it has.
+    private var digitAdvance: CGFloat { 0.6 }
+
+    /// Fader digit font size, sized from the width the digits actually get.
+    ///
+    /// Two digits sit either side of the thumb inside the *fader*, not the track column — in
+    /// landscape the pan knob takes most of the column. Sizing this against `trackColW` (which
+    /// also ignores the inter-strip gaps) made the digits about twice the available width, so
+    /// both glyphs were clipped on their right edge. The caps are unchanged, so any layout with
+    /// room to spare looks exactly as before.
+    var volValueFont: CGFloat {
+        let perDigit = faderColW / 2 - volValueSpacing
+        return min(perDigit / digitAdvance, isIpad ? 58 : 28)
+    }
+
+    /// Padding between a strip's edge and its contents, and between the pan knob and the fader.
+    /// Deliberately tight: this is the width the volume digits are competing for.
+    var stripInnerPad: CGFloat { trackGapUnit * 1.4 }
+    var panFaderGap: CGFloat   { trackGapUnit * 1.4 }
+
+    /// The width one strip's *content* actually gets. `trackColW` is the nominal column and
+    /// ignores the gaps `TracksView` and `TrackStripView` add — about 5% narrower in practice —
+    /// so anything sized against it overestimates.
+    var stripContentW: CGFloat {
+        let mixerW  = isLandscape ? screen.width - transportColW : screen.width
+        let n       = CGFloat(max(1, trackCount))
+        let perStrip = (mixerW - 2 * trackGapUnit - (n - 1) * trackGapUnit) / n
+        return perStrip - 2 * trackGapUnit
+    }
+
+    /// Width available to the fader itself. In landscape the pan knob sits beside it; in portrait
+    /// the knob is above, so the fader has the whole strip. Devices without pan (the TP-7) give
+    /// the fader the strip in both orientations.
+    var faderColW: CGFloat {
+        guard isLandscape else { return stripContentW }
+        guard hasPan else { return stripContentW - 2 * stripInnerPad }
+        return stripContentW - panKnobLandscape - 2 * stripInnerPad - panFaderGap
+    }
 
     /// Gap unit between track columns: total visual gap = 3 × trackGapUnit (right pad + spacing + left pad).
     /// Portrait: 0.5% of width → ~2pt iPhone, ~5pt iPad. Landscape: 0.24% → ~2pt iPhone, ~3pt iPad.
@@ -120,7 +211,8 @@ struct LayoutMetrics {
     var muteVPad: CGFloat       { tracksH * 0.025 }
 
     /// Pan knob square size in portrait (fits column width, capped by track height).
-    var panKnobPortrait: CGFloat  { min(trackColW - 24, tracksH * 0.30) }
+    /// 0.754 reproduces the previous `trackColW - 24` at the iPhone-portrait reference width.
+    var panKnobPortrait: CGFloat  { min(trackColW * 0.754, tracksH * 0.30) }
 
     /// Pan knob square size in landscape (height is the tight constraint).
     var panKnobLandscape: CGFloat { min(tracksH * 0.52, trackColW * 0.38) }
@@ -150,6 +242,8 @@ extension EnvironmentValues {
 
 struct ContentView: View {
     @Environment(\.horizontalSizeClass) private var hSize
+    @EnvironmentObject private var app: AppState
+    @EnvironmentObject private var tour: TourController
 
     var body: some View {
         GeometryReader { geo in
@@ -157,7 +251,9 @@ struct ContentView: View {
             let isIpad              = hSize == .regular
             let needsCombinedLfoRow = isLandscape
             let needsSideBySide     = isLandscape
-            let m = LayoutMetrics(screen: geo.size, isLandscape: isLandscape, isIpad: isIpad)
+            let m = LayoutMetrics(screen: geo.size, isLandscape: isLandscape, isIpad: isIpad,
+                                  trackCount: app.profile.trackCount,
+                                  hasPan: app.profile.caps.hasPan)
 
             VStack(spacing: 0) {
                 if isLandscape {
@@ -187,10 +283,17 @@ struct ContentView: View {
                 StatusBarView()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // While the tour is up, VoiceOver can't reach the controls under it either.
+            .accessibilityHidden(tour.isActive)
+            .overlayPreferenceValue(TourAnchorKey.self) { TourOverlayLayer(anchors: $0) }
             .environment(\.metrics, m)
             .background(C.bg)
             .preferredColorScheme(.dark)
         }
+        .onAppear { tour.profileChanged(app.tourCaps) }
+        // Fires when the device changes and when one is first connected or picked, since either
+        // can add or remove steps.
+        .onChange(of: app.tourDevice?.id) { _, _ in tour.profileChanged(app.tourCaps) }
     }
 }
 
@@ -198,6 +301,7 @@ struct ContentView: View {
 
 struct StatusBarView: View {
     @EnvironmentObject var app: AppState
+    @EnvironmentObject private var tour: TourController
     @Environment(\.metrics) private var m
     @State private var showDevicePicker = false
 
@@ -208,7 +312,7 @@ struct StatusBarView: View {
                     Circle()
                         .fill(app.isConnected ? C.green : C.yellow)
                         .frame(width: 7, height: 7)
-                    Text(app.connectionLabel)
+                    Text(app.connectionLabel.lowercased())   // device names arrive in the device's own case
                         .font(.system(size: m.statusBarFont, weight: .medium, design: .monospaced))
                         .foregroundColor(.white)
                         .lineLimit(1)
@@ -222,26 +326,80 @@ struct StatusBarView: View {
                 HStack(spacing: 0) {
                     Text("tempo: ")
                         .foregroundColor(.white)
-                    Text(app.isClockMaster ? "app (midi sync)" : "op1 (beat match)")
+                    Text(app.isClockMaster
+                         ? "app (midi sync)"
+                         : "\(app.profile.caps.clockLabel) (beat match)")
                         .foregroundColor(app.isClockMaster ? C.green : C.track(1))
                 }
                 .font(.system(size: m.statusBarFont, weight: .medium, design: .monospaced))
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("tempoModeButton")
+            // Devices that never emit MIDI clock can't be the tempo source, so the app stays master.
+            .disabled(!app.profile.caps.canBeClockMaster)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, m.statusBarVPad)
         .background(C.bg2)
+        .tourAnchor(.statusBar)
         .sheet(isPresented: $showDevicePicker) { DevicePickerView() }
+        .onChange(of: showDevicePicker) { _, shown in tour.sheet(shown) }
     }
 }
 
 // MARK: - Device picker sheet (used by StatusBarView)
 
 
+/// Trailing mark on a device row: "connected" in green when it is the live device, otherwise the
+/// usual chevron.
+private struct ConnectedBadge: View {
+    let connected: Bool
+    var body: some View {
+        if connected {
+            HStack(spacing: 4) {
+                Text("connected")
+                Image(systemName: "checkmark.circle.fill")
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundColor(C.green)
+        } else {
+            Image(systemName: "chevron.right").foregroundColor(C.dim)
+        }
+    }
+}
+
+private extension View {
+    /// A light green box around the row, so the connected device is obvious at a glance.
+    func connectedHighlight(_ on: Bool) -> some View {
+        self
+            .background(on ? C.green.opacity(0.18) : Color.clear)
+            .overlay(Rectangle().stroke(on ? C.green.opacity(0.7) : Color.clear, lineWidth: 1))
+            .accessibilityValue(on ? "connected" : "")
+    }
+}
+
 struct DevicePickerView: View {
     @EnvironmentObject var app: AppState
     @Environment(\.dismiss) private var dismiss
+
+    /// Whether the list row `rowName` is the device the app is connected to right now. Only the
+    /// *active* transport counts: if both are connected, the one that carries MIDI is the one
+    /// that gets the highlight. Names are compared exactly as the lists show them.
+    static func isConnectedRow(_ rowName: String, connectedName: String?, transportIsActive: Bool) -> Bool {
+        guard transportIsActive, let connectedName else { return false }
+        return rowName.caseInsensitiveCompare(connectedName) == .orderedSame
+    }
+
+    /// Same, for a Bluetooth row: matched by peripheral identity, because a BLE device's name can
+    /// differ between the advertisement the list was built from and the connected peripheral.
+    static func isConnectedRow(_ rowID: UUID, connectedID: UUID?, transportIsActive: Bool) -> Bool {
+        transportIsActive && connectedID == rowID
+    }
+
+    private var connectedUSBName: String? {
+        if case .connected(let n) = app.usb.state { return n }
+        return nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -251,31 +409,35 @@ struct DevicePickerView: View {
                     // MARK: USB / Network MIDI
                     Text("usb / network midi")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundColor(C.dim)
+                        .foregroundColor(C.text)
                         .padding(.top, 20)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
 
                     if app.usb.discovered.isEmpty {
                         Text("no usb midi devices found")
-                            .foregroundColor(C.dim)
+                            .foregroundColor(C.text)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 12)
                     } else {
                         ForEach(app.usb.discovered, id: \.self) { name in
+                            let connected = Self.isConnectedRow(
+                                name, connectedName: connectedUSBName,
+                                transportIsActive: app.router.effectiveTransport == .usb)
                             Button {
                                 app.usb.connectTo(name)
-                                dismiss()
+                                app.router.setActiveTransport(.usb)
                             } label: {
                                 HStack {
                                     Image(systemName: "cable.connector").foregroundColor(C.text)
-                                    Text(name)
+                                    Text(name.lowercased())
                                         .foregroundColor(C.text)
                                     Spacer()
-                                    Image(systemName: "chevron.right").foregroundColor(C.dim)
+                                    ConnectedBadge(connected: connected)
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
+                                .connectedHighlight(connected)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -288,7 +450,7 @@ struct DevicePickerView: View {
 
                     Text("bluetooth midi")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundColor(C.dim)
+                        .foregroundColor(C.text)
                         .padding(.top, 16)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
@@ -304,25 +466,28 @@ struct DevicePickerView: View {
                                 Label("no ble midi devices found", systemImage: "antenna.radiowaves.left.and.right")
                             }
                         }
-                        .foregroundColor(C.dim)
+                        .foregroundColor(C.text)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
                     } else {
                         ForEach(app.ble.discovered, id: \.identifier) { p in
+                            let connected = Self.isConnectedRow(
+                                p.identifier, connectedID: app.ble.connectedPeripheralID,
+                                transportIsActive: app.router.effectiveTransport == .ble)
                             Button {
-                                app.usb.disconnect()   // yield routing priority to BLE
                                 app.ble.connect(p)
-                                dismiss()
+                                app.router.setActiveTransport(.ble)
                             } label: {
                                 HStack {
                                     Image(systemName: "antenna.radiowaves.left.and.right").foregroundColor(C.text)
-                                    Text(p.name ?? p.identifier.uuidString)
+                                    Text((p.name ?? p.identifier.uuidString).lowercased())
                                         .foregroundColor(C.text)
                                     Spacer()
-                                    Image(systemName: "chevron.right").foregroundColor(C.dim)
+                                    ConnectedBadge(connected: connected)
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
+                                .connectedHighlight(connected)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
@@ -335,7 +500,6 @@ struct DevicePickerView: View {
                     Button("disconnect") {
                         app.ble.disconnect()
                         app.usb.disconnect()
-                        dismiss()
                     }
                     .foregroundColor(C.red)
                     .padding(.horizontal, 16)
@@ -354,8 +518,110 @@ struct DevicePickerView: View {
         .preferredColorScheme(.dark)
         .onAppear {
             app.usb.rescan()
-            // Restart BLE scan if it timed out before the picker was opened
-            if case .notFound = app.ble.state { app.ble.startScan() }
+            // While the menu is open, scan continuously with no "not found" flicker —
+            // the user is actively looking for a device and may take a while to power it on.
+            app.ble.startScan(continuous: true)
+        }
+        .onDisappear {
+            // Back to the shorter, give-up-eventually launch scan once the menu is closed.
+            app.ble.startScan(continuous: false)
+        }
+    }
+}
+
+// MARK: - Help copy (shared by HelpView and the tutorial)
+
+/// Section titles and short tutorial hints in one place, so the tour and help can't disagree.
+/// Help keeps the long text; the tour shows `tourTitle` plus `tourText`.
+enum HelpCopy {
+    static func title(_ a: TourAnchor) -> String {
+        switch a {
+        case .welcome:      return "welcome"
+        case .statusBar:    return "status bar"
+        case .mutePad:      return "mute"
+        case .panKnob:      return "pan"
+        case .volumeFader:  return "volume"
+        case .transport:    return "transport"
+        case .bpm:          return "tempo bpm"
+        case .tempoMode:    return "tempo source"
+        case .trackToggle:  return "tracks"
+        case .masterToggle: return "master"
+        case .preview:      return "preview"
+        case .paramPicker:  return "parameter & curve"
+        case .wavePicker:   return "wave shape"
+        case .speedBox:     return "speed & center & depth"
+        case .centerBox:    return "center"
+        case .depthBox:     return "depth"
+        case .waveform:     return "waveform preview"
+        case .startButtons: return "repeat, 1x, delete"
+        case .chipArea:     return "lfo chips"
+        case .helpSettings: return "help & settings"
+        }
+    }
+
+    /// Help covers parameter + wave, and speed + center + depth, in one section each; the tour
+    /// gives each control its own step, so those steps get narrower titles.
+    static func tourTitle(_ a: TourAnchor) -> String {
+        switch a {
+        case .paramPicker: return "parameter"
+        case .speedBox:    return "speed"
+        default:           return title(a)
+        }
+    }
+
+    /// `device` is nil until the app knows which device the user has (see `AppState.tourDevice`);
+    /// the wording is then neutral rather than naming a device that was only remembered.
+    static func tourText(_ a: TourAnchor, device: DeviceProfile?) -> String {
+        let dev = device?.displayName.lowercased() ?? "device"
+        let clk = device?.caps.clockLabel ?? "device"
+        switch a {
+        case .welcome:
+            // Every supported device, not just the connected one: a first-time user may not have
+            // connected anything yet. "a, b, or c" from the registry, so a new profile joins in.
+            let names = DeviceRegistry.all.map { $0.displayName }
+            let list = names.count > 1
+                ? names.dropLast().joined(separator: ", ") + ", or " + names.last!
+                : names.joined()
+            return "op1 lfo hero sends beat-synced lfos to your \(list). this quick tour shows what each control does and how to use it. you can replay it any time in settings."
+        case .statusBar:
+            // Two tap targets: the connection (left) and the tempo mode (right).
+            return "two buttons. left: midi connection (usb-c and ble), tap to pick and connect to a device. right: tempo source, tap to switch between app (midi sync) and \(clk) (beat match)."
+        case .mutePad:
+            return "tap a track's colored number pad to mute or unmute it."
+        case .panKnob:
+            return "drag up/down on a track's knob to pan right/left."
+        case .volumeFader:
+            return "drag up/down to set a track's volume. drag sideways while scrubbing for fine control."
+        case .transport:
+            return "play and stop the \(dev)'s tape. left/right arrows (op-1 field and tp-7) move tape backward and forward. -/+ (tx-6) change tempo bpm."
+        case .bpm:
+            return "drag up/down to scrub the tempo. double-tap or long-press to type an exact bpm."
+        case .tempoMode:
+            return "tap to switch the tempo source: app (midi sync) or \(clk) (beat match). then set the \(dev) to match."
+        case .trackToggle:
+            return "choose which tracks the lfo drives. tap to cycle off → on → inverted."
+        case .masterToggle:
+            return "applies the lfo parameter to master, not a track. only avilable for some parameters. tap to cycle off → on → inverted."
+        case .preview:
+            return "preview the lfo live while changing settings, so you can hear the effect before creating an lfo."
+        case .paramPicker:
+            return "choose what the lfo changes. tap the bolt icon to step to the next parameter without opening the list."
+        case .wavePicker:
+            return "choose the lfo's wave shape. tap the wave icon to step to the next shape."
+        case .speedBox:
+            return "choose the lfo's speed. 8 to 1 are synced to the tempo, fastest to slowest. f1 to f17 are free and ignore the tempo. drag up/down to scrub it, or tap the timer icon to step to the next speed."
+        case .centerBox:
+            return "choose the center value the lfo swings around. drag up/down to scrub it, or tap the center icon to snap it to the current value."
+        case .depthBox:
+            return "choose the depth the lfo swings either side of center. drag up/down to scrub it."
+        case .waveform:
+            return "show the active lfos as wave shapes. it overlays each curve in its track's color."
+        case .startButtons:
+            return "create an lfo from current settings that loops (repeat) or runs once (1x). or delete all lfos."
+        case .chipArea:
+            return "lfo chips created as loop or 1x are shown here. tap chips to pause, long-press to edit (and again to save changes), or tap × to delete."
+        case .helpSettings:
+            return "show descriptions for every control from help. change options or replay this tutorial from settings."
         }
     }
 }
@@ -363,27 +629,48 @@ struct DevicePickerView: View {
 // MARK: - Help sheet (used by LFOPanelView)
 
 struct HelpView: View {
+    @EnvironmentObject private var app: AppState
+    @EnvironmentObject private var tour: TourController
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var hSize
     private var isPad: Bool { hSize == .regular }
     @State private var wavePhase: Double = 0
 
-    private let sections: [(String, Text)] = [
-        ("mute", Text("tap a track's colored number pad to mute/unmute it. bright colored background = unmuted; dark background = muted.")),
-        ("pan", Text("drag up/down on a knob to pan right/left. release near top dead center to snap to center. [vertical scrubbing for horizontal controls like pan are hard. i'm open to better ideas...]")),
-        ("volume", Text("drag up/down on a fader to set that track's volume. drag to the side for fine scrubbing.")),
-        ("transport", Text("play/stop control op1 tape playback (play only works when the app is the clock master). left/right arrow buttons step the op1 tape position backward/forward.")),
-        ("metronome & tempo mode", Text("tap the metronome icon to switch the clock source. then change the op1 to match.\n\(Text("op1 (beat match)").foregroundColor(C.track(1))) — op1 is master\n· app's lfos follow op1's tempo.\n\(Text("app (midi sync)").foregroundColor(C.green)) — app is master\n· app controls op1 tape transport (play/stop/back/forward).")),
-        ("tempo & bpm", Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.\n\(Text("· note: ").bold())tempo control requires 'app (midi sync)' mode and usb-c; ble midi (bluetooth) does not send high-resolution tempo changes.")),
-        ("track & master", Text("tap to cycle off → on → inverted. tracks apply the lfo to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
-        ("preview (p)", Text("enables live preview: the current editor settings are sent to the op-1 in real time as you adjust them, so you can hear the effect while dialing in speed, depth, center, and wave shape. no chip is created — press repeat or 1x to create an lfo.")),
-        ("parameter & curve", Text("choose which parameter the lfo modulates, and which waveform shape it follows. tap the icons to step to the next option without opening the picker.")),
-        ("speed & center & depth", Text("drag up/down on a box to scrub its value. tap the speed (timer) icon to step to the next speed value one at a time. speed sets lfo speed, depth sets its range, center sets its midpoint.")),
-        ("waveform preview", Text("when no lfo chips are running, shows the current editor settings as a preview. when chips are active, shows all running lfo curves overlaid, colored per track.")),
-        ("repeat & one-shot & delete", Text("start the lfo looping, start it once, or delete all currently active lfos.")),
-        ("active lfos", Text("lfos are shown as 'chips' showing 'track/master·parameter·wave·speed·center±depth·repeat/loop'.\n\(Text("tap").bold()) — toggle the lfo on/off without stopping it.\n\(Text("long-press").bold()) — enter edit mode; adjust controls to update the chip live, then long-press again to commit.\n\(Text("×").bold()) — stop and remove that lfo.\n\(Text("tap empty space").bold()) — cancel the current edit.")),
-        ("status bar", Text("shows the current midi connection and clock source; tap it to choose a ble midi device."))
-    ]
+    /// Computed, not stored: the copy names the connected device, which is only known at render.
+    private var sections: [(String, Text)] {
+        let dev = app.profile.displayName
+        let clk = app.profile.caps.clockLabel
+        var out: [(String, Text)] = []
+        // Devices that need settings changed on the hardware first — otherwise the app looks
+        // broken through no fault of its own.
+        if !app.profile.setupSteps.isEmpty {
+            var body = Text("before the app can control the \(dev), change these on the device itself:\n")
+            for step in app.profile.setupSteps {
+                body = body + Text("\n· ") + Text(step)
+            }
+            out.append(("\(dev) setup — do this first", body))
+        }
+        return out + [
+        (HelpCopy.title(.mutePad), Text("tap a track's colored number pad to mute/unmute it. bright colored background = unmuted; dark background = muted.")),
+        (HelpCopy.title(.panKnob), Text("drag up/down on a knob to pan right/left. release near top dead center to snap to center.\n[vertical scrubbing for horizontal controls like pan are hard. i'm open to better ideas...]")),
+        (HelpCopy.title(.volumeFader), Text("drag up/down on a fader to set that track's volume. drag to the side for fine scrubbing.")),
+        (HelpCopy.title(.transport), Text("play/stop control op1 tape playback (play only works when the app is the clock master). play resumes from where the last play stopped, not from where you moved the tape by hand. left/right arrow buttons (op-1 field and tp-7) move the device's tape position backward/forward. -/+ buttons (tx-6) adjust the tempo bpm.")),
+        (HelpCopy.title(.tempoMode), app.profile.caps.canBeClockMaster
+            ? Text("tap the metronome icon to switch the clock source. then change the \(dev) to match.\n· \(Text("\(clk) (beat match)").foregroundColor(C.track(1))) — \(dev) is master — lfos follow the \(dev)'s tempo.\n· \(Text("app (midi sync)").foregroundColor(C.green)) — app is master — app controls the \(dev)'s transport (play/stop/back/forward).")
+            : Text("the \(dev) does not send midi clock, so the app is always the tempo source. its lfos run on the app's own clock and the transport buttons drive the \(dev) over cc.")),
+        (HelpCopy.title(.bpm), Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.\n· app tempo control of op-1 field requires 'app (midi sync)' mode and usb-c\n· op-1 field ble midi does not send tempo change messages")),
+        (HelpCopy.title(.trackToggle), Text("tap to cycle off → on → inverted. tracks apply the lfo to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
+        (HelpCopy.title(.preview), Text("enables live preview: the current editor settings are sent to the device in real time as you adjust them, so you can hear the effect while dialing in speed, depth, center, and wave shape. no chip is created — press repeat or 1x to create an lfo.")),
+        (HelpCopy.title(.paramPicker), Text("choose which parameter the lfo modulates, and which waveform shape it follows. tap the icons to step to the next option without opening the picker.")),
+        (HelpCopy.title(.speedBox), Text("drag up/down on a box to scrub its value. tap the speed (timer) icon to step to the next speed value one at a time. speed sets lfo speed, depth sets its range, center sets its midpoint.")),
+        (HelpCopy.title(.waveform), Text("when no lfo chips are running, shows the current editor settings as a preview. when chips are active, shows all running lfo curves overlaid, colored per track.")),
+        (HelpCopy.title(.startButtons), Text("start the lfo looping (repeat), run it once (one-shot), or delete all lfos.")),
+        (HelpCopy.title(.chipArea), Text("lfos are shown as chips with abbreviated names. example: 'track/master·parameter·wave·speed·center±depth·repeat/loop'.\n· \(Text("tap").bold()) — toggle the lfo on/off\n· \(Text("long-press").bold()) — edit the controls for selected chip and hear changes live, then long-press again to save changes.\n· \(Text("tap anywhere else").bold()) — cancel the current edit.\n· \(Text("×").bold()) — stop and delete the lfo.")),
+        (HelpCopy.title(.statusBar), Text(app.profile.caps.canBeClockMaster
+            ? "· left side: midi device — tap it to connect to a usb or ble device\n· right side: tempo source — tap it to switch the tempo source (same as tapping the metronome icon)"
+            : "· left side: midi device — tap it to connect to a usb or ble device\n· right side: tempo source — always set to 'app' on the \(dev)."))
+        ]
+    }
 
     var body: some View {
         NavigationStack {
@@ -400,6 +687,13 @@ struct HelpView: View {
                         Text("op1 lfo hero")
                             .font(.system(size: 20, weight: .bold, design: .monospaced))
                             .foregroundColor(C.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        Spacer(minLength: 8)
+                        // Right-aligned under the nav bar's "done", in line with the header.
+                        Button("show tutorial") { tour.replay(); dismiss() }
+                            .buttonStyle(CapsuleButtonStyle(fill: C.track(1)))
+                            .accessibilityIdentifier("replayTourFromHelp")
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
@@ -455,6 +749,13 @@ struct HelpView: View {
 // MARK: - Settings sheet (used by LFOPanelView)
 
 struct SettingsView: View {
+    /// Stores the *displayed* label, exactly like every other picker here, and maps it to a
+    /// profile id in onChange. Binding through `app` or through a tuple-tagged picker both
+    /// lose the selection when the view rebuilds mid-gesture.
+    @AppStorage("deviceOverrideLabel") private var deviceOverride: String = "auto"
+
+    @EnvironmentObject private var app: AppState
+    @EnvironmentObject private var tour: TourController
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var hSize
     private var isPad: Bool { hSize == .regular }
@@ -464,12 +765,10 @@ struct SettingsView: View {
     @AppStorage("oneShotFinishAction")     private var oneShotFinishAction: String = "hold"
     @AppStorage("cleanupOneShots")         private var cleanupOneShots: Bool = false
 
-    @State private var quantumSync     = false
-    @State private var defiantJazzMode = false
-    @State private var yoloVelocity    = false
-    @State private var retrograde      = false
+    /// Shown for either joke toggle's forbidden action; nil = no message box on screen.
+    @State private var jokeMessage: String?
+    /// Always on — cowbell boost cannot be turned off.
     @State private var cowbell         = true
-    @State private var aiVibeCheck     = false
 
     var body: some View {
         NavigationStack {
@@ -486,6 +785,11 @@ struct SettingsView: View {
                         Text("op1 lfo hero")
                             .font(.system(size: 20, weight: .bold, design: .monospaced))
                             .foregroundColor(C.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        Spacer(minLength: 8)
+                        // Right-aligned under the nav bar's "done", in line with the header.
+                        replayTourBtn
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
@@ -495,15 +799,23 @@ struct SettingsView: View {
                     Divider()
 
                     settingRowPicker(
+                        "device",
+                        "which teenage engineering device the app is controlling. auto detects it from the midi port name — set it manually if you connect through a hub or a generically-named port.",
+                        $deviceOverride,
+                        ["auto"] + DeviceRegistry.all.map(\.displayName),
+                        accessibilityId: "deviceOverridePicker"
+                    )
+
+                    settingRowPicker(
                         "lfo chip: on pause",
-                        "what to send to the op-1 when any lfo chip is manually paused: previous = original value before lfo started. center = lfo center value. hold = send nothing, op-1 keeps last lfo value.",
+                        "what to send to the device when any lfo chip is manually paused: previous = original value before lfo started. center = lfo center value. hold = send nothing, the device keeps the last lfo value.",
                         $chipPauseAction,
                         ["previous", "center", "hold"]
                     )
 
                     settingRowPicker(
                         "one-shot lfo chip: on finish",
-                        "what to send to the op-1 when a one-shot lfo chip finishes or is paused: previous = original value before lfo started. center = lfo center value. hold = send nothing, op-1 keeps last lfo value.",
+                        "what to send to the device when a one-shot lfo chip finishes or is paused: previous = original value before lfo started. center = lfo center value. hold = send nothing, the device keeps the last lfo value.",
                         $oneShotFinishAction,
                         ["previous", "center", "hold"]
                     )
@@ -514,35 +826,30 @@ struct SettingsView: View {
                         $cleanupOneShots
                     )
 
-                    settingRow(
-                        "quantum tempo sync",
-                        "no cap — aligns your bpm with the fabric of the universe. slay or get slayed.",
-                        $quantumSync
-                    )
+                    resetBtn
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, isPad ? 24 : 16)
+                    .padding(.vertical, isPad ? 16 : 12)
+
+                    // The joke toggles below change nothing; the line keeps them apart from real settings.
+                    Divider()
+
                     settingRow(
                         "defiant jazz mode",
                         "randomly replaces your notes with more sophisticated ones. ritualistic dancing is encouraged.",
-                        $defiantJazzMode
-                    )
-                    settingRow(
-                        "yolo velocity",
-                        "sends every midi message at velocity 127. the era of nuance is dead and buried.",
-                        $yoloVelocity
-                    )
-                    settingRow(
-                        "retrograde playback",
-                        "reverses tape direction in ways the op-1 doesn't actually support. understood the assignment.",
-                        $retrograde
+                        Binding(get: { false }, set: { on in
+                            if on { jokeMessage = "The Music Dance Experience is officially canceled." }
+                        }),
+                        joke: true
                     )
                     settingRow(
                         "cowbell boost",
                         "too much is never enough. periodt.",
-                        $cowbell
-                    )
-                    settingRow(
-                        "ai vibe check",
-                        "your aura is being evaluated rn. bestie is not impressed and your rizz is cooked.",
-                        $aiVibeCheck
+                        Binding(get: { true }, set: { on in
+                            if !on { jokeMessage = "I gotta have more cowbell, baby!" }
+                            cowbell = true
+                        }),
+                        joke: true
                     )
                     // Wave footer
                     ColorfulSplashWave(phase: wavePhase)
@@ -569,10 +876,56 @@ struct SettingsView: View {
         }
         .presentationDetents(isPad ? [.fraction(0.92)] : [.large])
         .preferredColorScheme(.dark)
+        // Map the displayed label to a profile id, then tell AppState to pick up the device.
+        .onChange(of: deviceOverride) { _, label in
+            let id = label == "auto"
+                ? "auto"
+                : (DeviceRegistry.all.first { $0.displayName == label }?.id ?? "auto")
+            UserDefaults.standard.set(id, forKey: AppState.profileOverrideKey)
+            app.resolveProfile()
+        }
+        .overlay {
+            if let message = jokeMessage {
+                Color.black.opacity(0.6)
+                    .ignoresSafeArea()
+                    .onTapGesture { jokeMessage = nil }
+                    .overlay {
+                        Text(message)
+                            .font(.system(size: isPad ? 18 : 15, weight: .semibold))
+                            .foregroundColor(C.text)
+                            .multilineTextAlignment(.center)
+                            .padding(24)
+                            .frame(maxWidth: isPad ? 420 : 280)
+                            .background(C.bg)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(C.border, lineWidth: 0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .allowsHitTesting(false)
+                    }
+            }
+        }
+    }
+
+    /// Starts once this sheet has closed. Deliberately not part of reset to defaults.
+    private var replayTourBtn: some View {
+        Button("show tutorial") { tour.replay(); dismiss() }
+            .buttonStyle(CapsuleButtonStyle(fill: C.track(1)))
+            .accessibilityIdentifier("replayTourButton")
+    }
+
+    private var resetBtn: some View {
+        Button("reset to defaults") { resetToDefaults() }
+            .buttonStyle(CapsuleButtonStyle())
+    }
+
+    private func resetToDefaults() {
+        deviceOverride = "auto"
+        chipPauseAction = "previous"
+        oneShotFinishAction = "hold"
+        cleanupOneShots = false
     }
 
     @ViewBuilder
-    private func settingRowPicker(_ title: String, _ desc: String, _ selection: Binding<String>, _ options: [String]) -> some View {
+    private func settingRowPicker(_ title: String, _ desc: String, _ selection: Binding<String>, _ options: [String], accessibilityId: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: isPad ? 6 : 4) {
                 Text(title)
@@ -586,6 +939,7 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.top, 4)
+                .accessibilityIdentifier(accessibilityId ?? "")
             }
             .padding(.top, isPad ? 24 : 18)
             .padding(.horizontal, isPad ? 24 : 16)
@@ -595,15 +949,17 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func settingRow(_ title: String, _ desc: String, _ isOn: Binding<Bool>) -> some View {
+    private func settingRow(_ title: String, _ desc: String, _ isOn: Binding<Bool>, joke: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: isPad ? 6 : 4) {
-                    Text(title)
+                    Text(joke ? "🎲 \(title)" : title)
                         .font(.system(size: isPad ? 18 : 13, weight: .semibold))
+                        .italic(joke)
                         .foregroundColor(C.text)
                     Text(desc)
                         .font(.system(size: isPad ? 17 : 15))
+                        .italic(joke)
                         .foregroundColor(C.text)
                 }
                 Spacer()

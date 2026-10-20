@@ -1,1 +1,1 @@
-lfo automation for op-1 field
+op-1, tx-6 & tp-7 midi lfos

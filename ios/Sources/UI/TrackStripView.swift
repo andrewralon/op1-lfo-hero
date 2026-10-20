@@ -9,10 +9,15 @@ struct TrackStripView: View {
     var body: some View {
         let color = C.track(track)
         let muted = app.mutes[track] ?? false
-        let vol   = Binding(get: { app.volumes[track] ?? 90 },
+        // Devices without pan (the TP-7 is a recorder, not a mixer) hide the knob entirely
+        // and let the fader take the space.
+        let hasPan = app.profile.caps.hasPan
+        let vol   = Binding(get: { app.volumes[track] ?? app.profile.defaultVolume },
                             set: { app.setVolume(track: track, value: $0) })
         let pan   = Binding(get: { app.pans[track] ?? 0 },
                             set: { app.setPan(track: track, value: $0) })
+        // The tutorial points at one strip only.
+        let tagged = track == app.profile.trackIndices.first
 
         VStack(spacing: 0) {
 
@@ -26,38 +31,53 @@ struct TrackStripView: View {
                     .foregroundColor(muted ? color : .black)
             }
             .buttonStyle(ImmediateButtonStyle())
+            .accessibilityIdentifier("muteButton\(track)")
+            .accessibilityValue(muted ? "muted" : "unmuted")
+            .tourAnchor(.mutePad, when: tagged)
 
             if isLandscape {
                 // ── Landscape: pan knob left of fader, tops aligned ──────────
                 let panSize = m.panKnobLandscape
                 HStack(alignment: .center, spacing: 0) {
-                    PanKnobView(
-                        value: pan,
-                        onLiveChange: { app.controller.setPan(track: track, value: $0 + 64) }
-                    ) { app.setPan(track: track, value: $0) }
-                        .frame(width: panSize, height: panSize)
-                        .padding(.leading, 6)
-                        .padding(.trailing, 4)
+                    if hasPan {
+                        PanKnobView(
+                            value: pan,
+                            onLiveChange: { app.controller.setPan(track: track, value: $0 + 64) }
+                        ) { app.setPan(track: track, value: $0) }
+                            .frame(width: panSize, height: panSize)
+                            .padding(.leading, m.stripInnerPad)
+                            .padding(.trailing, m.panFaderGap)
+                            .accessibilityIdentifier("panKnob\(track)")
+                            .tourAnchor(.panKnob, when: tagged)
+                    }
 
+                    // No leading padding: the knob's trailing `panFaderGap` already separates
+                    // them. These insets are what `faderColW` subtracts, so they must match.
                     VolumeFaderView(
                         value: vol,
                         onLiveChange: { app.controller.setVolume(track: track, value: uiToMidi($0)) }
                     ) { app.setVolume(track: track, value: $0) }
                         .padding(.vertical, 8)
-                        .padding(.horizontal, 6)
+                        .padding(.trailing, m.stripInnerPad)
+                        .padding(.leading, hasPan ? 0 : m.stripInnerPad)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .tourAnchor(.volumeFader, when: tagged)
                 }
                 .frame(maxHeight: .infinity)
             } else {
                 // ── Portrait: pan above fader ────────────────────────────────
-                PanKnobView(
-                    value: pan,
-                    onLiveChange: { app.controller.setPan(track: track, value: $0 + 64) }
-                ) { app.setPan(track: track, value: $0) }
-                    .padding(.horizontal, m.panHPad)
-                    .frame(height: m.panKnobPortrait)
-                    .padding(.top, m.panVPadTop)
-                    .padding(.bottom, m.panVPadTop * 0.5)
+                if hasPan {
+                    PanKnobView(
+                        value: pan,
+                        onLiveChange: { app.controller.setPan(track: track, value: $0 + 64) }
+                    ) { app.setPan(track: track, value: $0) }
+                        .padding(.horizontal, m.panHPad)
+                        .frame(height: m.panKnobPortrait)
+                        .padding(.top, m.panVPadTop)
+                        .padding(.bottom, m.panVPadTop * 0.5)
+                        .accessibilityIdentifier("panKnob\(track)")
+                        .tourAnchor(.panKnob, when: tagged)
+                }
 
                 VolumeFaderView(
                     value: vol,
@@ -65,6 +85,7 @@ struct TrackStripView: View {
                 ) { app.setVolume(track: track, value: $0) }
                     .padding(.vertical, 8)
                     .frame(maxHeight: .infinity)
+                    .tourAnchor(.volumeFader, when: tagged)
                 Spacer(minLength: 0)
             }
         }
@@ -81,10 +102,11 @@ struct TrackStripView: View {
 
 struct TracksView: View {
     var isLandscape: Bool = false
+    @EnvironmentObject private var app: AppState
     @Environment(\.metrics) private var m
     var body: some View {
         HStack(spacing: m.trackGapUnit) {
-            ForEach(1...4, id: \.self) { TrackStripView(track: $0, isLandscape: isLandscape) }
+            ForEach(app.profile.trackIndices, id: \.self) { TrackStripView(track: $0, isLandscape: isLandscape) }
         }
         .padding(.horizontal, m.trackGapUnit)
         .padding(.vertical, 0)
