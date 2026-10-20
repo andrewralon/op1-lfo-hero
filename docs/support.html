@@ -17,22 +17,42 @@
   <ul>
     <li>
       <strong>app shows <code>no device found</code></strong><br>
-      make sure the op1 is powered on. for usb: try a different cable — some usb-c cables are charge-only and carry no data. for bluetooth: confirm <code>bluetooth: on</code> is set on the op1.
+      make sure the device is powered on. for usb: try a different cable — some usb-c cables are charge-only and carry no data. for bluetooth: confirm <code>bluetooth: on</code> is set on the op-1, or that the tx-6 / tp-7 is advertising. if it still isn't found, open the device picker and tap it, or pick the device yourself in settings.
     </li>
     <li>
-      <strong>controls send but op1 doesn't respond</strong><br>
-      unplug and replug the op1, or restart lfo hero. if using bluetooth, toggle <code>bluetooth: off</code> then back <code>on</code> on the op1.
+      <strong>controls send but the device doesn't respond</strong><br>
+      unplug and replug the device, or restart lfo hero. if using bluetooth, toggle <code>bluetooth: off</code> then back <code>on</code> on the op-1.
     </li>
     <li>
-      <strong>tape doesn't respond to play / stop</strong><br>
+      <strong>tx-6 ignores the app</strong><br>
+      set <code>midi control</code> to <code>in</code> on the tx-6. in that mode it stops sending its own fader and knob messages, which is expected.
+    </li>
+    <li>
+      <strong>tx-6 tempo, play and stop do nothing, but volume and mute work</strong><br>
+      set <code>clock SRC</code> to <code>usb</code> over usb-c or <code>ble</code> over bluetooth. the tx-6 only accepts clock and play/stop from the source you pick.
+    </li>
+    <li>
+      <strong>lfos stopped and the app says <code>lfos paused — no clock</code></strong><br>
+      the app is following the device's clock and none is arriving. tap the banner to use the app's clock instead. a tp-7 only sends clock while its tape is moving, and only in <code>sync</code> mode.
+    </li>
+    <li>
+      <strong>tp-7 doesn't respond to the app</strong><br>
+      leave <code>ctrl</code> mode — in it the tp-7 acts as a controller for other gear and ignores the app. <code>off</code> and <code>sync</code> both accept volume, mute and gain.
+    </li>
+    <li>
+      <strong>a tx-6 fader fights the lfo</strong><br>
+      grabbing a fader while an lfo drives that channel makes them compete. pause the lfo chip first.
+    </li>
+    <li>
+      <strong>op-1 tape doesn't respond to play / stop</strong><br>
       confirm the op1 is in <code>midi sync</code> mode and the app is in <code>app</code> clock mode. the op1's bpm display should show <code>--</code> while waiting for clock.
     </li>
     <li>
-      <strong>op1 tempo doesn't match the app</strong><br>
-      restart the app. power cycle the op1. <strong>note:</strong> bluetooth (ble midi) does not send high-resolution tempo changes.
+      <strong>device tempo doesn't match the app</strong><br>
+      restart the app. power cycle the device. <strong>note:</strong> bluetooth (ble midi) does not send high-resolution tempo changes.
     </li>
     <li>
-      <strong>left / right tape buttons stop playback</strong><br>
+      <strong>left / right tape buttons stop playback (op-1)</strong><br>
       this is normal op1 behavior — receiving a song position pointer while playing causes it to pause. press play to resume.
     </li>
   </ul>

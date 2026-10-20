@@ -22,29 +22,66 @@
       allowfullscreen></iframe>
   </div>
 
+  <h2>what's new in 1.1.0</h2>
+  <ul>
+    <li><strong>tx-6 and tp-7 support!</strong> and op-1 field — six-track layouts, device auto-detect</li>
+    <li><strong>first-run tutorial</strong> so you know how to get started. view it again later in settings</li>
+    <li><strong>midi tempo improvements</strong> — bpm readout is steadier, now timed by the device's own timestamps</li>
+    <li>lfos pause with a banner when the device sends no clock — tap it to use the app's clock</li>
+    <li>tempo maximum increased to 440 bpm</li>
+    <li>settings are stored more safely, in the keychain</li>
+  </ul>
+  <p>full notes on <a href="https://github.com/andrewralon/op1-lfo-hero/releases/tag/v1.1.0">github</a>.</p>
+
+  <h2>supported devices</h2>
+  <ul>
+    <li><strong>op-1 field</strong> — 4 tracks, master fx, tape transport, midi clock both ways</li>
+    <li><strong>tx-6</strong> — 6 tracks plus the master and fx buses (they share the <code>m</code> target), about 17 parameters per channel</li>
+    <li><strong>tp-7</strong> — 6 tracks, no pan. <code>gain 1–3</code> belong to the three input jacks, not to tracks. record is deliberately not an lfo target</li>
+  </ul>
+  <p>the app picks your device from its midi name, or choose it yourself in settings if you connect through a hub. one device at a time.</p>
+
   <h2>connection</h2>
   <ul>
-    <li>connect iphone to op1 via usb-c or bluetooth (ble midi)</li>
-    <li>open the app — automatically connects to op1</li>
-    <li>status bar shows <code>op-1 field (usb)</code> or <code>op-1 field (ble)</code></li>
+    <li>connect your midi device via usb-c or ble (bluetooth low energy)</li>
+    <li>the layout changes based on the connected device</li>
   </ul>
 
   <h2>tempo modes</h2>
   <ul>
-    <li><code>op1 (beat match)</code> — op1 is master. app's lfos follow op1's tempo.</li>
-    <li><code>app (midi sync)</code> — app is master. app controls <i>basic</i> op1 tape transport (play/stop/back/forward).
+    <li><code>op1 (beat match) / tx6 / tp7</code> — the device is master. the app's lfos follow its tempo.</li>
+    <li><code>app (midi sync)</code> — the app is master. it controls <i>basic</i> transport (play/stop, plus back/forward on the op-1 and tp-7, or the −/+ tempo buttons on the tx-6).
       <ul style="margin-top:6px">
-        <li><code>tempo</code> lfo requires usb-c connection.</li>
-        <li><strong>note:</strong> bluetooth (ble midi) does not send high-resolution tempo changes.</li>
+        <li><code>tempo</code> lfo on the op-1 requires a usb-c connection.</li>
+        <li><strong>note:</strong> bluetooth (ble midi) does not send high-resolution tempo changes from the op-1.</li>
       </ul>
     </li>
   </ul>
-  <p>toggle the app's tempo mode by tapping the <code>metronome</code>, then change the op1 to match.</p>
+  <p>toggle the app's tempo mode by tapping the <code>metronome</code>, then change the device to match.</p>
+
+  <h2>tx-6 setup</h2>
+  <ul>
+    <li>set <code>midi control</code> to <code>in</code>. until you do, the tx-6 ignores everything the app sends (and stops sending its own knob and fader messages).</li>
+    <li>set <code>clock SRC</code> to match how you are connected: <code>usb</code> over usb-c, <code>ble</code> over bluetooth. with the wrong one, tempo and play/stop silently do nothing while volume, pan and mute still work.</li>
+    <li>to have the app follow the tx-6 instead, set <code>clock SRC</code> to internal, enable clock <code>out</code>, and tap the metronome until it reads <code>tx6</code>.</li>
+    <li>moving a fader on the tx-6 while an lfo drives that channel fights the lfo — pause the chip first. lfos restart on a play pressed <i>in the app</i>.</li>
+  </ul>
+
+  <h2>tp-7 setup</h2>
+  <ul>
+    <li>use <code>sync</code> mode for the app to follow the tp-7's tempo. it only streams midi clock while its tape is moving. volume, mute and gain control work in <code>off</code> and <code>sync</code> alike.</li>
+    <li>in <code>ctrl</code> mode the tp-7 acts as a controller for other gear: it will not play back and stops receiving commands from the app.</li>
+  </ul>
+
+  <h2>op-1 field</h2>
+  <ul>
+    <li>the op-1's <code>midi sync</code> mode is needed for tape transport from the app.</li>
+  </ul>
 
   <h2>help wanted — got another te device?</h2>
   <p>
-    every device lfo hero supports was mapped by measuring real hardware, because the published
-    midi references turned out to be wrong in several places. adding the
+    every device lfo hero supports — the op-1 field, tx-6 and tp-7 — was mapped by measuring real
+    hardware, because the published midi references turned out to be wrong in several places. adding the
     <strong>op-1 (original)</strong>, op-z, ep-133, ob-4 or a po means someone who owns one has to
     record what it actually sends.
   </p>
@@ -61,6 +98,7 @@
   <h2>references</h2>
   <ul>
     <li><a href="https://teenage.engineering/guides/op-1#midi-reference">op-1 field midi reference</a> — teenage engineering</li>
+    <li><a href="https://github.com/andrewralon/op1-lfo-hero">source and release notes</a> — github</li>
   </ul>
 
   <footer>
