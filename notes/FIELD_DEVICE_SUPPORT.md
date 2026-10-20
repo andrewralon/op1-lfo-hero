@@ -5,7 +5,7 @@ Tracks the multi-device feature (OP-1 Field / TX-6 / TP-7) on `feature/support-f
 Protocol details and hardware measurements live in [RESEARCH.md](RESEARCH.md). This file is
 just what is done, what is not, and what is still only assumed.
 
-**Current state:** 156 unit tests, 20 UI tests. TP-7 and TX-6 both validated through the app over
+**Current state:** 289 unit tests, 29 UI tests (tutorial, multi-device, help/settings; the screenshot and app-preview capture tests are separate). TP-7 and TX-6 both validated through the app over
 BLE. **The OP-1 has still never been run on hardware since its MIDI path was rewritten** — that is
 the largest remaining risk on this branch.
 
