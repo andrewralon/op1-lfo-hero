@@ -171,9 +171,13 @@ platform :ios do
       export_method: "app-store",
       xcargs: "CURRENT_PROJECT_VERSION=#{next_build}"
     )
+    # Screenshots and previews are uploaded separately (`upload_media` / `previews`) and are already
+    # on App Store Connect. Without skip_screenshots this would append a second copy and go past
+    # the 10-per-set limit. Previews are safe: deliver skips a file whose checksum is already there.
     deliver(
       submit_for_review: true,
       automatic_release: false,
+      skip_screenshots: true,
       force: true,
       precheck_include_in_app_purchases: false
     )
