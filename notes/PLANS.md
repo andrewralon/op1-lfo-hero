@@ -49,7 +49,7 @@ needed** so that stopping an LFO leaves these parameters somewhere sensible — 
 | **Pitch bend never touches the tape** | Neither recorded nor played-back material moves, only notes being played now. It presumably uses the instrument's portamento / bend-range settings (T2 envelope screen); that link is a guess. |
 | **Bend is a held level** | One `E0 7F 7F` stays in effect with nothing re-sent: held 3 s in one test, then held 30+ s in another through releasing keys and switching instrument. It only cleared when the patch was reset on the device (no recentre was sent). A bend LFO that merely stops sending therefore leaves the pitch wherever it last was. The exact no-bend value is **8192** (`E0 00 40`); 0-16383 has no integer midpoint. |
 | **Master EQ (CC 90, 91, 92)** | All three move the matching knob on the OP-1's EQ screen and audibly change the sound. **64 is dead centre on all three.** |
-| **Record level (CC 78)** | A global level, moved by the same CC on **channel 1 and channel 4** (two runs on 4), as the reference's "any channel" says. It drives the red record-level line on the tape screen and the volume of whatever the synth or drum engine is playing live, so it would set the level recorded to tape. Tape *playback* is unaffected. The app's binding (wire channel 0) is the one verified byte-for-byte: `B0 4E 00`, `B0 4E 7F`, `B0 4E 40` gave bottom, top, middle on the red line and in the sound. TE's guide calls it both the recording level and "the main level for Synthesizer and Drum sounds". No default is published and the device reports nothing back, but it resets on startup to a fixed position: CC 96 (about 75% up the line, measured from photos; see Parameters). |
+| **Record level (CC 78)** | A global level, moved by the same CC on **channel 1 and channel 4** (two runs on 4), as the reference's "any channel" says. It drives the red record-level line on the tape screen and the volume of whatever the synth or drum engine is playing live, so it would set the level recorded to tape. Tape *playback* is unaffected. The app's binding (wire channel 0) is the one verified byte-for-byte: `B0 4E 00`, `B0 4E 7F`, `B0 4E 40` gave bottom, top, middle on the red line and in the sound. TE's guide calls it both the recording level and "the main level for Synthesizer and Drum sounds". No default is published and the device reports nothing back, but it resets on startup to a fixed position: CC 95 (about 75% up the line, measured from photos; see Parameters). |
 
 So the original plan's per-track pitch bend was wrong: the reference's "accepted on channels 1-16"
 does not mean per-channel bend on this device.
@@ -61,7 +61,7 @@ persistence contract for saved LFO clips and must not change.
 
 | id | name | short | binding | `restValue` (native) | `defaultCenter` (display) |
 |---|---|---|---|---|---|
-| `op1.recLevel` | rec level | rcl | `masterOnly`, CC 78, ch 0, continuous | 96 | 75 |
+| `op1.recLevel` | rec level | rcl | `masterOnly`, CC 78, ch 0, continuous | 95 | 74 |
 | `op1.eqLow` | eq low | eql | `masterOnly`, CC 90, ch 0, continuous | 64 | 49 |
 | `op1.eqMid` | eq mid | eqm | `masterOnly`, CC 91, ch 0, continuous | 64 | 49 |
 | `op1.eqHigh` | eq high | eqh | `masterOnly`, CC 92, ch 0, continuous | 64 | 49 |
@@ -74,13 +74,14 @@ persistence contract for saved LFO clips and must not change.
   instrument is playing live, so an LFO on it does nothing to anything already recorded. The name
   `bend (live)` says so in the picker; keep the same wording in the RESEARCH.md entry.
 - Sustain gets no `defaultCenter`: a centre means nothing on a two-state switch.
-- **Record level rests at its startup default: MIDI 96 (96 / 127 = 75.6% of max; 75 on the 0-99 display scale).** The device resets to that level on power-up
-  and the guide does not publish it, so it was measured: on the tape screen the record-level dot
-  sits 75.4% of the way up its line at startup, and 75.3% after sending CC 78 = 96 (two photos).
-  MIDI 78 (61%) was sent to confirm: the dot sat far below the startup position. One CC step is under a pixel in a photo, so the true
-  default is 96 give or take a step or two; 96 is used. `defaultCenter: 75` starts a new LFO there,
-  and the neutral snap makes that slider position exactly 96 (plain conversion would give 97).
-  Named "rec level" rather than "tape level" because it does not touch tape playback.
+- **Record level rests at its startup default: MIDI 95** (95 / 127 = 74.8% of max, about 75%; 74
+  on the 0-99 display scale). The device resets to that level on power-up and the guide does not
+  publish it, so it was measured from photos of the tape-screen record-level dot, aligned on its red
+  line. Against the startup photo, a photo after sending CC 78 = 95 differs by -0.1 of a step and
+  one after sending 96 by +0.6, which fits 95 and not 96. MIDI 78 was also sent and sat far below.
+  `defaultCenter: 74` starts a new LFO there; plain conversion of display 74 already gives exactly
+  95, so the neutral snap is a no-op for this parameter. Named "rec level" rather than "tape level"
+  because it does not touch tape playback.
 
 ## Pitch bend is 14-bit end to end
 
