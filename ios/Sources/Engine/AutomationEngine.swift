@@ -293,6 +293,12 @@ final class AutomationEngine {
         ((ticks % cycle) + cycle) % cycle
     }
 
+    /// Top of the clip's parameter in native units — 127 for a CC, 16383 for pitch bend. The one
+    /// rounding of an LFO's output happens at this resolution, never through a 7-bit step.
+    private func valueMax(_ lfo: LfoClip) -> Double {
+        profile.param(lfo.paramId)?.valueMax ?? 127
+    }
+
     private func evaluatePreview(_ lfo: LfoClip, phase: Double) -> Double {
         var y: Double
         if lfo.wave == .random {
@@ -315,7 +321,7 @@ final class AutomationEngine {
         if isTempo(lfo, profile) {
             return max(AppState.minBpm, min(AppState.maxBpm, lfo.centerValue + y * lfo.depth))
         }
-        return max(0, min(127, (lfo.centerValue + y * lfo.depth).rounded()))
+        return max(0, min(valueMax(lfo), (lfo.centerValue + y * lfo.depth).rounded()))
     }
 
     private func evaluate(_ lfo: LfoClip, phase: Double) -> Double {
@@ -342,7 +348,7 @@ final class AutomationEngine {
         if isTempo(lfo, profile) {
             return max(AppState.minBpm, min(AppState.maxBpm, lfo.centerValue + y * lfo.depth))
         }
-        return max(0, min(127, (lfo.centerValue + y * lfo.depth).rounded()))
+        return max(0, min(valueMax(lfo), (lfo.centerValue + y * lfo.depth).rounded()))
     }
 
     private func dispatch(lfo: LfoClip, value: Double) {

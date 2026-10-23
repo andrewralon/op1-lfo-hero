@@ -27,8 +27,9 @@ final class Controller {
 
     // MARK: - Generic send
 
-    /// Send one parameter to one target. `track` 0 is master. `value` is in MIDI units (0-127),
-    /// or BPM for a tempo parameter. Pass `profile` explicitly from the automation thread so a
+    /// Send one parameter to one target. `track` 0 is master. `value` is in the parameter's native
+    /// units (`ParamSpec.valueMax`: 0-127 for a CC, 0-16383 for pitch bend), or BPM for a tempo
+    /// parameter. Pass `profile` explicitly from the automation thread so a
     /// concurrent profile switch cannot split a clip's parameter from its device.
     /// Fires transport ops for a `.transport` binding. Set by AppState so the Controller does
     /// not need to know about ClockEngine's play state or song position.
@@ -55,12 +56,10 @@ final class Controller {
             // No MIDI — the app's own clock is the target. AppState reacts via updateCallback.
             return
         case .pitchBend(let rule):
-            // Parameters are always in MIDI units (0-127); pitch bend is 14-bit (0-16383).
-            // Map across the full range so an LFO sweeping 0-127 sweeps the whole bend range,
-            // with 64 landing near centre (8192 = no change).
+            // Native units: 0...valueMax (16383 for bend) with 8192 = no bend. Nothing is
+            // stretched; the one rounding is the step to a whole wire value, here.
             let ch = prof.channel(rule, track: track)
-            let clamped = max(0, min(127, value))
-            let v = Int((clamped * 16383.0 / 127.0).rounded())
+            let v = Int(max(0, min(spec.valueMax, value)).rounded())
             router?.send([UInt8(0xE0 | (ch & 0x0F)), UInt8(v & 0x7F), UInt8((v >> 7) & 0x7F)])
         case .cc(let cc, let rule, let encoding):
             sendCC(ch: prof.channel(rule, track: track), cc: cc, val: encoding.wireValue(from: value))

@@ -146,6 +146,10 @@ For **Tempo** and other master-only parameters, the track 1–4 buttons are disa
 | env attack/decay/sustain/release | Per-track synth envelope | CC 50-53 (ch 1-4) |
 | fx 1–4 | Per-track patch FX parameters | CC 54-57 (ch 1-4) |
 | lfo 1–4 | Per-track patch LFO parameters | CC 58-61 (ch 1-4) |
+| rec level | Global record level — also the main level of the synth and drum sound, so it shapes what reaches the tape | CC 78 (master) |
+| eq low / mid / high | Global master EQ, flat at the middle | CC 90-92 (master) |
+| sustain | Global sustain pedal | CC 64 (master) |
+| live bend | Global pitch bend of the selected instrument's live notes — not the tape. 14-bit | Pitch bend, ch 1 (master) |
 
 **Tempo LFO:** modulates the app's BPM directly with float precision. The OP-1 display tracks in real time. When the Tempo LFO is stopped the BPM restores to its original value. Requires app-clock mode (MIDI Sync on the OP-1); unavailable when the OP-1 is the clock master or when connected via Bluetooth.
 
@@ -269,9 +273,17 @@ This installs:
 |----|----------|-------|-------|
 | 70-73 | Master FX params 1-4 | 0-127 | |
 | 74-77 | Master compressor params 1-4 | 0-127 | |
+| 64 | Sustain pedal | 0-127 | ≥ 64 = down (holds live notes). Measured: 63 releases, 127 holds |
+| 78 | Tape record level | 0-127 | Also the main level of the synth/drum sound. Answers on any channel. Starts at 95 on power-up |
 | 79 | Octave   | 0-127 | < 64 = down, ≥ 64 = up (keyboard/synth mode only) |
+| 90-92 | Master EQ low / mid / high | 0-127 | 64 = flat. Answers on any channel |
 | 82 | Tape prev bar | 127 | Tape navigation |
 | 83 | Tape next bar | 127 | Tape navigation |
+
+**Pitch bend** (status `0xE0`, 14-bit, 0-16383, 8192 = no bend): **channel 1 only**. It bends the
+selected instrument's *live* notes; recorded and played-back tape is not affected, and channels 2-4
+are ignored. The OP-1 holds the level once sent, so a bend stays on until it is sent back to 8192
+or the patch is reset.
 
 **Transport messages**
 
