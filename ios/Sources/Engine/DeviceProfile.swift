@@ -118,6 +118,17 @@ struct ParamSpec: Identifiable, Hashable {
     /// neutral point that is not the global default of 90, such as pitch bend, where 90 would
     /// start the tape at roughly 1.9x speed.
     var defaultCenter: Double? = nil
+    /// Top of the parameter's **native** range. Every value the app carries for a parameter — LFO
+    /// centre, depth, original, rest, and the evaluated output — is in these units. 127 for a CC;
+    /// 16383 for pitch bend, so a bend LFO is genuinely 14-bit instead of being quantised to 128
+    /// steps and stretched on the way out.
+    var valueMax: Double = 127
+    /// What the parameter goes back to when an LFO stops (the "previous" pause/finish option), in
+    /// native units. nil → the chip's own centre, which is right only when the device really
+    /// reports its state. Set it where the device cannot be read back and has a neutral value:
+    /// bend 8192, flat EQ 64, sustain 0. `defaultCenter` is where a *new* LFO starts (display
+    /// units); this is where it ends up (native units).
+    var restValue: Double? = nil
     /// false → hidden from the LFO parameter picker (relative encoders).
     var lfoTargetable = true
 
@@ -129,6 +140,27 @@ struct ParamSpec: Identifiable, Hashable {
         guard self.track != nil else { return false }
         guard let r = availableTracks else { return true }
         return r.contains(track)
+    }
+
+    // MARK: Display (0-99 sliders) <-> native units
+
+    /// A depth slider position as native units. 7-bit parameters keep `uiToMidi` exactly; wider
+    /// ones scale linearly so 99 is full scale.
+    func nativeDepth(fromDisplay d: Double) -> Double {
+        valueMax == 127 ? Double(uiToMidi(d)) : d * valueMax / 99
+    }
+
+    /// A centre slider position as native units. The slider's one `defaultCenter` position maps to
+    /// **exactly** `restValue` when both are declared: the 0-99 scale has no step on 8192 (49.5),
+    /// and plain conversion would put display 49 at 8126 for bend and at 63 for a flat EQ.
+    func nativeCenter(fromDisplay d: Double) -> Double {
+        if let c = defaultCenter, let r = restValue, d == c { return r }
+        return nativeDepth(fromDisplay: d)
+    }
+
+    /// Native units shown on the 0-99 scale, rounding down as `midiToUI` does.
+    func displayValue(fromNative v: Double) -> Double {
+        nativeToUI(v, valueMax: valueMax)
     }
 
     /// Interpret an incoming byte as on/off, using this parameter's own switch encoding.
@@ -350,7 +382,7 @@ struct DeviceProfile: Identifiable, Hashable {
     /// Clamp an LFO's raw output into the range this parameter can actually take.
     func clamp(_ spec: ParamSpec, track: Int, raw: Double) -> Double {
         if spec.role == .tempo { return Swift.max(AppState.minBpm, Swift.min(AppState.maxBpm, raw)) }
-        return Swift.max(0, Swift.min(127, raw.rounded()))
+        return Swift.max(0, Swift.min(spec.valueMax, raw.rounded()))
     }
 
     func matches(endpointName: String) -> Bool {

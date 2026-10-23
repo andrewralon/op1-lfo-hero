@@ -90,6 +90,34 @@ extension DeviceProfile {
         // (CC 74-77) — a long-standing intentional overload of the same UI parameter.
         for i in 1...4 { p.append(trackAndMaster("lfo \(i)", "l\(i)", cc: 57 + i, masterCC: 73 + i)) }
 
+        // Global controls, measured on a real OP-1 Field (notes/PLANS.md, "Measured on hardware").
+        // They are not per track: CC 64/78/90-92 are "any channel", and bend answers on channel 1
+        // only. They shape what the instrument is playing live, before the tape. The ids are
+        // appended after the 20 above, whose order is a persistence contract.
+        //
+        // The OP-1 never reports state back, so each carries the neutral value it should return to
+        // when an LFO stops (`restValue`, native units) and, where a centre is meaningful, the
+        // slider position a new LFO starts on (`defaultCenter`, 0-99).
+        //
+        // Record level rests at the device's startup position, CC 95 (74.8% of max): measured from
+        // aligned photos of the tape-screen dot, since no default is published.
+        p.append(masterOnly("op1.recLevel", "rec level", "rcl", cc: 78, channel: 0,
+                            defaultCenter: 74, restValue: 95))
+        // Master EQ is flat at 64 (confirmed on the EQ screen).
+        p.append(masterOnly("op1.eqLow",  "eq low",  "eql", cc: 90, channel: 0,
+                            defaultCenter: 49, restValue: 64))
+        p.append(masterOnly("op1.eqMid",  "eq mid",  "eqm", cc: 91, channel: 0,
+                            defaultCenter: 49, restValue: 64))
+        p.append(masterOnly("op1.eqHigh", "eq high", "eqh", cc: 92, channel: 0,
+                            defaultCenter: 49, restValue: 64))
+        // Sustain pedal: 63 and below release, 64 and above hold (0/63 release and 127 holds were
+        // measured). Resting means released, or stopping an LFO would leave notes ringing.
+        p.append(masterOnly("op1.sustain", "sustain", "sus", cc: 64, channel: 0,
+                            encoding: .switching(SwitchEncoding()), restValue: 0))
+        // One global bend on channel 1 that moves the selected instrument's live notes — not the
+        // tape, not other tracks. 14-bit; see `masterPitchBend`.
+        p.append(masterPitchBend("op1.pitchbend", "live bend", "pit", channel: 0))
+
         return p
     }()
 }
@@ -111,27 +139,34 @@ private func perTrack(_ id: String, _ name: String, _ short: String, cc: Int,
 private func masterOnly(_ id: String, _ name: String, _ short: String,
                         cc: Int, channel: Int,
                         encoding: ValueEncoding = .continuous,
+                        defaultCenter: Double? = nil,
+                        restValue: Double? = nil,
                         lfoTargetable: Bool = true) -> ParamSpec {
     ParamSpec(id: id, name: name, short: short,
               track: nil,
               master: .cc(cc: cc, channel: .pinned(channel), encoding: encoding),
+              defaultCenter: defaultCenter, restValue: restValue,
               lfoTargetable: lfoTargetable)
 }
 
-/// A master-level pitch-bend control (the TP-7's playback speed).
+/// A master-level pitch-bend control (the TP-7's playback speed, the OP-1's live-notes bend).
 ///
-/// Centred at 49 rather than the global default of 90. Bend's neutral point is the middle of the
-/// range, and 90 would start a new LFO at roughly **1.9x speed** — then leave the tape pitched up
-/// when the chip stops, with nothing on the device to show why.
+/// **14-bit end to end.** `valueMax` is 16383 and every value the app holds for it — LFO centre,
+/// depth, output, rest — is in native bend units, so an LFO sweeps all 16384 positions and rests on
+/// the exact no-bend value, 8192 (`E0 00 40`). 0-16383 has no integer midpoint; 8192 is the MIDI
+/// convention for "no bend".
 ///
-/// 49 rather than 50 because the 0-99 display scale cannot express MIDI 64 exactly: display 49
-/// maps to MIDI 63 and bend 8126, within 1% of true centre (8192). Display 50 lands on MIDI 65,
-/// which is nearly 3% fast.
+/// Centred at display 49 rather than the global default of 90. Bend's neutral point is the middle
+/// of the range, and 90 would start a new LFO at roughly **1.9x speed** — then leave the tape pitched
+/// up when the chip stops, with nothing on the device to show why. The 0-99 slider cannot express
+/// 8192 (it has no 49.5), so `nativeCenter` maps display 49 to exactly `restValue`.
+///
+/// Both devices hold the level once sent, so a stopped LFO that does not send 8192 leaves it bent.
 private func masterPitchBend(_ id: String, _ name: String, _ short: String,
                              channel: Int) -> ParamSpec {
     ParamSpec(id: id, name: name, short: short,
               track: nil, master: .pitchBend(channel: .pinned(channel)),
-              defaultCenter: 49)
+              defaultCenter: 49, valueMax: 16383, restValue: 8192)
 }
 
 /// TE's documented on/off convention for the 6-channel devices: 0-63 off, 64-127 on.

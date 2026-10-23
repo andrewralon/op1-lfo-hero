@@ -24,10 +24,7 @@
 - [ ] MED - pause or stop LFO chaos - maybe stop button should stop lfo activity while setting up new LFOs cause it's distracting. Play should start it. Or a better way?
 - [ ] MED - rate/speed needs all of the OP-1 options - 25 options (in order): 8 to 1 (relative tempo time) + 17 for clock symbols 0 to 30 minutes (absolute time)
 - [ ] LOW - add parameter: SOUND SLOT SELECT - CC 102, channel 1-8, >=64 *****
-- [ ] LOW - add parameter: SYNTH PITCH BEND - channel 1-16, 0-16383
 - [ ] LOW - add parameter: OCTAVE - CC 79, < 64 = down, ≥ 64 = up
-- [ ] LOW - add parameter: MASTER EQ low/mid/high - CC 90-92, 0-127
-- [ ] LOW - add parameter: SUSTAIN - CC 64, >= 64 = down
 - [ ] LOW - add parameter: LOOP IN/OUT/TOGGLE - CC 86-88, 0-127
 - [ ] LOW - depth & center spinboxes have no visual feedback for what they do since the waveform doesn't change.... not clear without trying it.
 - [ ] LOW - icons: center could use some clarity
@@ -40,6 +37,10 @@
 - [ ] LOW - fix left/right scrub mode if possible, like pressing them on the op1! tried and reverted, see commit history.
 
 ## Done
+- [x] LOW - op-1 parameter: pitch bend, as `live bend` (2026-10-23; unit-tested, bytes and behaviour measured on an op-1 from a mac. global, channel 1 only, live notes only, not the tape; 14-bit, rests on exactly 8192. not yet driven from the app on the ipad)
+- [x] LOW - op-1 parameter: master eq low/mid/high, CC 90-92 (2026-10-23; unit-tested, measured on an op-1: 64 is flat, rests there. not yet driven from the app on the ipad)
+- [x] LOW - op-1 parameter: tape record level, as `rec level`, CC 78 (2026-10-23; unit-tested, measured on an op-1: global, any channel, also the live synth/drum level, rests at its startup default of 95. not yet driven from the app on the ipad)
+- [x] LOW - op-1 parameter: sustain, CC 64, >= 64 = down (2026-10-23; unit-tested, measured on an op-1 against live notes, rests released. not yet checked against tape playback or driven from the app on the ipad)
 - [x] MED - ble startup scan reworked (2026-10-19; unit-tested, hardware-verified the same day on an ipad with a tx-6 over ble: reconnect on relaunch without a scan, "not found" after 60 s, a device switched on in the window connects): the 60 s launch scan is now a fixed deadline (discovering a device used to cancel it, so a stray ble-midi device left it running forever); it ends on connect and restarts for another 60 s when a ble device disconnects; before scanning, the app connects to a device the system already holds (`retrieveConnectedPeripherals`, which never advertises, so a scan cannot find it) or asks the system to connect to the remembered device (`retrievePeripherals(withIdentifiers:)`, a pending connect with no scan and no timeout; the id is saved on connect); a deliberate 'disconnect' sets `suppressAutoConnect` so none of this undoes it until a device is picked
 - [x] MED - while a ble device is connected, the device picker lists no other available ble devices (found 2026-10-18).. fixed 2026-10-19 (reworked the same day after the connected row vanished when the picker opened): the picker's list is now one pure type, `BleDeviceList`, that owns the rules (the connected/connecting device is always a row and survives a fresh scan; a disconnect or failed connect keeps its row until the silence rule drops it; everything else drops after 2 s quiet), tested as a state machine; `BLEMidi` only feeds it events and mutates it on its own queue. `BLEMidi.scanPlan` - while linked, a continuous scan (picker open) runs quietly (status and list untouched, nothing auto-connects) and a non-continuous one stops the scan; unit-tested, hardware-verified 2026-10-19 (tx-6 connected, tp-7 listed, row dropped in about 2 s when switched off, no flicker)
 - [x] MED - disconnecting a ble device in the picker removes it from the list, but it should stay listed if it is still available: disconnect should only clear the green box and change the status, and the device remains a row to tap again.. fixed 2026-10-19: a disconnect no longer forgets the device; it gets `lastSeen` = now + `BLEMidi.disconnectGrace` (3 s) on top of the 2 s silence rule, so it drops off only if it never advertises again; unit-tested, hardware-verified 2026-10-19 (stays tappable, not reconnected by itself, reconnects after power cycle)

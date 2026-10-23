@@ -127,12 +127,12 @@ struct LfoClip: Identifiable, Codable, Equatable {
     var wave: LfoWave
     var rateTicks: Int
     var freeRatePeriod: Double? = nil  // non-nil → free rate (fixed seconds, not tempo-dependent)
-    var depth: Double        // MIDI units (0-127), or BPM for tempo
-    var centerValue: Double  // MIDI units (0-127), or BPM for tempo
+    var depth: Double        // native units (ParamSpec.valueMax: 0-127, 0-16383 for bend), or BPM for tempo
+    var centerValue: Double  // native units, or BPM for tempo
     var inverted: Bool
     let loop: Bool           // set at creation; not editable
     var isEnabled: Bool = true   // false = paused; chip stays in list but sends no MIDI
-    let originalValue: Double    // MIDI value of parameter captured at clip creation (for restore-on-disable)
+    let originalValue: Double    // native value of parameter captured at clip creation (for restore-on-disable)
 
     init(id: UUID = UUID(), deviceId: String = "op1", track: Int, paramId: String,
          wave: LfoWave, rateTicks: Int, freeRatePeriod: Double? = nil,
@@ -214,6 +214,12 @@ struct LfoClip: Identifiable, Codable, Equatable {
 
 func midiToUI(_ v: Double) -> Double {
     (v * 99 / 127).rounded(.down)
+}
+
+/// `midiToUI` for a parameter whose native range is not 0-127 (pitch bend, 0-16383). 7-bit
+/// parameters keep `midiToUI` exactly; wider ones scale linearly, rounding down the same way.
+func nativeToUI(_ v: Double, valueMax: Double) -> Double {
+    valueMax == 127 ? midiToUI(v) : (v * 99 / valueMax).rounded(.down)
 }
 
 func uiToMidi(_ v: Double) -> Int {

@@ -137,6 +137,42 @@ final class MultiDeviceUITests: XCTestCase {
         XCTAssertFalse(tp7.buttons["eq high"].exists, "tp-7 has no eq")
     }
 
+    // MARK: - OP-1 global controls
+
+    /// The OP-1's rec level, master EQ, sustain and live bend are global: each is offered in the
+    /// picker, forces the master (m) target, and the ones with a neutral point start their centre
+    /// on it. The simulator has no MIDI, so this checks the layout and the state only.
+    @MainActor func testOP1GlobalControlsAreOfferedAndForceTheMasterTarget() throws {
+        let app = launch(profile: "op1")
+        let cases: [(name: String, centre: String?)] = [
+            ("rec level", "74"), ("eq low", "49"), ("eq mid", "49"),
+            ("eq high", "49"), ("sustain", nil), ("live bend", "49"),
+        ]
+        for c in cases {
+            let picker = app.buttons["paramPicker"]
+            XCTAssertTrue(picker.waitForExistence(timeout: 5))
+            picker.tap()
+            let option = app.buttons[c.name]
+            XCTAssertTrue(option.waitForExistence(timeout: 3), "'\(c.name)' must be in the OP-1's picker")
+            let list = app.scrollViews.containing(.button, identifier: c.name).firstMatch
+            var tries = 0
+            while !option.isHittable && tries < 15 && list.exists { list.swipeUp(); tries += 1 }
+            XCTAssertTrue(option.isHittable, "'\(c.name)' must be reachable by scrolling")
+            option.tap()
+
+            XCTAssertTrue(app.buttons["masterButton"].isEnabled, "\(c.name) targets master")
+            for t in 1...4 {
+                XCTAssertFalse(app.buttons["track\(t)Button"].isEnabled,
+                               "\(c.name) is global, so track \(t) must not be selectable")
+            }
+            if let centre = c.centre {
+                let value = app.descendants(matching: .any)["centerScrub"].value as? String
+                XCTAssertEqual(value, centre, "\(c.name): a new LFO must start centred on its neutral point")
+            }
+            if c.name == "live bend" { try shot(app, "op1_bend_live") }
+        }
+    }
+
     // MARK: - Slaved to a clock that never arrives
 
     /// Switching the clock source to a device that isn't sending clock freezes every LFO. The

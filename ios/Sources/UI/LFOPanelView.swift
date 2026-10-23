@@ -51,6 +51,18 @@ struct LFOPanelView: View {
     @State private var showHelp = false
     @State private var showSettings = false
 
+    /// Choose the parameter an LFO will drive, from the picker or the cycle button.
+    ///
+    /// A parameter with a neutral point (bend, the OP-1's EQ and record level) starts a new LFO
+    /// centred there rather than at the global default of 90, which for bend would start a new
+    /// chip at roughly 1.9x pitch and leave it there when it stops. Not while a chip is being
+    /// edited: its own centre has to survive a change of parameter.
+    private func selectParam(_ new: ParamSpec) {
+        let changed = new != app.lfoParam
+        app.lfoParam = new
+        if changed, selectedLfoID == nil, let centre = new.defaultCenter { app.lfoCenter = centre }
+    }
+
     private func snapCenter() {
         if app.lfoParam.role == .tempo {
             app.lfoCenter = app.bpm
@@ -140,12 +152,13 @@ struct LFOPanelView: View {
 
     @ViewBuilder private var paramRow: some View {
         HStack(spacing: m.controlHSpacing) {
-            Button { app.lfoParam = cycleNextParam(app.lfoParam) } label: {
+            Button { selectParam(cycleNextParam(app.lfoParam)) } label: {
                 Image(systemName: "bolt.fill")
                     .font(.system(size: m.iconSize))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
-            CompactPicker(options: app.profile.pickerParams, selection: $app.lfoParam,
+            CompactPicker(options: app.profile.pickerParams,
+                          selection: Binding(get: { app.lfoParam }, set: { selectParam($0) }),
                           label: { $0.name }, accessibilityId: "paramPicker")
         }
         .tourAnchor(.paramPicker)
@@ -261,6 +274,7 @@ struct LFOPanelView: View {
                     ActiveLfoChip(lfo: lfo,
                                   paramShort: spec?.short ?? lfo.paramId,
                                   isTempo: spec?.role == .tempo,
+                                  valueMax: spec?.valueMax ?? 127,
                                   selected: selectedLfoID == lfo.id) {
                         // Long press: enter edit or commit if already selected
                         if selectedLfoID == lfo.id { commitChipEdit() }
@@ -715,6 +729,9 @@ private struct ActiveLfoChip: View {
     /// Resolved by the caller from the active profile — the chip does not look up parameters.
     let paramShort: String
     let isTempo: Bool
+    /// Native top of the parameter (127, or 16383 for bend) so the chip can show centre and depth
+    /// on the same 0-99 scale as the sliders.
+    let valueMax: Double
     let selected: Bool
     let onSelect: () -> Void
     let onToggleEnabled: () -> Void
@@ -723,8 +740,8 @@ private struct ActiveLfoChip: View {
 
     private func chipLabel() -> Text {
         let t = lfo.track == 0 ? "m" : "\(lfo.track)"
-        let dCenter = isTempo ? Int(lfo.centerValue.rounded()) : Int(midiToUI(lfo.centerValue))
-        let dDepth  = isTempo ? Int(lfo.depth.rounded())       : Int(midiToUI(lfo.depth))
+        let dCenter = isTempo ? Int(lfo.centerValue.rounded()) : Int(nativeToUI(lfo.centerValue, valueMax: valueMax))
+        let dDepth  = isTempo ? Int(lfo.depth.rounded())       : Int(nativeToUI(lfo.depth, valueMax: valueMax))
         var result = Text(t)
         if lfo.inverted { result = result + Text(Image(systemName: "arrow.up.arrow.down")) }
         result = result + Text("·\(paramShort)·\(lfo.wave.shortName)")

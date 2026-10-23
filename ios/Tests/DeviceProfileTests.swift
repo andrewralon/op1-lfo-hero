@@ -20,6 +20,16 @@ final class OP1ProfileMatchesSpecTests: XCTestCase {
         ctrl.setProfile(.op1Field)
     }
 
+    /// The 20 parameters the app shipped with, in their persistence order. The OP-1 has grown
+    /// since (rec level, EQ, sustain, bend — see `OP1GlobalControlsTests`); these tests keep
+    /// guarding the original contract, so they look at this prefix only.
+    private static let legacyIds = ["volume", "pan", "mute", "tempo",
+                                    "par 1", "par 2", "par 3", "par 4",
+                                    "env A", "env D", "env S", "env R",
+                                    "fx 1", "fx 2", "fx 3", "fx 4",
+                                    "lfo 1", "lfo 2", "lfo 3", "lfo 4"]
+    private var legacyParams: [ParamSpec] { Array(profile.params.prefix(Self.legacyIds.count)) }
+
     /// The OP-1 CC map, transcribed from the spec: (channel, cc) for a parameter on a track.
     /// Master (track 0) always lands on channel 0 and, for fx/lfo, a different CC bank.
     private func expected(_ id: String, track: Int) -> (ch: Int, cc: Int)? {
@@ -51,7 +61,7 @@ final class OP1ProfileMatchesSpecTests: XCTestCase {
     /// Every parameter, every track, every probe value — profile output vs the transcribed spec.
     func testEveryParamTrackAndValueMatchesTheSpec() {
         var compared = 0
-        for spec in profile.params {
+        for spec in legacyParams {
             for track in 0...profile.trackCount where spec.isAvailable(onTrack: track) {
                 guard let want = expected(spec.id, track: track) else {
                     XCTAssertNil(profile.binding(spec, track: track).flatMap { b -> ParamBinding? in
@@ -80,13 +90,8 @@ final class OP1ProfileMatchesSpecTests: XCTestCase {
     /// The old `Parameter` enum's raw values are the persistence contract for saved LFO clips.
     /// If one of these ids changes, users lose chips on upgrade.
     func testLegacyParameterIdsAreAllPresent() {
-        let legacy = ["volume", "pan", "mute", "tempo",
-                      "par 1", "par 2", "par 3", "par 4",
-                      "env A", "env D", "env S", "env R",
-                      "fx 1", "fx 2", "fx 3", "fx 4",
-                      "lfo 1", "lfo 2", "lfo 3", "lfo 4"]
-        XCTAssertEqual(profile.params.map(\.id), legacy,
-                       "OP-1 parameter ids/order must match the old Parameter enum exactly")
+        XCTAssertEqual(profile.params.prefix(Self.legacyIds.count).map(\.id), Self.legacyIds,
+                       "the first 20 OP-1 parameter ids/order must match the old Parameter enum exactly; new ones are appended after")
     }
 
     /// Mirrors the old `Parameter.shortName` table — these appear on LFO chips.
@@ -96,7 +101,7 @@ final class OP1ProfileMatchesSpecTests: XCTestCase {
                         "env A": "eA", "env D": "eD", "env S": "eS", "env R": "eR",
                         "fx 1": "fx1", "fx 2": "fx2", "fx 3": "fx3", "fx 4": "fx4",
                         "lfo 1": "l1", "lfo 2": "l2", "lfo 3": "l3", "lfo 4": "l4"]
-        for spec in profile.params {
+        for spec in legacyParams {
             XCTAssertEqual(spec.short, expected[spec.id], "short name for '\(spec.id)'")
         }
     }
@@ -106,7 +111,7 @@ final class OP1ProfileMatchesSpecTests: XCTestCase {
     func testMasterCapabilityMatchesLegacy() {
         let masterCapable: Set<String> = ["tempo", "fx 1", "fx 2", "fx 3", "fx 4",
                                           "lfo 1", "lfo 2", "lfo 3", "lfo 4"]
-        for spec in profile.params {
+        for spec in legacyParams {
             XCTAssertEqual(spec.isMasterCapable, masterCapable.contains(spec.id),
                            "isMasterCapable for '\(spec.id)'")
             XCTAssertEqual(spec.isMasterOnly, spec.id == "tempo",
