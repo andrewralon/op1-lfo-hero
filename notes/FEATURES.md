@@ -24,10 +24,11 @@
 - [ ] MED - pause or stop LFO chaos - maybe stop button should stop lfo activity while setting up new LFOs cause it's distracting. Play should start it. Or a better way?
 - [ ] MED - rate/speed needs all of the OP-1 options - 25 options (in order): 8 to 1 (relative tempo time) + 17 for clock symbols 0 to 30 minutes (absolute time)
 - [ ] LOW - add parameter: SOUND SLOT SELECT - CC 102, channel 1-8, >=64 *****
-- [ ] LOW - add parameter: SYNTH PITCH BEND - channel 1-16, 0-16383
+- [ ] LOW - add parameter: SYNTH PITCH BEND - channel 1-16, 0-16383 (planned, per track, centred at 49 like the tp-7 — see PLANS.md "op-1 field: tape level, master eq, sustain, pitch bend")
 - [ ] LOW - add parameter: OCTAVE - CC 79, < 64 = down, ≥ 64 = up
-- [ ] LOW - add parameter: MASTER EQ low/mid/high - CC 90-92, 0-127
-- [ ] LOW - add parameter: SUSTAIN - CC 64, >= 64 = down
+- [ ] LOW - add parameter: MASTER EQ low/mid/high - CC 90-92, 0-127 (planned, see PLANS.md)
+- [ ] LOW - add parameter: TAPE RECORD LEVEL - CC 78, 0-127 (planned, see PLANS.md)
+- [ ] LOW - add parameter: SUSTAIN - CC 64, >= 64 = down (planned, see PLANS.md)
 - [ ] LOW - add parameter: LOOP IN/OUT/TOGGLE - CC 86-88, 0-127
 - [ ] LOW - depth & center spinboxes have no visual feedback for what they do since the waveform doesn't change.... not clear without trying it.
 - [ ] LOW - icons: center could use some clarity

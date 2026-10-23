@@ -5,6 +5,7 @@ testing records what was *assumed* — not what the code does.
 
 | plan | status |
 |---|---|
+| OP-1 tape level, master EQ, sustain, pitch bend | 🟡 **planned** — not built; needs hardware to verify |
 | TX-6 FX I / FX II transport buttons | 🟡 **deferred** — not built; open questions below |
 | Volume digits clipped in landscape | ✅ **shipped** |
 | Multi-device support (OP-1 / TX-6 / TP-7) | ⚠️ **superseded** — several assumptions proved wrong; see its banner |
@@ -15,6 +16,93 @@ For what the code actually does, read these instead:
 2. `RESEARCH.md` — measured hardware behaviour, including corrections to TE's own references
 3. `FIELD_DEVICE_SUPPORT.md` — what is done and what is untested
 4. `../tools/midi/` — the probes that produced the measurements
+
+---
+
+# OP-1 Field: tape level, master EQ, sustain, pitch bend
+
+> 🟡 **Planned — not built.** Written 2026-10-23 from a comparison of the OP-1 Field MIDI
+> reference (https://teenage.engineering/guides/op-1#midi-reference) against the OP-1 profile in
+> `DeviceProfiles.swift`. Nothing here has been sent to a real OP-1; delivery can only be
+> confirmed by watching the device (it transmits nothing and echoes nothing).
+
+## Context
+
+The OP-1 profile covers CC 7, 9, 10, 46-61, 70-77, 82 and 83, tempo through the app's own clock,
+and the clock/start/continue/stop/SPP transport messages. The reference lists more. The first batch
+to add is the ones that fit the existing LFO parameter system: **tape record level (CC 78), master
+EQ low/mid/high (CC 90-92), sustain (CC 64) and pitch bend**, the last modelled the way the TP-7's
+playback speed already is.
+
+All of this is profile data. CC numbers live only in `DeviceProfiles.swift`, and `Controller.send`
+already handles `.cc` and `.pitchBend` bindings, so no engine or UI code changes are needed.
+
+## Parameters
+
+Appended after the existing `lfo 1-4` params. The 20 existing ids and their order are a
+persistence contract for saved LFO clips and must not change.
+
+| id | name | short | binding |
+|---|---|---|---|
+| `op1.tapeLevel` | tape level | tpl | `masterOnly`, CC 78, ch 0, continuous |
+| `op1.eqLow` | eq low | eql | `masterOnly`, CC 90, ch 0, continuous |
+| `op1.eqMid` | eq mid | eqm | `masterOnly`, CC 91, ch 0, continuous |
+| `op1.eqHigh` | eq high | eqh | `masterOnly`, CC 92, ch 0, continuous |
+| `op1.sustain` | sustain | sus | `masterOnly`, CC 64, ch 0, `.switching(SwitchEncoding())` (127/0, threshold 64, as OP-1 mute) |
+| `op1.pitchbend` | pitch bend | pit | track binding `.pitchBend(channel: .trackRelative(offset: 0))`, no master, `defaultCenter: 49` |
+
+- Reuse the file-private `masterOnly(...)` helper. These CCs are "any channel" on the OP-1, so
+  channel 0 is fine and collides with nothing already on it (7, 9, 10, 46-61, 70-77).
+- **Pitch bend is per track** (channel = track), unlike the TP-7's single master bend. The existing
+  `masterPitchBend` helper is master-only, so add a sibling with a track binding. Keep
+  `defaultCenter: 49` for the same reason as the TP-7: a new LFO centred at the global default of
+  90 would start about 1.9x sharp.
+- **Unverified assumption:** the reference only says pitch bend is accepted on channels 1-16. That
+  the OP-1 applies it per channel to the matching track is a guess.
+
+## Tests
+
+- `DeviceProfileTests` pins the OP-1 id list, short names, master capability and a 504-message
+  coverage count over *all* `profile.params`. Scope those four to the 20 legacy ids and assert the
+  legacy ids are a prefix of `profile.params`, so they keep guarding the old contract unchanged.
+- New tests (same `RecordingDestination` pattern) for the wire bytes:
+  - CC 78 / 90 / 91 / 92 on ch 0 at 0, 1, 63, 64, 126, 127, passed through; `isMasterOnly`.
+  - CC 64 snaps: below 64 sends `[0xB0, 64, 0]`, 64 and above sends `[0xB0, 64, 127]`.
+  - Pitch bend on tracks 1 and 4: 0 gives `[0xE0|ch, 0, 0]`, 127 gives `[0xE0|ch, 127, 127]`;
+    unavailable on master (`isAvailable(onTrack: 0) == false`).
+- `NewDeviceProfileTests.testOnlyPitchBendDeclaresACentre` only accepts a `.pitchBend` *master*
+  binding; extend it to accept the track binding too.
+- The inbound-collision test in `DeviceProfileStructureTests` should pass unchanged.
+
+## Docs
+
+- `README.md` MIDI reference: rows for CC 64, 78, 90-92 and a pitch-bend line.
+- `RESEARCH.md` and `HARDWARE_CHECKLIST.md`: an unverified-on-hardware entry for each parameter.
+
+## Verification
+
+1. Unit tests (`-only-testing:op1-lfo-heroTests`); rerun on a "Busy / RequestDenied" launch failure.
+2. Simulator with `--uitest-reset --uitest-profile op1`: the six new entries appear in the LFO
+   picker, the CC params and sustain force the master (m) target, pitch bend selects a track and
+   starts near 49. The simulator has no MIDI, so this checks layout only.
+3. Hardware (iPad + OP-1, `HARDWARE_CHECKLIST.md`): EQ and tape level react, sustain holds notes,
+   and pitch bend lands on tracks 1-4 individually.
+
+## Not in this batch
+
+Still unimplemented from the reference, left for later:
+
+- **Tape transport CCs** 84 (jump to start), 85 (jump to end), 86/87 (loop in/out), 88 (toggle
+  loop), 104/105 (stop/play). Trigger buttons rather than LFO targets.
+- **Patch actions** CC 62 (randomize) and CC 63 (reset). Destructive to the active patch, so keep
+  them out of the LFO picker like the TP-7's record.
+- **Mode and slots** CC 93 (synth/drum), CC 102 (slot select), Program Change, CC 79 (octave).
+- **Metronome level** CC 81.
+- **Drum-mode meanings of CC 46-53** (pitch, loop in/out, play mode; attack, gain, release,
+  smooth). The app labels them as synth parameters only.
+- **Notes**: Note On/Off and CC 123 (all notes off). Needs a keyboard UI, a different kind of
+  feature from automation.
+- CC 80 (tempo) is deliberately not sent; the app retunes its own clock.
 
 ---
 
