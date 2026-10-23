@@ -29,6 +29,7 @@ Each file is self-contained — no package, no dependencies beyond CoreMIDI.
 | `playpress` | yes | replays the app's three play presses and measures each phase |
 | `cc18map` | yes | maps CC 18 across transport states — parked vs playing, the +708 null, the bend curve; `raw <b0> <b1> <b2>` sends one arbitrary message through the same proven connection, for quick one-off diagnostics |
 | `looptest` | yes | walks CC 17 (loop) through set-in/set-out/resend-while-active/release, with pauses to read the display |
+| `sweep` | yes | slowly sweeps pitch bend or one CC across chosen channels (`1`, `1,3`, `1-4`, `all`), announcing each, so you can hear which channel a device answers to; always recentres, even on Ctrl-C |
 
 \* `anymidi ... kick` sends a single `0xFB` partway through, to test whether transmission only
 starts after a transport message.
@@ -45,6 +46,8 @@ starts after a transport message.
 ./cc18map TP-7 control        # what the app sends today, measured — run this first
 ./cc18map TP-7 stopped        # is there a dead zone with the tape parked?
 ./cc18map TP-7 bendhold 0 10  # hold one bend value while playing, exact elapsed time, for counter cross-checks
+./sweep OP-1 bend 1-4         # which channel does bend land on? play a note or the tape while it runs
+./sweep OP-1 cc 90 1 8        # one CC on one channel, 8 s per sweep
 ```
 
 ## The measurement trick

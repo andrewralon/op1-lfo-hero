@@ -5,7 +5,7 @@ testing records what was *assumed* — not what the code does.
 
 | plan | status |
 |---|---|
-| OP-1 tape level, master EQ, sustain, pitch bend | 🟡 **planned** — not built; needs hardware to verify |
+| OP-1 tape level, master EQ, sustain, pitch bend | 🟡 **planned** — not built; sustain, bend, EQ and record level all measured on hardware |
 | TX-6 FX I / FX II transport buttons | 🟡 **deferred** — not built; open questions below |
 | Volume digits clipped in landscape | ✅ **shipped** |
 | Multi-device support (OP-1 / TX-6 / TP-7) | ⚠️ **superseded** — several assumptions proved wrong; see its banner |
@@ -23,70 +23,177 @@ For what the code actually does, read these instead:
 
 > 🟡 **Planned — not built.** Written 2026-10-23 from a comparison of the OP-1 Field MIDI
 > reference (https://teenage.engineering/guides/op-1#midi-reference) against the OP-1 profile in
-> `DeviceProfiles.swift`. Nothing here has been sent to a real OP-1; delivery can only be
-> confirmed by watching the device (it transmits nothing and echoes nothing).
+> `DeviceProfiles.swift`, then revised the same day after probing a real OP-1 Field over
+> Bluetooth with `tools/midi/sweep`. Sustain, pitch bend, master EQ and record level were all measured (below).
+> The OP-1 transmits nothing and echoes nothing, so delivery can only be confirmed by watching or
+> listening to the device.
 
 ## Context
 
 The OP-1 profile covers CC 7, 9, 10, 46-61, 70-77, 82 and 83, tempo through the app's own clock,
 and the clock/start/continue/stop/SPP transport messages. The reference lists more. The first batch
 to add is the ones that fit the existing LFO parameter system: **tape record level (CC 78), master
-EQ low/mid/high (CC 90-92), sustain (CC 64) and pitch bend**, the last modelled the way the TP-7's
-playback speed already is.
+EQ low/mid/high (CC 90-92), sustain (CC 64) and pitch bend**, the last modelled exactly the way the
+TP-7's playback speed already is (one master-level bend).
 
-All of this is profile data. CC numbers live only in `DeviceProfiles.swift`, and `Controller.send`
-already handles `.cc` and `.pitchBend` bindings, so no engine or UI code changes are needed.
+The parameters themselves are profile data: CC numbers live only in `DeviceProfiles.swift`, and
+`Controller.send` already handles `.cc` and `.pitchBend` bindings. **One small engine change is
+needed** so that stopping an LFO leaves these parameters somewhere sensible — see "Rest value".
+
+## Measured on hardware (2026-10-23, OP-1 Field over Bluetooth)
+
+| finding | detail |
+|---|---|
+| **Sustain** | CC 64 = 127 holds notes; 0 and 63 release. Behaves like a piano pedal, so ≥ 64 is down. Exactly 64 was not sent; it is taken from the reference. Tested on live notes only, not tape playback. |
+| **Pitch bend is global, on channel 1 only** | Bend on ch 1 moves the **selected instrument's live notes**. Ch 2, 3 and 4 do nothing: not the instrument, not the tape loop, not any other track (three runs each of 2, 3, 4). Channels 5-16 were not swept. |
+| **Pitch bend never touches the tape** | Neither recorded nor played-back material moves, only notes being played now. It presumably uses the instrument's portamento / bend-range settings (T2 envelope screen); that link is a guess. |
+| **Bend is a held level** | One `E0 7F 7F` stays in effect with nothing re-sent: held 3 s in one test, then held 30+ s in another through releasing keys and switching instrument. It only cleared when the patch was reset on the device (no recentre was sent). A bend LFO that merely stops sending therefore leaves the pitch wherever it last was. The exact no-bend value is **8192** (`E0 00 40`); 0-16383 has no integer midpoint. |
+| **Master EQ (CC 90, 91, 92)** | All three move the matching knob on the OP-1's EQ screen and audibly change the sound. **64 is dead centre on all three.** |
+| **Record level (CC 78)** | A global level, moved by the same CC on **channel 1 and channel 4** (two runs on 4), as the reference's "any channel" says. It drives the red record-level line on the tape screen and the volume of whatever the synth or drum engine is playing live, so it would set the level recorded to tape. Tape *playback* is unaffected. The app's binding (wire channel 0) is the one verified byte-for-byte: `B0 4E 00`, `B0 4E 7F`, `B0 4E 40` gave bottom, top, middle on the red line and in the sound. TE's guide calls it both the recording level and "the main level for Synthesizer and Drum sounds". No default is published and the device reports nothing back, but it resets on startup to a fixed position: CC 96 (about 75% up the line, measured from photos; see Parameters). |
+
+So the original plan's per-track pitch bend was wrong: the reference's "accepted on channels 1-16"
+does not mean per-channel bend on this device.
 
 ## Parameters
 
 Appended after the existing `lfo 1-4` params. The 20 existing ids and their order are a
 persistence contract for saved LFO clips and must not change.
 
-| id | name | short | binding |
-|---|---|---|---|
-| `op1.tapeLevel` | tape level | tpl | `masterOnly`, CC 78, ch 0, continuous |
-| `op1.eqLow` | eq low | eql | `masterOnly`, CC 90, ch 0, continuous |
-| `op1.eqMid` | eq mid | eqm | `masterOnly`, CC 91, ch 0, continuous |
-| `op1.eqHigh` | eq high | eqh | `masterOnly`, CC 92, ch 0, continuous |
-| `op1.sustain` | sustain | sus | `masterOnly`, CC 64, ch 0, `.switching(SwitchEncoding())` (127/0, threshold 64, as OP-1 mute) |
-| `op1.pitchbend` | pitch bend | pit | track binding `.pitchBend(channel: .trackRelative(offset: 0))`, no master, `defaultCenter: 49` |
+| id | name | short | binding | `restValue` (native) | `defaultCenter` (display) |
+|---|---|---|---|---|---|
+| `op1.recLevel` | rec level | rcl | `masterOnly`, CC 78, ch 0, continuous | 96 | 75 |
+| `op1.eqLow` | eq low | eql | `masterOnly`, CC 90, ch 0, continuous | 64 | 49 |
+| `op1.eqMid` | eq mid | eqm | `masterOnly`, CC 91, ch 0, continuous | 64 | 49 |
+| `op1.eqHigh` | eq high | eqh | `masterOnly`, CC 92, ch 0, continuous | 64 | 49 |
+| `op1.sustain` | sustain | sus | `masterOnly`, CC 64, ch 0, `.switching(SwitchEncoding())` (127/0, threshold 64, as OP-1 mute) | 0 | — |
+| `op1.pitchbend` | bend (live) | pit | `masterPitchBend(..., channel: 0)` — master-only, no track binding, **14-bit** | **8192** | 49 |
 
-- Reuse the file-private `masterOnly(...)` helper. These CCs are "any channel" on the OP-1, so
-  channel 0 is fine and collides with nothing already on it (7, 9, 10, 46-61, 70-77).
-- **Pitch bend is per track** (channel = track), unlike the TP-7's single master bend. The existing
-  `masterPitchBend` helper is master-only, so add a sibling with a track binding. Keep
-  `defaultCenter: 49` for the same reason as the TP-7: a new LFO centred at the global default of
-  90 would start about 1.9x sharp.
-- **Unverified assumption:** the reference only says pitch bend is accepted on channels 1-16. That
-  the OP-1 applies it per channel to the matching track is a guess.
+- Reuse the file-private `masterOnly(...)` and `masterPitchBend(...)` helpers. No track-bend
+  variant. CCs 64, 78 and 90-92 collide with nothing on channel 0 (7, 9, 10, 46-61, 70-77).
+- **Pitch bend is a master parameter that acts before the tape.** It only affects what the
+  instrument is playing live, so an LFO on it does nothing to anything already recorded. The name
+  `bend (live)` says so in the picker; keep the same wording in the RESEARCH.md entry.
+- Sustain gets no `defaultCenter`: a centre means nothing on a two-state switch.
+- **Record level rests at its startup default: MIDI 96 (96 / 127 = 75.6% of max; 75 on the 0-99 display scale).** The device resets to that level on power-up
+  and the guide does not publish it, so it was measured: on the tape screen the record-level dot
+  sits 75.4% of the way up its line at startup, and 75.3% after sending CC 78 = 96 (two photos).
+  MIDI 78 (61%) was sent to confirm: the dot sat far below the startup position. One CC step is under a pixel in a photo, so the true
+  default is 96 give or take a step or two; 96 is used. `defaultCenter: 75` starts a new LFO there,
+  and the neutral snap makes that slider position exactly 96 (plain conversion would give 97).
+  Named "rec level" rather than "tape level" because it does not touch tape playback.
+
+## Pitch bend is 14-bit end to end
+
+**Problem.** Every LFO value is currently rounded to a whole number 0-127 *inside the LFO
+evaluation* (`AutomationEngine.evaluate`, the two `.rounded()` clamps), and the centre and depth the
+user sets are quantised to 128 steps by `uiToMidi`. `Controller` then stretches that to 14 bits. So
+bend has 128 distinct positions, spaced ~129 apart, and the exact centre 8192 is unreachable from a
+running LFO. This is true of the TP-7's bend today.
+
+**Change.**
+- `ParamSpec` gains `var valueMax: Double = 127` — the top of the parameter's native range. Bend
+  sets `16383`. Everything that carries a parameter value (`LfoClip.centerValue`, `depth`,
+  `originalValue`, `restValue`, the `evaluate` clamp, `DeviceProfile.clamp`) is in these **native
+  units**. Tempo stays in BPM as now.
+- `evaluate` clamps to `0...spec.valueMax` and rounds **once**, to a whole native unit. That one
+  rounding is unavoidable (the wire carries an integer) and is the only one: nothing passes through
+  a 7-bit value on the way.
+- `Controller.send(.pitchBend)` stops scaling: it takes the native 0...16383 value, rounds once and
+  splits it into two 7-bit bytes. The `* 16383 / 127` stretch is deleted.
+- Display to native for 14-bit parameters is linear, `d * valueMax / 99` (depth 99 = full scale;
+  inverse `native * 99 / valueMax`, rounding down, as `midiToUI` does). 7-bit parameters keep
+  `uiToMidi`/`midiToUI` exactly as they are.
+- **Neutral snap.** The 0-99 slider cannot express 8192 (it has no 49.5), and linear would put
+  display 49 at 8126. So when a parameter declares both `defaultCenter` and `restValue`, the slider
+  position `defaultCenter` converts to **exactly `restValue`**; every other position is linear.
+  A new bend LFO therefore starts centred on exactly 8192, and the EQ bands on exactly 64
+  (was 63). Slider positions either side of it step ~165 units apart for bend; that is a limit of
+  the slider, not of the LFO.
+
+**Persistence.** Saved `tp7.pitchbend` chips hold centre/depth/original in 0-127. A one-time
+migration (flag in `UserDefaults`, same hook as `legacyParamIdMap`) rescales centre and depth by
+`16383 / 127`, rounded, and sets `originalValue` to **8192** — what the old restore was reaching
+for. Without it a saved chip would sweep a 128th of its range. The OP-1 bend is new, so it has
+nothing to migrate.
+
+## Rest value and ending an LFO
+
+**Problem.** When a chip is paused, deleted or finishes, "previous" restores the chip's
+`originalValue`. For a generic parameter the app has nothing better than the chip's own centre
+(`AppState.capturedValue`, `.generic` case), because the OP-1 reports no state. With the default
+centre that leaves sustain **down**, an EQ band **boosted**, and bend **off-centre** — and bend, as
+measured above, stays that way until something sends 8192.
+
+**Change.**
+- `ParamSpec` gains `var restValue: Double? = nil`, in native units, documented next to
+  `defaultCenter`: `defaultCenter` is where a *new* LFO's centre slider starts (display units);
+  `restValue` is what the parameter goes back to when the LFO *stops* (native units).
+- `capturedValue`'s `.generic` case returns `spec.restValue ?? fallback`, so "previous" sends the
+  neutral value for sustain, EQ and bend.
+- **No override.** "on pause" / "on finish" keep their documented meaning for every parameter,
+  bend included: `previous` sends `restValue`, `center` sends the chip's centre, `hold` sends
+  nothing, and a user who chooses `hold` or `center` gets what they asked for. Because a new bend
+  LFO's centre starts at exactly 8192 (neutral snap above), `center` also ends at exactly 8192
+  unless the user moved the slider.
+- `masterPitchBend` sets `restValue: 8192`, so the TP-7's bend ends exactly at 8192 on `previous`
+  as well.
+
+**Not covered.** The device holds the level, so choosing `hold`, a force-quit, a crash or a Bluetooth drop in the
+middle of a bend LFO leaves the bend on (`hold` by choice, the rest by accident). Sending 8192 (or resetting the patch on the device) clears it; note that in
+the RESEARCH.md entry and the help text.
 
 ## Tests
 
 - `DeviceProfileTests` pins the OP-1 id list, short names, master capability and a 504-message
   coverage count over *all* `profile.params`. Scope those four to the 20 legacy ids and assert the
   legacy ids are a prefix of `profile.params`, so they keep guarding the old contract unchanged.
-- New tests (same `RecordingDestination` pattern) for the wire bytes:
-  - CC 78 / 90 / 91 / 92 on ch 0 at 0, 1, 63, 64, 126, 127, passed through; `isMasterOnly`.
+- Wire bytes (`RecordingDestination` pattern):
+  - CC 78 / 90 / 91 / 92 on ch 0 at 0, 1, 63, 64, 126, 127, passed through; all `isMasterOnly`.
   - CC 64 snaps: below 64 sends `[0xB0, 64, 0]`, 64 and above sends `[0xB0, 64, 127]`.
-  - Pitch bend on tracks 1 and 4: 0 gives `[0xE0|ch, 0, 0]`, 127 gives `[0xE0|ch, 127, 127]`;
-    unavailable on master (`isAvailable(onTrack: 0) == false`).
-- `NewDeviceProfileTests.testOnlyPitchBendDeclaresACentre` only accepts a `.pitchBend` *master*
-  binding; extend it to accept the track binding too.
+  - Bend on both devices, in native units: 0 gives `[0xE0, 0, 0]`, 8192 gives `[0xE0, 0, 64]`,
+    16383 gives `[0xE0, 127, 127]`; 8191.4 gives 8191 and 8191.6 gives 8192 (one rounding, no
+    intermediate). OP-1 bend is master-only on ch 0 and unavailable on tracks 1-4.
+  - The existing TP-7 bend assertions (`NewDeviceProfileTests` near 732-745) change from 0-127
+    inputs to native inputs.
+- 14-bit LFO: a bend LFO over one cycle at full depth produces more than 100 distinct wire values,
+  stays within 0...16383, and includes values that a 128-step grid could not (not all multiples of
+  ~129). A bend LFO centred by the neutral snap at depth 0 sends exactly `[0xE0, 0, 64]`. The EQ
+  neutral snap sends 64, not 63.
+- Ending an LFO, for bend, sustain and EQ alike: with the setting on `previous`, a paused,
+  finished, stopped or deleted chip, or an ended preview, sends the rest value (`[0xE0, 0, 64]`,
+  `[0xB0, 64, 0]`, `[0xB0, 90, 64]`). On `center` it sends the chip's centre, and for a bend chip
+  left at the default centre that is exactly `[0xE0, 0, 64]`. On `hold` it sends nothing.
+- Persistence: migrating a saved `tp7.pitchbend` chip rescales centre and depth and sets
+  `originalValue` to 8192; migrating twice changes nothing.
+- Every `restValue` lies within `0...valueMax`, and only `.generic`-role params set one (the mixer
+  roles already have real captured state).
+- `NewDeviceProfileTests.testOnlyPitchBendDeclaresACentre` fails for any `defaultCenter` that isn't
+  on a master pitch-bend binding, and the EQ params now declare one. Rename it and allow pitch bend
+  or the three EQ ids explicitly, so a stray centre elsewhere still fails.
 - The inbound-collision test in `DeviceProfileStructureTests` should pass unchanged.
 
 ## Docs
 
-- `README.md` MIDI reference: rows for CC 64, 78, 90-92 and a pitch-bend line.
-- `RESEARCH.md` and `HARDWARE_CHECKLIST.md`: an unverified-on-hardware entry for each parameter.
+- `README.md` MIDI reference: rows for CC 64, 78, 90-92 and a pitch-bend line (channel 1 only,
+  live notes only).
+- `RESEARCH.md`: the "Measured on hardware" table above, under "Hardware findings — OP-1 Field".
+  `HARDWARE_CHECKLIST.md`: an entry for record level, and for sustain on tape playback (not yet tested).
+- `tools/midi/README.md`: add `sweep` to the tool table (it ships with this branch).
 
 ## Verification
 
 1. Unit tests (`-only-testing:op1-lfo-heroTests`); rerun on a "Busy / RequestDenied" launch failure.
 2. Simulator with `--uitest-reset --uitest-profile op1`: the six new entries appear in the LFO
-   picker, the CC params and sustain force the master (m) target, pitch bend selects a track and
-   starts near 49. The simulator has no MIDI, so this checks layout only.
-3. Hardware (iPad + OP-1, `HARDWARE_CHECKLIST.md`): EQ and tape level react, sustain holds notes,
-   and pitch bend lands on tracks 1-4 individually.
+   picker, all of them force the master (m) target, and bend and the EQ bands start near 49. The
+   simulator has no MIDI, so this checks layout only.
+3. Hardware (iPad + OP-1, `HARDWARE_CHECKLIST.md`):
+   - EQ and sustain react as measured; stopping each LFO chip returns EQ to flat and releases
+     sustain.
+   - Bend: a slow bend LFO is audibly smooth (no 128-step staircase); pausing, stopping, deleting
+     and finishing a one-shot each leave **no** bend with the setting on `previous` (and on
+     `center` at the default centre); on `hold` the bend stays where the LFO left it, by design. Repeat on the TP-7 (speed returns to exactly 1x) since its values were rescaled.
+   - Record level: an LFO audibly rides the level of the live synth/drum sound and the red line on
+     the tape screen; tape playback is unchanged.
 
 ## Not in this batch
 
