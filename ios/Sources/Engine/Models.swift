@@ -219,7 +219,9 @@ func midiToUI(_ v: Double) -> Double {
 /// `midiToUI` for a parameter whose native range is not 0-127 (pitch bend, 0-16383). 7-bit
 /// parameters keep `midiToUI` exactly; wider ones scale linearly, rounding down the same way.
 func nativeToUI(_ v: Double, valueMax: Double) -> Double {
-    valueMax == 127 ? midiToUI(v) : (v * 99 / valueMax).rounded(.down)
+    // The epsilon absorbs float error in the d*max/99 -> *99/max round trip, which otherwise
+    // lands just under the integer and floors one step low (display 51 and 55 on a 16383 range).
+    valueMax == 127 ? midiToUI(v) : (v * 99 / valueMax + 1e-9).rounded(.down)
 }
 
 func uiToMidi(_ v: Double) -> Int {

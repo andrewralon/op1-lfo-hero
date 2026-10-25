@@ -73,6 +73,7 @@ case "cc":
 default:
     usage()
 }
+if !seconds.isFinite || seconds <= 0 { seconds = 6 }   // "nan"/"inf" would trap in Int(...) below
 
 func find(_ count: Int, _ get: (Int) -> MIDIEndpointRef) -> MIDIEndpointRef {
     var fallback: MIDIEndpointRef = 0
@@ -90,10 +91,15 @@ guard dest != 0 else { print("NO \(target) destination — run ./mididiag"); exi
 var client = MIDIClientRef(); MIDIClientCreate("sweep" as CFString, nil, nil, &client)
 var outPort = MIDIPortRef(); MIDIOutputPortCreate(client, "out" as CFString, &outPort)
 func send(_ b: [UInt8]) {
-    var pkt = MIDIPacketList()
-    let p = MIDIPacketListInit(&pkt)
-    _ = MIDIPacketListAdd(&pkt, 1024, p, 0, b.count, b)
-    MIDISend(outPort, dest, &pkt)
+    // The list must really be as large as the size handed to MIDIPacketListAdd; a bare
+    // MIDIPacketList() is only ~268 bytes.
+    let size = 1024
+    let raw = UnsafeMutableRawPointer.allocate(byteCount: size, alignment: MemoryLayout<MIDIPacketList>.alignment)
+    defer { raw.deallocate() }
+    let pkt = raw.bindMemory(to: MIDIPacketList.self, capacity: 1)
+    let p = MIDIPacketListInit(pkt)
+    _ = MIDIPacketListAdd(pkt, size, p, 0, b.count, b)
+    MIDISend(outPort, dest, pkt)
 }
 func say(_ s: String) { print(s); fflush(stdout) }
 
@@ -118,7 +124,8 @@ func recentre(ch: Int) {
 
 // Triangle: centre -> top -> bottom -> centre, in 20 ms steps.
 func sweep(ch: Int) {
-    let stepsPerLeg = Int(seconds / 0.02 / 4)
+    // At least one step per leg: 0 divides by zero below, and a NaN/inf trap on Int(...).
+    let stepsPerLeg = max(1, Int(seconds / 0.02 / 4))
     var path: [Double] = []
     for i in 0...stepsPerLeg { path.append(0.5 + 0.5 * Double(i) / Double(stepsPerLeg)) }
     for i in 0...(2 * stepsPerLeg) { path.append(1.0 - Double(i) / Double(stepsPerLeg)) }

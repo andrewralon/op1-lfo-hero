@@ -44,7 +44,7 @@ needed** so that stopping an LFO leaves these parameters somewhere sensible — 
 
 | finding | detail |
 |---|---|
-| **Sustain** | CC 64 = 127 holds notes; 0 and 63 release. Behaves like a piano pedal, so ≥ 64 is down. Exactly 64 was not sent; it is taken from the reference. Tested on live notes only, not tape playback. |
+| **Sustain** | CC 64 = 127 holds notes; 0 and 63 release. Behaves like a piano pedal, so ≥ 64 is down. Exactly 64 was not sent; it is taken from the reference. It does nothing to tape playback, only to what is played live on the selected instrument (confirmed 2026-10-25). |
 | **Pitch bend is global, on channel 1 only** | Bend on ch 1 moves the **selected instrument's live notes**. Ch 2, 3 and 4 do nothing: not the instrument, not the tape loop, not any other track (three runs each of 2, 3, 4). Channels 5-16 were not swept. |
 | **Pitch bend never touches the tape** | Neither recorded nor played-back material moves, only notes being played now. It presumably uses the instrument's portamento / bend-range settings (T2 envelope screen); that link is a guess. |
 | **Bend is a held level** | One `E0 7F 7F` stays in effect with nothing re-sent: held 3 s in one test, then held 30+ s in another through releasing keys and switching instrument. It only cleared when the patch was reset on the device (no recentre was sent). A bend LFO that merely stops sending therefore leaves the pitch wherever it last was. The exact no-bend value is **8192** (`E0 00 40`); 0-16383 has no integer midpoint. |
@@ -179,7 +179,7 @@ the RESEARCH.md entry and the help text.
 - `README.md` MIDI reference: rows for CC 64, 78, 90-92 and a pitch-bend line (channel 1 only,
   live notes only).
 - `RESEARCH.md`: the "Measured on hardware" table above, under "Hardware findings — OP-1 Field".
-  `HARDWARE_CHECKLIST.md`: an entry for record level, and for sustain on tape playback (not yet tested).
+  `HARDWARE_CHECKLIST.md`: an entry for record level, and for sustain on tape playback (tested: no effect).
 - `tools/midi/README.md`: add `sweep` to the tool table (it ships with this branch).
 
 ## Verification

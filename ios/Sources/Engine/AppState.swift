@@ -65,7 +65,7 @@ final class AppState: ObservableObject {
     }
     @Published var lfoRate   = 3           // 1-8
     @Published var lfoDepth  = 10.0        // display units (0-99)
-    @Published var lfoCenter = 90.0        // display units (0-99)
+    @Published var lfoCenter = AppState.defaultLfoCenter        // display units (0-99)
     @Published var trackOn   = [1: 1, 2: 0, 3: 0, 4: 0]  // 0=off 1=on 2=inv
     @Published var masterOn  = 0                            // 0=off 1=on 2=inv
     @Published var activeLfos: [LfoClip] = []
@@ -738,6 +738,8 @@ final class AppState: ObservableObject {
     /// Musical range for any tempo the app will accept or display. 0 is kept as a separate
     /// sentinel meaning "slaved, no clock data yet", so it is deliberately outside this.
     static let minBpm = 20.0
+    /// Where a new LFO's centre slider starts (display units) when the parameter has no neutral point.
+    static let defaultLfoCenter = 90.0
     /// The one tempo ceiling, used everywhere: what the app generates as clock master, the tempo LFO
     /// range, the typed and scrubbed BPM, a saved tempo, and what it accepts from a device it follows.
     /// Set to the highest of TE's own limits (OP-1 Field 440, TX-6 400, TP-7 shows 200 but is assumed to
@@ -1021,6 +1023,7 @@ final class AppState: ObservableObject {
     func saveChipEdits(id: UUID) {
         guard let idx = activeLfos.firstIndex(where: { $0.id == id }) else { return }
         var lfo = activeLfos[idx]
+        let sameParam = lfo.paramId == lfoParam.id
 
         lfo.deviceId  = profile.id
         lfo.paramId   = lfoParam.id
@@ -1038,8 +1041,15 @@ final class AppState: ObservableObject {
             lfo.depth       = lfoDepth
             lfo.centerValue = lfoCenter
         } else {
-            lfo.depth       = lfoParam.nativeDepth(fromDisplay: lfoDepth)
-            lfo.centerValue = lfoParam.nativeCenter(fromDisplay: lfoCenter)
+            // A slider left where the chip's own value displays keeps that exact value: converting
+            // back would quantise it (and snap a near-rest centre to the rest value), so opening a
+            // chip and committing would change it.
+            if !(sameParam && lfoParam.displayValue(fromNative: lfo.depth) == lfoDepth) {
+                lfo.depth = lfoParam.nativeDepth(fromDisplay: lfoDepth)
+            }
+            if !(sameParam && lfoParam.displayValue(fromNative: lfo.centerValue) == lfoCenter) {
+                lfo.centerValue = lfoParam.nativeCenter(fromDisplay: lfoCenter)
+            }
         }
 
         // Track + inverted: master takes priority; otherwise lowest-indexed non-zero track.

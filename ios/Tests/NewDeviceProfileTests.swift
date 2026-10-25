@@ -2223,6 +2223,18 @@ final class OP1GlobalControlsTests: XCTestCase {
         XCTAssertEqual(bend.nativeDepth(fromDisplay: 0), 0)
     }
 
+    func testEverySliderPositionRoundTripsThroughTheFourteenBitScale() {
+        // d*16383/99 followed by *99/16383 lands just under d for 51 and 55 in plain floating
+        // point, which used to read back one step low and let an edit drift a chip's value.
+        let bend = spec("op1.pitchbend")
+        for d in stride(from: 0.0, through: 99.0, by: 1) {
+            XCTAssertEqual(bend.displayValue(fromNative: bend.nativeDepth(fromDisplay: d)), d, "depth \(d)")
+            if d != bend.defaultCenter {
+                XCTAssertEqual(bend.displayValue(fromNative: bend.nativeCenter(fromDisplay: d)), d, "centre \(d)")
+            }
+        }
+    }
+
     func testSevenBitParametersKeepTheirOriginalDisplayConversion() {
         let vol = spec("volume")
         for v in stride(from: 0.0, through: 99.0, by: 1) {

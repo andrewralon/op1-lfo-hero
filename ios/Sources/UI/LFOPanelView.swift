@@ -58,9 +58,15 @@ struct LFOPanelView: View {
     /// chip at roughly 1.9x pitch and leave it there when it stops. Not while a chip is being
     /// edited: its own centre has to survive a change of parameter.
     private func selectParam(_ new: ParamSpec) {
-        let changed = new != app.lfoParam
+        let old = app.lfoParam
         app.lfoParam = new
-        if changed, selectedLfoID == nil, let centre = new.defaultCenter { app.lfoCenter = centre }
+        guard new != old, selectedLfoID == nil else { return }
+        if let centre = new.defaultCenter {
+            app.lfoCenter = centre
+        } else if old.defaultCenter != nil {
+            // Leaving a neutral-centred parameter: its centre (49 for bend) means nothing here.
+            app.lfoCenter = AppState.defaultLfoCenter
+        }
     }
 
     private func snapCenter() {

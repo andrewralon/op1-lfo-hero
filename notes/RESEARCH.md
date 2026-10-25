@@ -1347,7 +1347,7 @@ device by eye and ear.
 
 | control | result |
 |---|---|
-| **Sustain, CC 64** | 127 holds live notes; 0 and 63 release; behaves like a piano pedal. Exactly 64 was not sent (taken from the reference). Whether it holds notes on tape playback was not tested. |
+| **Sustain, CC 64** | 127 holds live notes; 0 and 63 release; behaves like a piano pedal. Exactly 64 was not sent (taken from the reference). It does nothing to tape playback: it only holds what is being played live on the selected instrument (confirmed on an OP-1, 2026-10-25), like pitch bend. |
 | **Pitch bend** | **Global, channel 1 only.** It bends the selected instrument's live notes. Channels 2, 3 and 4 do nothing (three runs of each): not the instrument, not the tape loop, not another track. It never touches recorded or played-back tape. Presumably it drives the instrument's portamento / bend-range settings (T2, envelope screen); that link is a guess. Channels 5-16 were not swept. |
 | **Bend is a held level** | One `E0 7F 7F` stayed in effect with nothing re-sent: 3 s in one test, then 30+ s in another through releasing keys and switching instrument. It cleared only when the patch was reset on the device. The no-bend value is **8192** (`E0 00 40`); 0-16383 has no integer midpoint. |
 | **Master EQ, CC 90 / 91 / 92** | All three move the matching knob on the OP-1's EQ screen and audibly change the sound. **64 is dead centre on all three.** Answered on channel 1. |

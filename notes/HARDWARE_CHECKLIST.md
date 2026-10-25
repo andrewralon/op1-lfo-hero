@@ -22,7 +22,7 @@ Needs `iPad Pro Dawg` with the device on USB-C. Record the commit, the date, and
 - [ ] rec level, eq low/mid/high, sustain and pitch bend from the app on the iPad: each is offered under the master (m) target only; a slow LFO on each is audible and the OP-1 screen follows (EQ knobs, the red record-level line)
 - [ ] stopping or pausing each of those chips on `previous` returns it to neutral: EQ flat, sustain released, record level back to 95, no bend left. `hold` leaves it where the LFO was, by design
 - [ ] a pitch bend LFO is smooth (no 128-step staircase) and ends on exactly 8192; a one-shot finishes on 8192 too
-- [ ] sustain also holds notes against tape playback? (not tested yet)
+- [x] sustain does nothing to tape playback; it only holds live notes on the selected instrument (2026-10-25)
 - [ ] **TP-7:** speed bend returns to exactly x1.0 when its LFO stops, and a saved TP-7 bend chip from an older build still sweeps the same range after the 14-bit migration (settings v2 -> v3)
 
 ## Probing from a Mac (`tools/midi/`)
