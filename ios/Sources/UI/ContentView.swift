@@ -906,7 +906,7 @@ struct SettingsView: View {
 
             // Deliberately does not touch the tutorial, which lives in help.
             SheetItem("reset settings", text: {
-                Text("put every setting above back to how it started: device = auto, lfo chip on pause = previous, one-shot lfo chip on finish = hold, clean up one-shot lfo chips = off.")
+                Text("put all settings back to default values.")
             }, controls: {
                 Button("reset to defaults") { resetToDefaults() }
                     .buttonStyle(CapsuleButtonStyle())
@@ -978,7 +978,7 @@ struct SettingsView: View {
 
     private func toggleItem(_ title: String, _ desc: String, _ isOn: Binding<Bool>,
                             joke: Bool = false) -> some View {
-        SheetItem(joke ? "\u{1F3B2} \(title)" : title, italic: joke, text: { Text(desc) }, accessory: {
+        SheetItem(title, italic: joke, text: { Text(desc) }, accessory: {
             Toggle("", isOn: isOn)
                 .labelsHidden()
                 .tint(C.green)
