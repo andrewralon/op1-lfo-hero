@@ -163,6 +163,85 @@ final class MultiDeviceUITests: XCTestCase {
         XCTAssertFalse(thumb.exists, "a list that fits has nothing to scroll, so no bar")
     }
 
+    // MARK: - Picker interaction: tap opens, drag scrubs
+
+    /// Drags `element` vertically by `dy` points (negative = up) from its centre.
+    @MainActor private func drag(_ element: XCUIElement, dy: CGFloat) {
+        let start = element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: dy)))
+        Thread.sleep(forTimeInterval: 0.3)
+    }
+
+    /// The speed box opens its 25-item list on a tap, like the param and wave boxes, and the
+    /// list is long enough to need the always-visible scroll bar.
+    @MainActor func testTappingTheSpeedBoxOpensTheListWithAScrollBar() throws {
+        let app = launch(profile: "op1")
+        let rate = app.descendants(matching: .any)["rateScrub"]
+        XCTAssertTrue(rate.waitForExistence(timeout: 5))
+        rate.tap()
+
+        XCTAssertTrue(app.buttons["f17"].waitForExistence(timeout: 3) || app.buttons["f1"].waitForExistence(timeout: 3),
+                      "the speed list must open")
+        let thumb = app.descendants(matching: .any)["pickerScrollThumb"]
+        XCTAssertTrue(thumb.waitForExistence(timeout: 3), "25 speeds overflow the popover, so a bar shows")
+
+        let list = app.scrollViews.containing(.button, identifier: "8").firstMatch
+        var tries = 0
+        while !app.buttons["f17"].isHittable && tries < 10 && list.exists { list.swipeUp(); tries += 1 }
+        app.buttons["f17"].tap()
+        XCTAssertEqual(rate.value as? String, "f17", "picking from the list sets the speed")
+    }
+
+    /// Centre and depth are values to drag, not lists: a tap does nothing.
+    @MainActor func testTappingCenterOrDepthOpensNothing() throws {
+        let app = launch(profile: "op1")
+        for id in ["centerScrub", "depthScrub"] {
+            let box = app.descendants(matching: .any)[id]
+            XCTAssertTrue(box.waitForExistence(timeout: 5))
+            let before = box.value as? String
+            box.tap()
+            sleep(1)
+            XCTAssertFalse(app.descendants(matching: .any)["pickerScrollThumb"].exists, id)
+            XCTAssertFalse(app.buttons["f1"].exists, "\(id) must not open a list")
+            XCTAssertEqual(box.value as? String, before, id)
+        }
+    }
+
+    /// A drag on the wave box steps through the shapes; up goes to later ones, as on the speed box.
+    @MainActor func testDraggingTheWaveBoxStepsThroughTheShapes() throws {
+        let app = launch(profile: "op1")
+        let waves = app.buttons["wavePicker"]
+        XCTAssertTrue(waves.waitForExistence(timeout: 5))
+        let first = waves.label
+        drag(waves, dy: -70)
+        XCTAssertNotEqual(waves.label, first, "dragging up must move to another shape")
+        drag(waves, dy: 70)
+        XCTAssertEqual(waves.label, first, "and dragging back down returns to where it began")
+    }
+
+    /// The center box follows the parameter you let go on, not the ones passed over on the way.
+    @MainActor func testDraggingTheParamBoxRecentresOnTheOneYouLandOn() throws {
+        let app = launch(profile: "op1")
+        let params = app.buttons["paramPicker"]
+        let center = app.descendants(matching: .any)["centerScrub"]
+        XCTAssertTrue(params.waitForExistence(timeout: 5))
+        XCTAssertEqual(center.value as? String, "90")
+
+        // Pitch bend is the last item, so enough upward drags land on it (and stay: it is clamped).
+        var tries = 0
+        while params.label != "pitch bend" && tries < 6 { drag(params, dy: -300); tries += 1 }
+        XCTAssertEqual(params.label, "pitch bend")
+        XCTAssertEqual(center.value as? String, "49", "released on bend: center jumps to bend's rest")
+
+        // Back out past the EQ and sustain (which also centre at 49 or not at all) to a plain one.
+        tries = 0
+        while params.label == "pitch bend" || (center.value as? String) == "49" {
+            drag(params, dy: 300); tries += 1
+            if tries >= 6 { break }
+        }
+        XCTAssertEqual(center.value as? String, "90", "released on a plain parameter: back to the default")
+    }
+
     /// on it. The simulator has no MIDI, so this checks the layout and the state only.
     @MainActor func testOP1GlobalControlsAreOfferedAndForceTheMasterTarget() throws {
         let app = launch(profile: "op1")
