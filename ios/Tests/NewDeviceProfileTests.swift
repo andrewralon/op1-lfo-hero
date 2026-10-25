@@ -2387,3 +2387,31 @@ final class SlopeAndHoldTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode(LfoClip.self, from: json).wave, .sine)
     }
 }
+
+/// f1–f17 follow the OP-1's menus: f1 is the slowest, f17 the fastest.
+final class FreeRateOrderTests: XCTestCase {
+
+    func testF1IsTheSlowestAndF17TheFastest() {
+        XCTAssertEqual(FREE_RATE_SECONDS[9], FREE_RATE_MAX_S)
+        XCTAssertEqual(FREE_RATE_SECONDS[25]!, FREE_RATE_MIN_S, accuracy: 1e-12)
+        XCTAssertEqual(rateScrubLabel(for: 9), "f1")
+        XCTAssertEqual(rateScrubLabel(for: 25), "f17")
+    }
+
+    func testPeriodsStrictlyShortenFromF1ToF17() {
+        let periods = (9...25).map { FREE_RATE_SECONDS[$0]! }
+        XCTAssertEqual(periods.count, 17)
+        for (slower, faster) in zip(periods, periods.dropFirst()) {
+            XCTAssertGreaterThan(slower, faster)
+        }
+    }
+
+    func testASavedChipKeepsItsSpeedAndTakesTheLabelOfThatSpeed() {
+        // A chip stores seconds, so a 15 s chip was "f17" before the flip and is "f1" after.
+        let clip = LfoClip(track: 1, paramId: "volume", wave: .sine, rateTicks: 96,
+                           freeRatePeriod: FREE_RATE_MAX_S, depth: 10, centerValue: 64,
+                           inverted: false, loop: true, originalValue: 64)
+        XCTAssertEqual(clip.rateIndex, 9)
+        XCTAssertEqual(clip.rateLabel, "f1")
+    }
+}

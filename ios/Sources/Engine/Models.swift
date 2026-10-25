@@ -18,7 +18,9 @@ let RATE_TICKS: [Int: Int] = [
 let RATE_LABELS = ["8×", "4×", "2×", "1b", "2b", "4b", "8b", "16b"]
 
 // Free rates (f1–f17): fixed-time, tempo-independent. Rate indices 9–25.
-// Period in seconds, log-spaced from FREE_RATE_MIN_S to FREE_RATE_MAX_S.
+// Period in seconds, log-spaced from FREE_RATE_MIN_S to FREE_RATE_MAX_S. Ordered like the
+// OP-1's own menus: f1 is the slowest (index 9, FREE_RATE_MAX_S) and f17 the fastest (index 25,
+// FREE_RATE_MIN_S). The tempo-synced rates before them still run fastest to slowest.
 let FREE_RATE_MIN_S = 0.02
 let FREE_RATE_MAX_S = 15.0
 let FREE_RATE_SECONDS: [Int: Double] = {
@@ -26,10 +28,10 @@ let FREE_RATE_SECONDS: [Int: Double] = {
     let n = 17
     let logMin = log(FREE_RATE_MIN_S), logMax = log(FREE_RATE_MAX_S)
     for i in 0..<n {
-        // Exponent < 1 gives larger steps near the fast end (f1-f3) and
-        // smaller steps near the slow end (f15-f17) vs pure log spacing.
+        // i counts up from the fastest rate. Exponent < 1 gives larger steps near the fast end
+        // (f15-f17) and smaller steps near the slow end (f1-f3) vs pure log spacing.
         let u = i == 0 ? 0.0 : pow(Double(i) / Double(n - 1), 0.75)
-        d[9 + i] = exp(logMin + u * (logMax - logMin))
+        d[25 - i] = exp(logMin + u * (logMax - logMin))
     }
     return d
 }()

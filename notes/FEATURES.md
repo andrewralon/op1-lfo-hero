@@ -37,6 +37,7 @@
 - [ ] LOW - fix left/right scrub mode if possible, like pressing them on the op1! tried and reverted, see commit history.
 
 ## Done
+- [x] LOW - free rates run the op-1's way round: f1 is now the slowest (15 s) and f17 the fastest (0.02 s) (2026-10-25; unit-tested, not yet heard on an op-1): labels and list order are unchanged, only the period behind each label flipped. saved chips store seconds, so they keep their speed and only their label changes; a saved editor speed index (e.g. f1) now means the opposite speed
 - [x] LOW - status text reads "tap to connect a device" instead of "no device found; tap to connect" when no ble device is found (2026-10-25; unit-tested; the troubleshooting entry in docs/support.html matches)
 - [x] LOW - two wave shapes for one-shot use: `slope` (slp) and `hold` (hld) (2026-10-25; unit-tested, not yet heard on an op-1): slope is one rising ramp that lasts twice the speed (so the slowest free rate ramps for 30 s) and `hold` sends the center and ignores depth, so a 1x hold resets a parameter. both always end on their final value (a slope lands exactly on center ± depth, not a tick short) and keep it, whatever the on-finish setting says; `LfoWave.cycleMultiplier` / `keepsFinalValue` / `finalValue()` say so in one place, and the waveform views draw a slope over twice the span
 - [x] LOW - op-1 parameter: `pitch bend` (2026-10-23; unit-tested, bytes and behaviour measured on an op-1 from a mac. global, channel 1 only, live notes only, not the tape; 14-bit, rests on exactly 8192. not yet driven from the app on the ipad)

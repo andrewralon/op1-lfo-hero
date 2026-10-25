@@ -610,7 +610,7 @@ enum HelpCopy {
         case .wavePicker:
             return "choose the lfo's wave shape. tap the wave icon to step to the next shape. slope is a single ramp over twice the speed, best as 1x on slow free rates. hold sends the center value, use with 1x to reset a parameter."
         case .speedBox:
-            return "choose the lfo's speed. 8 to 1 are synced to the tempo, fastest to slowest. f1 to f17 are free and ignore the tempo. drag up/down to scrub it, or tap the timer icon to step to the next speed."
+            return "choose the lfo's speed. 8 to 1 are synced to the tempo, fastest to slowest. f1 to f17 are free and ignore the tempo, slowest to fastest. drag up/down to scrub it, or tap the timer icon to step to the next speed."
         case .centerBox:
             return "choose the center value the lfo swings around. drag up/down to scrub it, or tap the center icon to snap it to the current value."
         case .depthBox:
