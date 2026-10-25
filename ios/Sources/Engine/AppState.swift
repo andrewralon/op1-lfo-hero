@@ -549,7 +549,7 @@ final class AppState: ObservableObject {
     /// Follows the transport MIDI really travels over: the claimed one if there is one, otherwise
     /// whichever is connected, resolved the same way `MidiRouter.send` does. The router only claims
     /// a transport when a message *arrives*, and an OP-1 in midi sync sends none, so a connected
-    /// device would otherwise read as "scanning…" / "no device found" (Bluetooth's state) while MIDI
+    /// device would otherwise read as "scanning…" / "tap to connect a device" (Bluetooth's state) while MIDI
     /// flowed over USB.
     static func connectionStatus(active: MidiRouter.Transport?, usb: USBMidi.State,
                                  ble: BLEMidi.State) -> (label: String, isConnected: Bool) {

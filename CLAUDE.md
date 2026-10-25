@@ -61,7 +61,7 @@ python -m src.app
   - Track 5 = `#c25fa0` (magenta) — 6-channel devices only (TX-6 / TP-7)
   - Track 6 = `#3fb0a8` (teal) — 6-channel devices only
 - Dark theme throughout — near-black backgrounds (iOS `Theme.swift`: `#111111` / `#1a1a1a` / `#2a2a2a`, with `#454545` reserved for borders that need more contrast)
-- **All UI text is lowercase** — labels, button text, status messages (e.g. "scanning…", "no device found", "tempo mode:", window title "op1 lfo hero"). Match this in any new strings.
+- **All UI text is lowercase** — labels, button text, status messages (e.g. "scanning…", "tap to connect a device", "tempo mode:", window title "op1 lfo hero"). Match this in any new strings.
 - Green (`#4ec94e`-ish) marks active/centered/selected state (e.g. pan knob indicator is green at dead-center, white/text-colored off-center).
 
 ## iOS UI scaling (`LayoutMetrics`)

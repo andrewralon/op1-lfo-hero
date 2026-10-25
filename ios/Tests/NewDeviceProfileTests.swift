@@ -1684,7 +1684,7 @@ final class ConnectionStatusTests: XCTestCase {
     func testAConnectedUSBDeviceShowsEvenWhenNothingHasClaimedTheRouter() {
         let s = status(usb: .connected("OP-1"), ble: .notFound)
         XCTAssertEqual(s.label, "OP-1 (usb)")
-        XCTAssertTrue(s.isConnected, "was reading Bluetooth's \"no device found\" while USB worked")
+        XCTAssertTrue(s.isConnected, "was reading Bluetooth's \"tap to connect a device\" while USB worked")
     }
 
     func testAConnectedBluetoothDeviceShowsWhenNothingHasClaimedTheRouter() {
@@ -1706,7 +1706,7 @@ final class ConnectionStatusTests: XCTestCase {
     func testNothingConnectedStillReportsScanningAndNoDevice() {
         XCTAssertEqual(status(ble: .scanning).label, "scanning…")
         XCTAssertFalse(status(ble: .scanning).isConnected)
-        XCTAssertEqual(status(ble: .notFound).label, "no device found; tap to connect")
+        XCTAssertEqual(status(ble: .notFound).label, "tap to connect a device")
     }
 
     func testUnmatchedUSBDevicesAreListedWhenNothingIsConnected() {
