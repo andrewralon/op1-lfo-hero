@@ -276,8 +276,8 @@ Use XCUITest (not `cliclick` coordinate math) to drive the simulator — accessi
 - `repeatButton` — looping LFO start button (↻)
 - `oneShotButton` — one-shot LFO start button (→|)
 - `trashButton` — delete all chips button
-- `tourCard`, `tourTitle`, `tourCounter` — first-run tutorial hint card, its title and its `n / total` counter
-- `tourSkipButton` (top right) / `tourLaterButton` / `tourBackButton` / `tourNextButton` (bottom row) — the card's buttons (`tourNextButton` reads "start" on the welcome card and "done" on the last step; `tourBackButton` is disabled on the first)
+- `tourCard`, `tourTitle`, `tourCounter` — first-run tutorial hint card, its title and its `n/total` counter
+- `tourSkipButton` (top right) / `tourLaterButton` / `tourBackButton` / `tourNextButton` (bottom row) — the card's buttons (`tourNextButton` reads "next", or "done" on the last step; `tourBackButton` is disabled on the first)
 - `replayTourButton` (settings) / `replayTourFromHelp` (help) — the "show tutorial" button in each sheet's header, restarts the tutorial at step 1
 - `muteButton1` … `muteButton<n>` — mute pads; `value` is `muted` / `unmuted`
 

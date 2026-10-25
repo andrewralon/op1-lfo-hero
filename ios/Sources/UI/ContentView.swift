@@ -143,8 +143,9 @@ struct LayoutMetrics {
     var tourTitleFont: CGFloat    { tourCardW * 0.046 }
     var tourBodyFont: CGFloat     { tourCardW * 0.042 }
     var tourBtnFont: CGFloat      { tourCardW * 0.042 }
-    var tourCounterFont: CGFloat  { tourCardW * 0.036 }
-    /// Width of the counter (left) and skip (right) either side of the centered title.
+    /// The close x is a bare glyph, so it needs to be much larger than the words beside it to read.
+    var tourCloseFont: CGFloat    { tourBtnFont * 1.6 }
+    /// Width of the counter (left) and close x (right) either side of the centered title.
     var tourCardSideW: CGFloat    { tourCardW * 0.2 }
     /// How far the spotlight hole extends past the control it frames.
     var tourSpotlightInset: CGFloat  { trackGapUnit * 2 }

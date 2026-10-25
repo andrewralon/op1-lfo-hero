@@ -163,14 +163,14 @@ private struct TourOverlayView: View {
         let half = w / 2
         let x = min(max(target?.midX ?? screenW / 2, half + m.tourCardGap),
                     screenW - half - m.tourCardGap)
-        let nextLabel = step == .welcome ? "start" : (tour.isLastStep ? "done" : "next")
+        let nextLabel = tour.isLastStep ? "done" : "next"
 
         return VStack(alignment: .leading, spacing: m.tourCardPad * 0.6) {
-            // counter | title (centered) | skip. The two sides share one fixed width so the
+            // counter | title (centered) | close (x, skips the tutorial). The two sides share one fixed width so the
             // title is centered on the card, not on the space between them.
             HStack(alignment: .center, spacing: 0) {
-                Text("\(tour.stepIndex + 1) / \(tour.steps.count)")
-                    .font(.system(size: m.tourCounterFont, weight: .medium, design: .monospaced))
+                Text("\(tour.stepIndex + 1)/\(tour.steps.count)")
+                    .font(.system(size: m.tourBtnFont, weight: .semibold, design: .monospaced))
                     .foregroundColor(C.dim)
                     .accessibilityIdentifier("tourCounter")
                     .frame(width: m.tourCardSideW, alignment: .leading)
@@ -180,7 +180,7 @@ private struct TourOverlayView: View {
                     .multilineTextAlignment(.center)
                     .accessibilityIdentifier("tourTitle")
                     .frame(maxWidth: .infinity)
-                cardButton("skip", id: "tourSkipButton", color: C.dim) { tour.skip() }
+                cardButton("✕", id: "tourSkipButton", color: C.dim, font: m.tourCloseFont, voiceOver: "skip tutorial") { tour.skip() }
                     .frame(width: m.tourCardSideW, alignment: .trailing)
             }
             Text(HelpCopy.tourText(step, device: app.tourDevice))
@@ -208,16 +208,17 @@ private struct TourOverlayView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func cardButton(_ label: String, id: String, color: Color,
+    private func cardButton(_ label: String, id: String, color: Color, font: CGFloat? = nil, voiceOver: String? = nil,
                             action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: m.tourBtnFont, weight: .semibold, design: .monospaced))
+                .font(.system(size: font ?? m.tourBtnFont, weight: .semibold, design: .monospaced))
                 .foregroundColor(color)
                 .frame(minWidth: 44, minHeight: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(voiceOver ?? label)
         .accessibilityIdentifier(id)
     }
 

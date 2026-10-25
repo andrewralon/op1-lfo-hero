@@ -43,9 +43,9 @@ final class TourUITests: XCTestCase {
         XCTAssertTrue(done, "next didn't advance from step \(from) (\(title))", file: file, line: line)
     }
 
-    /// "3 / 16" → ("3", "16").
+    /// "3/16" → ("3", "16").
     private func counter(_ app: XCUIApplication) -> (String, String) {
-        let parts = app.staticTexts["tourCounter"].label.components(separatedBy: " / ")
+        let parts = app.staticTexts["tourCounter"].label.components(separatedBy: "/")
         return (parts.first ?? "", parts.last ?? "")
     }
 
@@ -83,7 +83,7 @@ final class TourUITests: XCTestCase {
     @MainActor func testWelcomeThenBack() throws {
         let app = launchTour()
         XCTAssertEqual(app.staticTexts["tourTitle"].label, "welcome")
-        XCTAssertEqual(app.buttons["tourNextButton"].label, "start")
+        XCTAssertEqual(app.buttons["tourNextButton"].label, "next")
         XCTAssertFalse(app.buttons["tourBackButton"].isEnabled, "nothing before the first step")
         tapNext(app)
         tapNext(app)
