@@ -222,19 +222,21 @@ final class AutomationEngine {
                 lock.lock()
                 let start = freeRateStart[lfo.id] ?? now
                 lock.unlock()
+                let cycle = period * lfo.wave.cycleMultiplier
                 let elapsed = now - start
-                if !lfo.loop && elapsed >= period { finished.append(lfo); continue }
-                phase = (elapsed / period).truncatingRemainder(dividingBy: 1.0)
+                if !lfo.loop && elapsed >= cycle { finished.append(lfo); continue }
+                phase = (elapsed / cycle).truncatingRemainder(dividingBy: 1.0)
             } else {
                 lock.lock()
                 let start = startTicks[lfo.id] ?? tickCount
                 lock.unlock()
+                let cycle = cycleTicks(lfo)
                 let elapsed = tickCount - start
-                if !lfo.loop && elapsed >= lfo.rateTicks { finished.append(lfo); continue }
+                if !lfo.loop && elapsed >= cycle { finished.append(lfo); continue }
                 lock.lock()
                 let origin = chipPhaseOrigin[lfo.id] ?? 0
                 lock.unlock()
-                phase = Double(cycleTick(tickCount - origin, lfo.rateTicks)) / Double(lfo.rateTicks)
+                phase = Double(cycleTick(tickCount - origin, cycle)) / Double(cycle)
             }
 
             let value = evaluate(lfo, phase: phase)
@@ -249,6 +251,14 @@ final class AutomationEngine {
         }
 
         for lfo in finished {
+            // The last tick before the finish check lands one step short of the end of a ramp,
+            // so a slope would stop just under its top. Send where the wave really ends before
+            // the chip goes. Skipped when that value already went out (a hold is sent once).
+            if lfo.wave.keepsFinalValue {
+                let last = scaled(lfo.wave.finalValue(), lfo: lfo)
+                lock.lock(); let prev = lastSent[lfo.id]; lock.unlock()
+                if prev != last { dispatch(lfo: lfo, value: last) }
+            }
             remove(lfo)
             finishedCallback?(lfo)
         }
@@ -267,12 +277,14 @@ final class AutomationEngine {
                 lock.lock()
                 let start = freePreviewStart[lfo.id] ?? now
                 lock.unlock()
-                pPhase = ((now - start) / period).truncatingRemainder(dividingBy: 1.0)
+                pPhase = ((now - start) / (period * lfo.wave.cycleMultiplier))
+                    .truncatingRemainder(dividingBy: 1.0)
             } else {
                 lock.lock()
                 let origin = previewPhaseOrigin
                 lock.unlock()
-                pPhase = Double(cycleTick(tickCount - origin, lfo.rateTicks)) / Double(lfo.rateTicks)
+                let cycle = cycleTicks(lfo)
+                pPhase = Double(cycleTick(tickCount - origin, cycle)) / Double(cycle)
             }
             let pValue = evaluatePreview(lfo, phase: pPhase)
 
@@ -291,6 +303,11 @@ final class AutomationEngine {
     /// `ticks` modulo `cycle`, never negative.
     private func cycleTick(_ ticks: Int, _ cycle: Int) -> Int {
         ((ticks % cycle) + cycle) % cycle
+    }
+
+    /// Clock ticks in one cycle of `lfo`'s wave: the rate, times the wave's own length.
+    private func cycleTicks(_ lfo: LfoClip) -> Int {
+        max(1, Int(Double(lfo.rateTicks) * lfo.wave.cycleMultiplier))
     }
 
     /// Top of the clip's parameter in native units — 127 for a CC, 16383 for pitch bend. The one
@@ -317,11 +334,7 @@ final class AutomationEngine {
         } else {
             y = lfo.wave.value(at: phase)
         }
-        if lfo.inverted { y = -y }
-        if isTempo(lfo, profile) {
-            return max(AppState.minBpm, min(AppState.maxBpm, lfo.centerValue + y * lfo.depth))
-        }
-        return max(0, min(valueMax(lfo), (lfo.centerValue + y * lfo.depth).rounded()))
+        return scaled(y, lfo: lfo)
     }
 
     private func evaluate(_ lfo: LfoClip, phase: Double) -> Double {
@@ -343,8 +356,13 @@ final class AutomationEngine {
             y = lfo.wave.value(at: phase)
         }
 
-        if lfo.inverted { y = -y }
+        return scaled(y, lfo: lfo)
+    }
 
+    /// A wave value in -1...1 → the clip's native output: inversion, centre and depth applied,
+    /// then clamped to the parameter's range (or the tempo limits).
+    private func scaled(_ wave: Double, lfo: LfoClip) -> Double {
+        let y = lfo.inverted ? -wave : wave
         if isTempo(lfo, profile) {
             return max(AppState.minBpm, min(AppState.maxBpm, lfo.centerValue + y * lfo.depth))
         }

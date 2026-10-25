@@ -11,7 +11,7 @@ struct WaveformView: View {
 
     var body: some View {
         Canvas { ctx, size in
-            let nCycles = Double(8 * PPQN) / Double(rateTicks)
+            let nCycles = Double(8 * PPQN) / (Double(rateTicks) * wave.cycleMultiplier)
             let w       = size.width
             let midY    = size.height / 2
             let amp     = midY * 0.88
@@ -127,7 +127,7 @@ struct MultiWaveformView: View {
         } else {
             displayTicks = lfo.rateTicks
         }
-        let nCycles = Double(8 * PPQN) / Double(displayTicks)
+        let nCycles = Double(8 * PPQN) / (Double(displayTicks) * lfo.wave.cycleMultiplier)
         let amplitude = size.height / 2 * 0.88
         let steps = Int(size.width * 1.5)
         var path = Path()

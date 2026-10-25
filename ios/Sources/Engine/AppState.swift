@@ -670,7 +670,8 @@ final class AppState: ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
                 let action = UserDefaults.standard.string(forKey: "oneShotFinishAction") ?? "previous"
-                switch action {
+                // Slope and hold end on their final value and keep it; a restore would undo them.
+                switch lfo.wave.keepsFinalValue ? "hold" : action {
                 case "center": self.automation.sendRestore(lfo: lfo, value: lfo.centerValue)
                 case "hold":   break
                 default:       self.automation.sendRestore(lfo: lfo, value: lfo.originalValue)

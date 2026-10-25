@@ -54,6 +54,9 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
     case sweepUp = "sweep up"
     case sweepDn = "sweep dn"
     case random
+    // The one-shot shapes come last: slope is not a saw, it ends on a value and stays there.
+    case slope
+    case hold
 
     var id: String { rawValue }
 
@@ -62,12 +65,32 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
         case .sine:     return "sin"
         case .triangle: return "tri"
         case .saw:      return "saw"
+        case .slope:    return "slp"
         case .square:   return "squ"
         case .log:      return "log"
         case .exp:      return "exp"
         case .sweepUp:  return "swu"
         case .sweepDn:  return "swd"
         case .random:   return "rnd"
+        case .hold:     return "hld"
+        }
+    }
+
+    /// How many rate periods one cycle of this wave spans. A slope is a single rising ramp that
+    /// takes twice the period, so a free rate that tops out at 15 s can ramp for 30 s. This is
+    /// the one place that says so; the engine and both waveform views multiply by it.
+    var cycleMultiplier: Double { self == .slope ? 2 : 1 }
+
+    /// True for waves that end a one-shot on a fixed value and stay there, instead of being put
+    /// back by the on-finish setting. Restoring would undo what the shape exists to do.
+    var keepsFinalValue: Bool { self == .slope || self == .hold }
+
+    /// The wave's last value, in -1...1. `value(at: 1.0)` wraps back to the start of the cycle,
+    /// so a one-shot can't ask it for where the wave ends.
+    func finalValue() -> Double {
+        switch self {
+        case .slope: return 1
+        default:     return 0
         }
     }
 
@@ -81,6 +104,10 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
             if p < 0.75 { return 2 - 4 * p }
             return 4 * p - 4
         case .saw:
+            return 2 * p - 1
+        case .slope:
+            // `phase` already spans the doubled cycle (see `cycleMultiplier`), so this is one
+            // ramp across it, not two.
             return 2 * p - 1
         case .square:
             return p < 0.5 ? 1 : -1
@@ -104,6 +131,9 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
         case .random:
             // Not called directly — AutomationEngine.evaluate() handles random with per-clip
             // stateful PRNG (xorshift64) so each clip and each cycle produces different values.
+            return 0
+        case .hold:
+            // Zero, so centre + 0 * depth is the centre and inverting changes nothing.
             return 0
         }
     }

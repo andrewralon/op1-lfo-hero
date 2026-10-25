@@ -2297,3 +2297,93 @@ final class OP1GlobalControlsTests: XCTestCase {
         }
     }
 }
+
+/// slope and hold: the two shapes built for one-shot use.
+final class SlopeAndHoldTests: XCTestCase {
+
+    /// See `LfoRestartOnPlayTests.keepAlive`.
+    private var keepAlive: [AnyObject] = []
+
+    private func makeEngine() -> (AutomationEngine, RecordingDestination) {
+        let dest = RecordingDestination()
+        let ctrl = Controller(router: dest)
+        ctrl.setProfile(.op1Field)
+        let engine = AutomationEngine()
+        engine.setProfile(.op1Field)
+        engine.controller = ctrl
+        keepAlive += [ctrl, dest, engine]
+        return (engine, dest)
+    }
+
+    private func clip(_ wave: LfoWave, inverted: Bool = false, loop: Bool = false) -> LfoClip {
+        LfoClip(deviceId: "op1", track: 1, paramId: "volume", wave: wave, rateTicks: 24,
+                depth: 40, centerValue: 64, inverted: inverted, loop: loop, originalValue: 10)
+    }
+
+    /// Ticks the engine from 0 to `last` and returns the volume values sent, plus the tick the
+    /// chip reported finished on.
+    private func run(_ lfo: LfoClip, to last: Int) -> (values: [Int], finishedAt: Int?) {
+        let (engine, dest) = makeEngine()
+        var finishedAt: Int?
+        var tick = 0
+        engine.finishedCallback = { _ in finishedAt = tick }
+        engine.add(lfo)
+        for t in 0...last { tick = t; engine.onTick(t) }
+        return (dest.packets.map { Int($0[2]) }, finishedAt)
+    }
+
+    func testSlopeOneShotRunsTwiceThePeriod() {
+        let r = run(clip(.slope), to: 60)
+        XCTAssertEqual(r.finishedAt, 48, "rateTicks 24 ramps for 48 ticks, not 24")
+    }
+
+    func testSlopeRisesAndLandsExactlyOnCenterPlusDepth() {
+        let v = run(clip(.slope), to: 60).values
+        XCTAssertEqual(v.first, 24, "starts at the bottom: center - depth")
+        XCTAssertEqual(v, v.sorted(), "never falls")
+        XCTAssertEqual(v.last, 104, "ends exactly on center + depth, not a tick short")
+    }
+
+    func testInvertedSlopeEndsOnCenterMinusDepth() {
+        let v = run(clip(.slope, inverted: true), to: 60).values
+        XCTAssertEqual(v.first, 104)
+        XCTAssertEqual(v, v.sorted(by: >))
+        XCTAssertEqual(v.last, 24)
+    }
+
+    func testLoopingSlopeRestartsAfterTwoPeriodsAndNeverFinishes() {
+        let r = run(clip(.slope, loop: true), to: 100)
+        XCTAssertNil(r.finishedAt)
+        XCTAssertLessThan(r.values.last ?? 0, 104, "a loop wraps back down rather than parking at the top")
+    }
+
+    func testHoldSendsTheCenterOnceAndIgnoresDepth() {
+        let r = run(clip(.hold), to: 30)
+        XCTAssertEqual(r.values, [64], "centre, sent once, not again when the chip finishes")
+        XCTAssertEqual(r.finishedAt, 24)
+    }
+
+    func testInvertedHoldIsStillTheCenter() {
+        XCTAssertEqual(run(clip(.hold, inverted: true), to: 30).values, [64])
+    }
+
+    func testOnlySlopeAndHoldKeepTheirFinalValue() {
+        for w in LfoWave.allCases {
+            XCTAssertEqual(w.keepsFinalValue, w == .slope || w == .hold, w.rawValue)
+            XCTAssertEqual(w.cycleMultiplier, w == .slope ? 2 : 1, w.rawValue)
+        }
+        XCTAssertEqual(LfoWave.slope.finalValue(), 1)
+        XCTAssertEqual(LfoWave.hold.finalValue(), 0)
+    }
+
+    func testNewShapesAreAppendedWhereThePickerExpectsThem() {
+        let all = LfoWave.allCases
+        XCTAssertEqual(all.firstIndex(of: .slope), all.firstIndex(of: .random)! + 1)
+        XCTAssertEqual(all.last, .hold)
+    }
+
+    func testAnUnknownWaveFromANewerBuildDecodesAsSine() throws {
+        let json = #"{"wave":"warble"}"#.data(using: .utf8)!
+        XCTAssertEqual(try JSONDecoder().decode(LfoClip.self, from: json).wave, .sine)
+    }
+}

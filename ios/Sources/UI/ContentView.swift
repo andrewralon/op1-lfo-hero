@@ -608,7 +608,7 @@ enum HelpCopy {
         case .paramPicker:
             return "choose what the lfo changes. tap the bolt icon to step to the next parameter without opening the list."
         case .wavePicker:
-            return "choose the lfo's wave shape. tap the wave icon to step to the next shape."
+            return "choose the lfo's wave shape. tap the wave icon to step to the next shape. slope is a single ramp over twice the speed, best as 1x on slow free rates. hold sends the center value, use with 1x to reset a parameter."
         case .speedBox:
             return "choose the lfo's speed. 8 to 1 are synced to the tempo, fastest to slowest. f1 to f17 are free and ignore the tempo. drag up/down to scrub it, or tap the timer icon to step to the next speed."
         case .centerBox:
@@ -801,7 +801,7 @@ struct HelpView: View {
         (HelpCopy.title(.bpm), Text("drag up/down to scrub the tempo. double-tap or long-press the box to type an exact bpm.\n· app tempo control of op-1 field requires 'app (midi sync)' mode and usb-c\n· op-1 field ble midi does not send tempo change messages")),
         (HelpCopy.title(.trackToggle), Text("tap to cycle off → on → inverted. tracks apply the lfo to that single track; master applies it to the selected master-capable parameter (e.g. tempo) across all tracks.")),
         (HelpCopy.title(.preview), Text("enables live preview: the current editor settings are sent to the device in real time as you adjust them, so you can hear the effect while dialing in speed, depth, center, and wave shape. no chip is created — press repeat or 1x to create an lfo.")),
-        (HelpCopy.title(.paramPicker), Text("choose which parameter the lfo modulates, and which waveform shape it follows. tap the icons to step to the next option without opening the picker.")),
+        (HelpCopy.title(.paramPicker), Text("choose which parameter the lfo modulates, and which waveform shape it follows. tap the icons to step to the next option without opening the picker.\n· \(Text("slope").bold()) — one rising ramp over twice the speed. best as 1x on slow free rates, and it stays at the top.\n· \(Text("hold").bold()) — sends the center value and ignores depth. use with 1x to reset a parameter.")),
         (HelpCopy.title(.speedBox), Text("drag up/down on a box to scrub its value. tap the speed (timer) icon to step to the next speed value one at a time. speed sets lfo speed, depth sets its range, center sets its midpoint.")),
         (HelpCopy.title(.waveform), Text("when no lfo chips are running, shows the current editor settings as a preview. when chips are active, shows all running lfo curves overlaid, colored per track.")),
         (HelpCopy.title(.startButtons), Text("start the lfo looping (repeat), run it once (one-shot), or delete all lfos.")),
