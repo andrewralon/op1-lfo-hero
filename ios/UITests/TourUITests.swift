@@ -66,7 +66,7 @@ final class TourUITests: XCTestCase {
         XCTAssertFalse(again.otherElements["tourCard"].waitForExistence(timeout: 3))
     }
 
-    @MainActor func testLaterComesBackAtTheSameStep() throws {
+    @MainActor func testLaterComesBackFromTheFirstStep() throws {
         let app = launchTour()
         tapNext(app)
         tapNext(app)
@@ -77,7 +77,7 @@ final class TourUITests: XCTestCase {
         app.terminate()
         let again = launch([])
         XCTAssertTrue(again.otherElements["tourCard"].waitForExistence(timeout: 8))
-        XCTAssertEqual(counter(again).0, "3")
+        XCTAssertEqual(counter(again).0, "1", "later starts over rather than resuming")
     }
 
     @MainActor func testWelcomeThenBack() throws {
