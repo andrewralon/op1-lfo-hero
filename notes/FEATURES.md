@@ -37,7 +37,7 @@
 - [ ] LOW - fix left/right scrub mode if possible, like pressing them on the op1! tried and reverted, see commit history.
 
 ## Done
-- [x] LOW - op-1 parameter: pitch bend, as `live bend` (2026-10-23; unit-tested, bytes and behaviour measured on an op-1 from a mac. global, channel 1 only, live notes only, not the tape; 14-bit, rests on exactly 8192. not yet driven from the app on the ipad)
+- [x] LOW - op-1 parameter: `pitch bend` (2026-10-23; unit-tested, bytes and behaviour measured on an op-1 from a mac. global, channel 1 only, live notes only, not the tape; 14-bit, rests on exactly 8192. not yet driven from the app on the ipad)
 - [x] LOW - op-1 parameter: master eq low/mid/high, CC 90-92 (2026-10-23; unit-tested, measured on an op-1: 64 is flat, rests there. not yet driven from the app on the ipad)
 - [x] LOW - op-1 parameter: tape record level, as `rec level`, CC 78 (2026-10-23; unit-tested, measured on an op-1: global, any channel, also the live synth/drum level, rests at its startup default of 95. not yet driven from the app on the ipad)
 - [x] LOW - op-1 parameter: sustain, CC 64, >= 64 = down (2026-10-23; unit-tested, measured on an op-1 against live notes, rests released. not yet checked against tape playback or driven from the app on the ipad)

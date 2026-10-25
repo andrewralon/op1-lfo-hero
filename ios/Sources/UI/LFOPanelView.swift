@@ -620,7 +620,7 @@ private struct CompactPicker<T>: View where T: Identifiable & Hashable {
                 if m.isLandscape {
                     // Landscape: UIKit caps to available height; ScrollView lets user reach cut-off items
                     ScrollViewReader { proxy in
-                        ScrollView(showsIndicators: true) { itemList.frame(minWidth: w - 20) }
+                        AlwaysVisibleScroll { itemList.frame(minWidth: w - 20) }
                             .onAppear { proxy.scrollTo(selection.id, anchor: .center) }
                     }
                     .frame(minWidth: w, idealWidth: w, maxWidth: w,
@@ -633,7 +633,7 @@ private struct CompactPicker<T>: View where T: Identifiable & Hashable {
                 } else {
                     // Portrait, long list: same scrolling treatment as landscape.
                     ScrollViewReader { proxy in
-                        ScrollView(showsIndicators: true) { itemList.frame(minWidth: w - 20) }
+                        AlwaysVisibleScroll { itemList.frame(minWidth: w - 20) }
                             .onAppear { proxy.scrollTo(selection.id, anchor: .center) }
                     }
                     .frame(minWidth: w, idealWidth: w, maxWidth: w,
@@ -642,6 +642,68 @@ private struct CompactPicker<T>: View where T: Identifiable & Hashable {
             }
             .presentationCompactAdaptation(.popover)
             .preferredColorScheme(.dark)
+        }
+    }
+}
+
+// MARK: - Always-visible scroll bar
+
+/// The system scroll indicator only appears while a list is moving, so a popover that opens with
+/// part of its list cut off gives no hint that more is above or below. This draws its own thumb,
+/// which stays on screen whenever the content is taller than the viewport.
+private struct ScrollMetrics: Equatable {
+    var offset: CGFloat = 0
+    var content: CGFloat = 0
+}
+
+private struct AlwaysVisibleScroll<Content: View>: View {
+    @ViewBuilder var content: Content
+    @State private var metrics = ScrollMetrics()
+    @State private var viewport: CGFloat = 0
+    @Environment(\.metrics) private var m
+    private let space = "alwaysVisibleScroll"
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            // Written straight into state: a PreferenceKey never reached the enclosing view from
+            // inside a popover, which left the bar permanently hidden.
+            content.background(
+                GeometryReader { g in
+                    let offset = -g.frame(in: .named(space)).minY
+                    let height = g.size.height
+                    Color.clear
+                        .onAppear { metrics = ScrollMetrics(offset: offset, content: height) }
+                        .onChange(of: offset) { _, v in metrics.offset = v }
+                        .onChange(of: height) { _, v in metrics.content = v }
+                })
+        }
+        .coordinateSpace(name: space)
+        .background(
+            GeometryReader { g in
+                Color.clear
+                    .onAppear { viewport = g.size.height }
+                    .onChange(of: g.size.height) { _, h in viewport = h }
+            })
+        .overlay(alignment: .topLeading) { thumb }
+    }
+
+    @ViewBuilder private var thumb: some View {
+        let overflow = metrics.content - viewport
+        if viewport > 0, overflow > 1 {
+            let inset = m.pickerFont * 0.3
+            let track = max(viewport - inset * 2, 1)
+            let height = min(track, max(m.pickerFont * 1.5, track * viewport / metrics.content))
+            let progress = min(max(metrics.offset / overflow, 0), 1)
+            HStack(alignment: .top, spacing: 0) {
+                Spacer(minLength: 0)
+                Capsule()
+                    .fill(Color.white.opacity(0.55))
+                    .frame(width: m.pickerFont * 0.2, height: height)
+                    .offset(y: inset + (track - height) * progress)
+                    .padding(.trailing, m.pickerFont * 0.15)
+                    .accessibilityIdentifier("pickerScrollThumb")
+            }
+            .allowsHitTesting(false)
         }
     }
 }

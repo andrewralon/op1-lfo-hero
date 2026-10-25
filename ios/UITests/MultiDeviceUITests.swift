@@ -139,14 +139,36 @@ final class MultiDeviceUITests: XCTestCase {
 
     // MARK: - OP-1 global controls
 
-    /// The OP-1's rec level, master EQ, sustain and live bend are global: each is offered in the
+    /// The OP-1's rec level, master EQ, sustain and pitch bend are global: each is offered in the
     /// picker, forces the master (m) target, and the ones with a neutral point start their centre
+    /// A long picker list must show a scroll bar the moment it opens (the system one only appears
+    /// while scrolling), and a short list that fits must not draw one.
+    @MainActor func testPickerShowsAScrollBarOnlyWhenTheListOverflows() throws {
+        let app = launch(profile: "op1")
+        let thumb = app.descendants(matching: .any)["pickerScrollThumb"]
+
+        let params = app.buttons["paramPicker"]
+        XCTAssertTrue(params.waitForExistence(timeout: 5))
+        params.tap()
+        XCTAssertTrue(app.buttons["rec level"].waitForExistence(timeout: 3))
+        sleep(1)
+        try shot(app, "picker_scrollbar")
+        XCTAssertTrue(thumb.waitForExistence(timeout: 3), "the long parameter list must show a scroll bar")
+        app.buttons["rec level"].tap()
+
+        let waves = app.buttons["wavePicker"]
+        XCTAssertTrue(waves.waitForExistence(timeout: 3))
+        waves.tap()
+        XCTAssertTrue(app.buttons["sine"].waitForExistence(timeout: 3))
+        XCTAssertFalse(thumb.exists, "a list that fits has nothing to scroll, so no bar")
+    }
+
     /// on it. The simulator has no MIDI, so this checks the layout and the state only.
     @MainActor func testOP1GlobalControlsAreOfferedAndForceTheMasterTarget() throws {
         let app = launch(profile: "op1")
         let cases: [(name: String, centre: String?)] = [
             ("rec level", "74"), ("eq low", "49"), ("eq mid", "49"),
-            ("eq high", "49"), ("sustain", nil), ("live bend", "49"),
+            ("eq high", "49"), ("sustain", nil), ("pitch bend", "49"),
         ]
         for c in cases {
             let picker = app.buttons["paramPicker"]
@@ -169,7 +191,7 @@ final class MultiDeviceUITests: XCTestCase {
                 let value = app.descendants(matching: .any)["centerScrub"].value as? String
                 XCTAssertEqual(value, centre, "\(c.name): a new LFO must start centred on its neutral point")
             }
-            if c.name == "live bend" { try shot(app, "op1_bend_live") }
+            if c.name == "pitch bend" { try shot(app, "op1_bend_live") }
         }
     }
 

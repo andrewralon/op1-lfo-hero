@@ -66,13 +66,14 @@ persistence contract for saved LFO clips and must not change.
 | `op1.eqMid` | eq mid | eqm | `masterOnly`, CC 91, ch 0, continuous | 64 | 49 |
 | `op1.eqHigh` | eq high | eqh | `masterOnly`, CC 92, ch 0, continuous | 64 | 49 |
 | `op1.sustain` | sustain | sus | `masterOnly`, CC 64, ch 0, `.switching(SwitchEncoding())` (127/0, threshold 64, as OP-1 mute) | 0 | — |
-| `op1.pitchbend` | live bend | pit | `masterPitchBend(..., channel: 0)` — master-only, no track binding, **14-bit** | **8192** | 49 |
+| `op1.pitchbend` | pitch bend | pit | `masterPitchBend(..., channel: 0)` — master-only, no track binding, **14-bit** | **8192** | 49 |
 
 - Reuse the file-private `masterOnly(...)` and `masterPitchBend(...)` helpers. No track-bend
   variant. CCs 64, 78 and 90-92 collide with nothing on channel 0 (7, 9, 10, 46-61, 70-77).
 - **Pitch bend is a master parameter that acts before the tape.** It only affects what the
-  instrument is playing live, so an LFO on it does nothing to anything already recorded. The name
-  `live bend` says so in the picker; keep the same wording in the RESEARCH.md entry.
+  instrument is playing live, so an LFO on it does nothing to anything already recorded. The picker
+  calls it `pitch bend` (the OP-1's own word, and the same label the TP-7 uses); the "live notes
+  only, not the tape" caveat lives in the README and RESEARCH.md entries instead.
 - Sustain gets no `defaultCenter`: a centre means nothing on a two-state switch.
 - **Record level rests at its startup default: MIDI 95** (95 / 127 = 74.8% of max, about 75%; 74
   on the 0-99 display scale). The device resets to that level on power-up and the guide does not

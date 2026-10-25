@@ -116,7 +116,7 @@ extension DeviceProfile {
                             encoding: .switching(SwitchEncoding()), restValue: 0))
         // One global bend on channel 1 that moves the selected instrument's live notes — not the
         // tape, not other tracks. 14-bit; see `masterPitchBend`.
-        p.append(masterPitchBend("op1.pitchbend", "live bend", "pit", channel: 0))
+        p.append(masterPitchBend("op1.pitchbend", "pitch bend", "pit", channel: 0))
 
         return p
     }()
