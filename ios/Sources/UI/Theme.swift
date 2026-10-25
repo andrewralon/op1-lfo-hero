@@ -72,7 +72,7 @@ struct DarkButton: ButtonStyle {
     }
 }
 
-/// Light capsule used for the settings / help action buttons ("show tutorial", "reset to
+/// Light capsule used for the settings / help action buttons ("start tutorial", "reset to
 /// defaults"). One style so the same button looks the same wherever it appears.
 struct CapsuleButtonStyle: ButtonStyle {
     /// Capsule color. The label stays the dark background color either way.

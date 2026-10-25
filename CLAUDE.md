@@ -278,7 +278,7 @@ Use XCUITest (not `cliclick` coordinate math) to drive the simulator — accessi
 - `trashButton` — delete all chips button
 - `tourCard`, `tourTitle`, `tourCounter` — first-run tutorial hint card, its title and its `n/total` counter
 - `tourSkipButton` (top right) / `tourLaterButton` / `tourBackButton` / `tourNextButton` (bottom row) — the card's buttons (`tourNextButton` reads "next", or "done" on the last step; `tourBackButton` is disabled on the first)
-- `replayTourButton` (settings) / `replayTourFromHelp` (help) — the "show tutorial" button in each sheet's header, restarts the tutorial at step 1
+- `replayTourFromHelp` (help) — the "start tutorial" button, the first item in the help sheet; restarts the tutorial at step 1. `versionLabel` — the app version at the top left of the help sheet (not settings)
 - `muteButton1` … `muteButton<n>` — mute pads; `value` is `muted` / `unmuted`
 
 **Reset app state in UITests** — pass `--uitest-reset` as a launch argument to clear UserDefaults before the test. It also marks the first-run tutorial done, because the tutorial's overlay swallows every tap — **every UI test must pass `--uitest-reset`** (or `--uitest-tour` to test the tutorial itself), including tests that otherwise want no setup. Add `--uitest-profile <id>` (`op1` / `tx6` / `tp7`) to pin the device, so 6-track layouts can be tested with no hardware attached:
