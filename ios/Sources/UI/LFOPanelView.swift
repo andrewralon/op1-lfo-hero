@@ -37,7 +37,106 @@ private extension View {
     func clockWaitingBanner() -> some View { modifier(ClockWaitingBanner()) }
 }
 
+/// Where the LFO controls are on screen, so a touch can be sorted into "on the controls" or
+/// "anywhere else". It holds the marker view itself and measures it at the moment of the touch,
+/// rather than copying a frame into state: a frame passed up through a SwiftUI preference arrived
+/// as zero and never updated, which made every touch count as "elsewhere".
+final class OnDeckRegion {
+    weak var view: UIView?
+
+    /// `windowPoint` is in window coordinates, as `UITouch.location(in: nil)` reports them.
+    func contains(_ windowPoint: CGPoint) -> Bool {
+        guard let view, view.window != nil else { return false }
+        return view.convert(view.bounds, to: nil).contains(windowPoint)
+    }
+}
+
+private struct OnDeckRegionKey: EnvironmentKey {
+    static let defaultValue = OnDeckRegion()
+}
+
+extension EnvironmentValues {
+    var onDeckRegion: OnDeckRegion {
+        get { self[OnDeckRegionKey.self] }
+        set { self[OnDeckRegionKey.self] = newValue }
+    }
+}
+
+/// An invisible view the size of whatever it is the background of; it registers itself as the
+/// LFO controls' region.
+struct OnDeckRegionMarker: UIViewRepresentable {
+    let region: OnDeckRegion
+
+    func makeUIView(context: Context) -> UIView {
+        let v = UIView()
+        v.isUserInteractionEnabled = false
+        v.backgroundColor = .clear
+        region.view = v
+        return v
+    }
+
+    func updateUIView(_ v: UIView, context: Context) { region.view = v }
+}
+
+/// Reports where every touch on the screen begins, in window coordinates, without taking part in
+/// the touch.
+///
+/// A SwiftUI gesture on a parent cannot reliably see a touch that a child (a button, a picker, a
+/// scrub box) handles itself, which is exactly the touches that matter here. This is a UIKit
+/// recognizer on the window that sees the touch first and never cancels, delays or claims it, so
+/// every control keeps behaving as before.
+struct TouchStartObserver: UIViewRepresentable {
+    let onTouchBegan: (CGPoint) -> Void
+
+    func makeUIView(context: Context) -> ObserverView {
+        let v = ObserverView()
+        v.isUserInteractionEnabled = false
+        v.onTouchBegan = onTouchBegan
+        return v
+    }
+
+    func updateUIView(_ v: ObserverView, context: Context) { v.onTouchBegan = onTouchBegan }
+
+    final class ObserverView: UIView, UIGestureRecognizerDelegate {
+        var onTouchBegan: ((CGPoint) -> Void)?
+        private var recognizer: StartRecognizer?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if let r = recognizer { r.view?.removeGestureRecognizer(r); recognizer = nil }
+            guard let window else { return }
+            let r = StartRecognizer { [weak self] touch in
+                guard let self else { return }
+                self.onTouchBegan?(touch.location(in: nil))
+            }
+            r.cancelsTouchesInView = false
+            r.delaysTouchesBegan = false
+            r.delaysTouchesEnded = false
+            r.delegate = self
+            window.addGestureRecognizer(r)
+            recognizer = r
+        }
+
+        func gestureRecognizer(_ g: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+    }
+
+    /// Fails as soon as it has reported the touch, so it never holds up another recognizer.
+    private final class StartRecognizer: UIGestureRecognizer {
+        let report: (UITouch) -> Void
+        init(report: @escaping (UITouch) -> Void) {
+            self.report = report
+            super.init(target: nil, action: nil)
+        }
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+            touches.forEach(report)
+            state = .failed
+        }
+    }
+}
+
 struct LFOPanelView: View {
+    @Environment(\.onDeckRegion) private var onDeckRegion
     var needsCombinedLfoRow: Bool = false
     var needsSideBySide: Bool = false
 
@@ -50,6 +149,31 @@ struct LFOPanelView: View {
     @State private var showDeleteConfirm = false
     @State private var showHelp = false
     @State private var showSettings = false
+    /// Choose the parameter an LFO will drive with the cycle button (the picker goes through
+    /// `recentre` itself, so that a drag only re-centers where it lands).
+    ///
+    /// A parameter with a neutral point (bend, the OP-1's EQ and record level) starts a new LFO
+    /// centred there rather than at the global default of 90, which for bend would start a new
+    /// chip at roughly 1.9x pitch and leave it there when it stops. Not while a chip is being
+    /// edited: its own centre has to survive a change of parameter.
+    private func selectParam(_ new: ParamSpec) {
+        let old = app.lfoParam
+        app.lfoParam = new
+        recentre(from: old, to: new)
+    }
+
+    /// The centering half of `selectParam`, for the picker's drag: it assigns the parameter as
+    /// the drag goes and calls this once, with the parameter it started on and the one it was
+    /// released on.
+    private func recentre(from old: ParamSpec, to new: ParamSpec) {
+        guard new != old, selectedLfoID == nil else { return }
+        if let centre = new.defaultCenter {
+            app.lfoCenter = centre
+        } else if old.defaultCenter != nil {
+            // Leaving a neutral-centred parameter: its centre (49 for bend) means nothing here.
+            app.lfoCenter = AppState.defaultLfoCenter
+        }
+    }
 
     private func snapCenter() {
         if app.lfoParam.role == .tempo {
@@ -120,6 +244,17 @@ struct LFOPanelView: View {
         return all[(idx + 1) % all.count]
     }
 
+    /// What the waveform draws. While an LFO is being set up (a chip is selected, preview is on,
+    /// or a control has been touched since the last touch elsewhere) it is empty, which makes
+    /// `MultiWaveformView` draw the editor's own curve: that is the LFO on deck, since `loadEditor`
+    /// fills the editor from a selected chip and `saveChipEdits` keeps it live. Otherwise every
+    /// LFO that is running, so paused and finished chips drop out; with none running it is empty
+    /// again rather than drawing an empty box.
+    private var waveformLfos: [LfoClip] {
+        if selectedLfoID != nil || app.isPreview || app.onDeckTouched { return [] }
+        return app.activeLfos.filter(\.isEnabled)
+    }
+
     private var waveTracks: [(Color, Bool)] {
         let trackDisabled = app.lfoParam.isMasterOnly || app.masterOn > 0
         let masterDisabled = !app.lfoParam.isMasterCapable
@@ -140,13 +275,19 @@ struct LFOPanelView: View {
 
     @ViewBuilder private var paramRow: some View {
         HStack(spacing: m.controlHSpacing) {
-            Button { app.lfoParam = cycleNextParam(app.lfoParam) } label: {
+            Button { selectParam(cycleNextParam(app.lfoParam)) } label: {
                 Image(systemName: "bolt.fill")
                     .font(.system(size: m.iconSize))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
-            CompactPicker(options: app.profile.pickerParams, selection: $app.lfoParam,
-                          label: { $0.name }, accessibilityId: "paramPicker")
+            .accessibilityIdentifier("paramIconButton")
+            // The binding writes the parameter at once, so preview, a selected chip and the
+            // label all follow a drag. Re-centering waits for the settle: passing over bend on
+            // the way to another parameter must not move the center box.
+            CompactPicker(options: app.profile.pickerParams,
+                          selection: Binding(get: { app.lfoParam }, set: { app.lfoParam = $0 }),
+                          label: { $0.name }, accessibilityId: "paramPicker",
+                          onSettle: { recentre(from: $0, to: $1) })
         }
         .tourAnchor(.paramPicker)
     }
@@ -158,6 +299,7 @@ struct LFOPanelView: View {
                     .font(.system(size: m.iconSize))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
+            .accessibilityIdentifier("waveIconButton")
             CompactPicker(options: Array(LfoWave.allCases), selection: $app.lfoWave,
                           label: { $0.rawValue }, accessibilityId: "wavePicker")
         }
@@ -177,7 +319,8 @@ struct LFOPanelView: View {
                 set: { app.lfoRate = max(1, min(25, Int($0.rounded()))) }
             ), range: 1...25, sensitivity: 0.04,
                labelForValue: { rateScrubLabel(for: $0) },
-               accessibilityId: "rateScrub")
+               accessibilityId: "rateScrub",
+               tapOptions: (1...25).map { rateScrubLabel(for: $0) })
             .frame(width: m.rateW)
         }
         .tourAnchor(.speedBox)
@@ -261,6 +404,7 @@ struct LFOPanelView: View {
                     ActiveLfoChip(lfo: lfo,
                                   paramShort: spec?.short ?? lfo.paramId,
                                   isTempo: spec?.role == .tempo,
+                                  valueMax: spec?.valueMax ?? 127,
                                   selected: selectedLfoID == lfo.id) {
                         // Long press: enter edit or commit if already selected
                         if selectedLfoID == lfo.id { commitChipEdit() }
@@ -278,6 +422,7 @@ struct LFOPanelView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { cancelChipEdit() }
+        .accessibilityIdentifier("lfoChipArea")
         .tourAnchor(.chipArea)
     }
 
@@ -323,88 +468,96 @@ struct LFOPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
 
-            // ── 1. Track + master toggle buttons ─────────────────────────────
-            // Wraps onto a second row when a 6-track device won't fit one row at the
-            // 44pt minimum touch target (iPhone portrait) — see LayoutMetrics.toggleBtnRows.
-            VStack(spacing: m.toggleBtnSpacing) {
-                ForEach(Array(toggleButtonRows.enumerated()), id: \.offset) { _, row in
-                    HStack(spacing: m.toggleBtnSpacing) {
-                        ForEach(row, id: \.self) { slot in
-                            switch slot {
-                            case .track(let t):
-                                TrackToggleButton(track: t,
-                                                  state: app.trackOn[t] ?? 0,
-                                                  disabled: app.lfoParam.isMasterOnly || app.masterOn > 0) {
-                                    app.cycleTrack(t)
+            // Sections 1-3 are the LFO's controls. `ContentView` watches touches against this frame:
+            // one inside puts the LFO on deck on the waveform, one outside takes it off.
+            VStack(spacing: 0) {
+                // ── 1. Track + master toggle buttons ─────────────────────────────
+                // Wraps onto a second row when a 6-track device won't fit one row at the
+                // 44pt minimum touch target (iPhone portrait) — see LayoutMetrics.toggleBtnRows.
+                VStack(spacing: m.toggleBtnSpacing) {
+                    ForEach(Array(toggleButtonRows.enumerated()), id: \.offset) { _, row in
+                        HStack(spacing: m.toggleBtnSpacing) {
+                            ForEach(row, id: \.self) { slot in
+                                switch slot {
+                                case .track(let t):
+                                    TrackToggleButton(track: t,
+                                                      state: app.trackOn[t] ?? 0,
+                                                      disabled: app.lfoParam.isMasterOnly || app.masterOn > 0) {
+                                        app.cycleTrack(t)
+                                    }
+                                    .tourAnchor(.trackToggle)
+                                case .master:
+                                    MasterToggleButton(state: app.masterOn,
+                                                       disabled: !app.lfoParam.isMasterCapable) {
+                                        app.cycleMaster()
+                                    }
+                                    .tourAnchor(.masterToggle)
+                                case .preview:
+                                    PreviewToggleButton(active: app.isPreview) {
+                                        app.togglePreview()
+                                    }
+                                    .tourAnchor(.preview)
                                 }
-                                .tourAnchor(.trackToggle)
-                            case .master:
-                                MasterToggleButton(state: app.masterOn,
-                                                   disabled: !app.lfoParam.isMasterCapable) {
-                                    app.cycleMaster()
-                                }
-                                .tourAnchor(.masterToggle)
-                            case .preview:
-                                PreviewToggleButton(active: app.isPreview) {
-                                    app.togglePreview()
-                                }
-                                .tourAnchor(.preview)
                             }
                         }
                     }
                 }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, m.toggleBtnTopPad)
-            .padding(.bottom, m.toggleBtnVPad)
-            .padding(.horizontal, m.toggleBtnHPad)
+                .frame(maxWidth: .infinity)
+                .padding(.top, m.toggleBtnTopPad)
+                .padding(.bottom, m.toggleBtnVPad)
+                .padding(.horizontal, m.toggleBtnHPad)
 
-            // ── 2+3. Param / wave / rate / depth / center controls ────────────
-            if needsCombinedLfoRow {
-                HStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    paramRow
-                    Spacer(minLength: m.controlHSpacing * 1.5)
-                    waveRow
-                    Spacer(minLength: m.controlHSpacing * 2)
-                    rateBox
-                    Spacer(minLength: m.controlHSpacing * 1.2)
-                    centerBox
-                    Spacer(minLength: m.controlHSpacing * 1.2)
-                    depthBox
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, m.controlVPad)
-            } else {
-                HStack(spacing: m.controlHSpacing * 3) {
-                    Spacer()
-                    paramRow
-                    waveRow
-                    Spacer()
-                }
-                .padding(.vertical, m.controlVPad)
+                // ── 2+3. Param / wave / rate / depth / center controls ────────────
+                if needsCombinedLfoRow {
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        paramRow
+                        Spacer(minLength: m.controlHSpacing * 1.5)
+                        waveRow
+                        Spacer(minLength: m.controlHSpacing * 2)
+                        rateBox
+                        Spacer(minLength: m.controlHSpacing * 1.2)
+                        centerBox
+                        Spacer(minLength: m.controlHSpacing * 1.2)
+                        depthBox
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, m.controlVPad)
+                } else {
+                    HStack(spacing: m.controlHSpacing * 3) {
+                        Spacer()
+                        paramRow
+                        waveRow
+                        Spacer()
+                    }
+                    .padding(.vertical, m.controlVPad)
 
-                HStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    rateBox
-                    Spacer(minLength: m.controlHSpacing * 2)
-                    centerBox
-                    Spacer(minLength: m.controlHSpacing * 2)
-                    depthBox
-                    Spacer(minLength: 0)
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        rateBox
+                        Spacer(minLength: m.controlHSpacing * 2)
+                        centerBox
+                        Spacer(minLength: m.controlHSpacing * 2)
+                        depthBox
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, m.controlVPad)
                 }
-                .padding(.vertical, m.controlVPad)
             }
+            .background(OnDeckRegionMarker(region: onDeckRegion))
 
             // ── 4+5. Waveform + action buttons + LFO list ─────────────────────
             if needsSideBySide {
                 HStack(spacing: 0) {
                     MultiWaveformView(
-                        lfos: [], wave: app.lfoWave,
+                        lfos: waveformLfos, wave: app.lfoWave,
                         rateTicks: app.lfoDisplayRateTicks,
                         depth: app.lfoDepth, tracks: waveTracks,
                         bpm: app.bpm
                     )
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityIdentifier("waveform")
+                    .accessibilityValue(waveformLfos.isEmpty ? "editor" : "running")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(C.bg2)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -445,11 +598,14 @@ struct LFOPanelView: View {
                 .frame(maxHeight: .infinity)
             } else {
                 MultiWaveformView(
-                    lfos: [], wave: app.lfoWave,
+                    lfos: waveformLfos, wave: app.lfoWave,
                     rateTicks: app.lfoDisplayRateTicks,
                     depth: app.lfoDepth, tracks: waveTracks,
                     bpm: app.bpm
                 )
+                .accessibilityElement(children: .ignore)
+                .accessibilityIdentifier("waveform")
+                .accessibilityValue(waveformLfos.isEmpty ? "editor" : "running")
                 .frame(height: m.waveformH)
                 .frame(maxWidth: .infinity)
                 .background(C.bg2)
@@ -540,110 +696,282 @@ private struct TrackToggleLiveUpdateModifier: ViewModifier {
     }
 }
 
+// MARK: - Option list popover
+
+/// The list that opens from a picker or from the speed box: every option on one scrolling,
+/// tappable column, opened on the current one. Takes plain labels so the parameter, wave and
+/// speed lists share it, and with them the always-visible scroll bar.
+private struct OptionListPopover: View {
+    let labels: [String]
+    let selectedIndex: Int
+    /// Fit the width to the labels instead of a fixed one, so a list of short labels is not lost in
+    /// the middle of a wide popover, and fits beside its box on a narrow screen.
+    var snug = false
+    let onPick: (Int) -> Void
+    @Environment(\.metrics) private var m
+    private let isPad = UIDevice.current.userInterfaceIdiom == .pad
+
+    /// The widest label, plus a gutter each side that clears the checkmark on the selected row.
+    private var snugWidth: CGFloat {
+        let font = UIFont.systemFont(ofSize: m.pickerFont, weight: .bold)
+        let widest = labels.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        return ceil(widest + 2 * m.pickerFont * 2.2)
+    }
+
+    var body: some View {
+        let w: CGFloat = snug ? snugWidth : (isPad ? 260 : 220)
+        let itemList = VStack(spacing: 0) {
+            ForEach(Array(labels.enumerated()), id: \.offset) { idx, text in
+                Button {
+                    onPick(idx)
+                } label: {
+                    Text(text)
+                        .font(.system(size: m.pickerFont, weight: .bold))
+                        .foregroundColor(idx == selectedIndex ? .accentColor : C.text)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                        .overlay(alignment: .trailing) {
+                            if idx == selectedIndex {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.accentColor)
+                                    .padding(.trailing, 20)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .id(idx)
+                if idx < labels.count - 1 { Divider() }
+            }
+        }
+        .padding(.vertical, 8)
+
+        // Cap the popover so a long list (the TX-6 has ~30 parameters) can never grow past
+        // the screen — without this the tail of the list is unreachable in portrait.
+        // The list's real height: a row is a line of text, 4pt padding top and bottom and a divider,
+        // inside 8pt of padding top and bottom. Guessing a round 44pt a row left a blank band under
+        // the last row once a list was long enough to need the scrolling frame.
+        let line = UIFont.systemFont(ofSize: m.pickerFont, weight: .bold).lineHeight
+        let naturalH = ceil(CGFloat(labels.count) * (line + 9) + 16)
+        let cappedH  = min(naturalH, m.screen.height * 0.6)
+
+        Group {
+            if m.isLandscape {
+                // Landscape: UIKit caps to available height; ScrollView lets user reach cut-off items
+                ScrollViewReader { proxy in
+                    AlwaysVisibleScroll { itemList.frame(minWidth: w - 20) }
+                        .onAppear { proxy.scrollTo(selectedIndex, anchor: .center) }
+                }
+                .frame(minWidth: w, idealWidth: w, maxWidth: w,
+                       idealHeight: naturalH, maxHeight: naturalH)
+            } else if naturalH <= cappedH {
+                // Portrait / iPad, short list: VStack has a natural height — UIHostingController
+                // measures it directly, so UIKit sizes the popover to exactly fit the
+                // content with no blank space.
+                itemList.frame(width: w)
+            } else {
+                // Portrait, long list: same scrolling treatment as landscape.
+                ScrollViewReader { proxy in
+                    AlwaysVisibleScroll { itemList.frame(minWidth: w - 20) }
+                        .onAppear { proxy.scrollTo(selectedIndex, anchor: .center) }
+                }
+                .frame(minWidth: w, idealWidth: w, maxWidth: w,
+                       idealHeight: cappedH, maxHeight: cappedH)
+            }
+        }
+        .presentationCompactAdaptation(.popover)
+        .preferredColorScheme(.dark)
+    }
+}
+
+private extension View {
+    /// Shows `OptionListPopover` from this view, and closes it after a pick.
+    func optionListPopover(isPresented: Binding<Bool>, labels: [String], selectedIndex: Int,
+                           snug: Bool = false,
+                           onPick: @escaping (Int) -> Void) -> some View {
+        modifier(OnDeckListPopover(isPresented: isPresented, labels: labels,
+                                   selectedIndex: selectedIndex, snug: snug, onPick: onPick))
+    }
+}
+
+/// The list popover, which also keeps the waveform on the LFO being set up. A row sits outside the
+/// LFO controls, so the touch that picks it would count as "anywhere else" and send the waveform
+/// back to the running LFOs. Opening a list and picking from one therefore say "a control was
+/// touched" themselves, after that touch has been seen.
+private struct OnDeckListPopover: ViewModifier {
+    @EnvironmentObject var app: AppState
+    @Binding var isPresented: Bool
+    let labels: [String]
+    let selectedIndex: Int
+    let snug: Bool
+    let onPick: (Int) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: isPresented) { _, open in if open { app.onDeckTouched = true } }
+            .popover(isPresented: $isPresented) {
+                OptionListPopover(labels: labels, selectedIndex: selectedIndex, snug: snug) { idx in
+                    onPick(idx)
+                    app.onDeckTouched = true
+                    isPresented = false
+                }
+            }
+    }
+}
+
 // MARK: - Compact picker
 
 /// Options are supplied with a label closure rather than constrained to a String-backed enum,
 /// so device-specific parameter lists (`[ParamSpec]`) work alongside `LfoWave`.
+///
+/// A tap opens the list; a vertical drag steps through the options, the same gesture as the
+/// speed, center and depth boxes. `onSettle` reports where a choice ended up, not every step of
+/// a drag: it is for effects (like re-centering) that must not fire on options merely passed over.
 private struct CompactPicker<T>: View where T: Identifiable & Hashable {
     let options: [T]
     @Binding var selection: T
     let label: (T) -> String
     var accessibilityId: String? = nil
+    /// Called once per choice with the selection from before it and the final one: when a drag
+    /// is released, or when an option is picked from the list.
+    var onSettle: ((_ from: T, _ to: T) -> Void)? = nil
     @State private var show = false
+    @State private var dragActive = false
+    @State private var dragFrom: T? = nil
     @Environment(\.metrics) private var m
-    private let isPad = UIDevice.current.userInterfaceIdiom == .pad
+
+    /// The selection as a position in `options`, so `ScrubDrag` can move it like any number.
+    /// Writes back only when the position changes, so a drag that stays on one option is silent.
+    private var position: Binding<Double> {
+        Binding(
+            get: { Double(options.firstIndex(of: selection) ?? 0) },
+            set: { v in
+                guard !options.isEmpty else { return }
+                let i = max(0, min(options.count - 1, Int(v.rounded())))
+                if options[i] != selection { selection = options[i] }
+            })
+    }
 
     var body: some View {
-        Button { show = true } label: {
-            ZStack(alignment: .leading) {
-                ForEach(options) { opt in Text(label(opt)).opacity(0) }
-                Text(label(selection)).foregroundColor(.white)
-            }
-            .font(.system(size: m.pickerFont, weight: .bold))
-            .padding(.horizontal, m.scrubH * 0.31)
-            .frame(height: m.scrubH)
-            .background(C.bg3)
-            .cornerRadius(5)
-            .overlay(RoundedRectangle(cornerRadius: 5).stroke(C.dim, lineWidth: 1))
+        ZStack(alignment: .leading) {
+            ForEach(options) { opt in Text(label(opt)).opacity(0) }
+            Text(label(selection)).foregroundColor(.white)
         }
-        .foregroundColor(.accentColor)
+        .font(.system(size: m.pickerFont, weight: .bold))
+        .padding(.horizontal, m.scrubH * 0.31)
+        .frame(height: m.scrubH)
+        .background(C.bg3)
+        .cornerRadius(5)
+        .overlay(RoundedRectangle(cornerRadius: 5)
+            .stroke(dragActive ? C.green.opacity(0.6) : C.dim, lineWidth: 1))
+        .contentShape(Rectangle())
+        .onTapGesture { show = true }
+        .modifier(ScrubDrag(value: position,
+                            range: 0...Double(max(0, options.count - 1)),
+                            sensitivity: 0.04, isActive: $dragActive,
+                            onBegan: { dragFrom = selection },
+                            onEnded: {
+                                if let from = dragFrom { onSettle?(from, selection) }
+                                dragFrom = nil
+                            }))
+        // A tap gesture is not a Button, so say it is one: the UI tests (and VoiceOver) look
+        // for `buttons[accessibilityId]`.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label(selection))
+        .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(accessibilityId ?? "")
-        .popover(isPresented: $show) {
-            let w: CGFloat = isPad ? 260 : 220
-            let itemList = VStack(spacing: 0) {
-                ForEach(Array(options.enumerated()), id: \.offset) { idx, opt in
-                    Button {
-                        selection = opt; show = false
-                    } label: {
-                        Text(label(opt))
-                            .font(.system(size: m.pickerFont, weight: .bold))
-                            .foregroundColor(selection == opt ? .accentColor : C.text)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 4)
-                            .contentShape(Rectangle())
-                            .overlay(alignment: .trailing) {
-                                if selection == opt {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.accentColor)
-                                        .padding(.trailing, 20)
-                                }
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .id(opt.id)
-                    if idx < options.count - 1 { Divider() }
-                }
-            }
-            .padding(.vertical, 8)
-
-            // Cap the popover so a long list (the TX-6 has ~30 parameters) can never grow past
-            // the screen — without this the tail of the list is unreachable in portrait.
-            let naturalH = CGFloat(options.count) * 44 + 40
-            let cappedH  = min(naturalH, m.screen.height * 0.6)
-
-            Group {
-                if m.isLandscape {
-                    // Landscape: UIKit caps to available height; ScrollView lets user reach cut-off items
-                    ScrollViewReader { proxy in
-                        ScrollView(showsIndicators: true) { itemList.frame(minWidth: w - 20) }
-                            .onAppear { proxy.scrollTo(selection.id, anchor: .center) }
-                    }
-                    .frame(minWidth: w, idealWidth: w, maxWidth: w,
-                           idealHeight: naturalH, maxHeight: naturalH)
-                } else if naturalH <= cappedH {
-                    // Portrait / iPad, short list: VStack has a natural height — UIHostingController
-                    // measures it directly, so UIKit sizes the popover to exactly fit the
-                    // content with no blank space.
-                    itemList.frame(width: w)
-                } else {
-                    // Portrait, long list: same scrolling treatment as landscape.
-                    ScrollViewReader { proxy in
-                        ScrollView(showsIndicators: true) { itemList.frame(minWidth: w - 20) }
-                            .onAppear { proxy.scrollTo(selection.id, anchor: .center) }
-                    }
-                    .frame(minWidth: w, idealWidth: w, maxWidth: w,
-                           idealHeight: cappedH, maxHeight: cappedH)
-                }
-            }
-            .presentationCompactAdaptation(.popover)
-            .preferredColorScheme(.dark)
+        // Sized to the labels: a fixed 220pt list did not fit beside the box on a narrow phone, so
+        // the system put it above, over the mixer.
+        .optionListPopover(isPresented: $show, labels: options.map(label),
+                           selectedIndex: options.firstIndex(of: selection) ?? -1,
+                           snug: true) { idx in
+            let from = selection
+            selection = options[idx]
+            onSettle?(from, options[idx])
         }
     }
 }
 
-// MARK: - Scrub value
+// MARK: - Always-visible scroll bar
 
-private struct ScrubValue: View {
+/// The system scroll indicator only appears while a list is moving, so a popover that opens with
+/// part of its list cut off gives no hint that more is above or below. This draws its own thumb,
+/// which stays on screen whenever the content is taller than the viewport.
+private struct ScrollMetrics: Equatable {
+    var offset: CGFloat = 0
+    var content: CGFloat = 0
+}
+
+private struct AlwaysVisibleScroll<Content: View>: View {
+    @ViewBuilder var content: Content
+    @State private var metrics = ScrollMetrics()
+    @State private var viewport: CGFloat = 0
+    @Environment(\.metrics) private var m
+    private let space = "alwaysVisibleScroll"
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            // Written straight into state: a PreferenceKey never reached the enclosing view from
+            // inside a popover, which left the bar permanently hidden.
+            content.background(
+                GeometryReader { g in
+                    let offset = -g.frame(in: .named(space)).minY
+                    let height = g.size.height
+                    Color.clear
+                        .onAppear { metrics = ScrollMetrics(offset: offset, content: height) }
+                        .onChange(of: offset) { _, v in metrics.offset = v }
+                        .onChange(of: height) { _, v in metrics.content = v }
+                })
+        }
+        .coordinateSpace(name: space)
+        .background(
+            GeometryReader { g in
+                Color.clear
+                    .onAppear { viewport = g.size.height }
+                    .onChange(of: g.size.height) { _, h in viewport = h }
+            })
+        .overlay(alignment: .topLeading) { thumb }
+    }
+
+    @ViewBuilder private var thumb: some View {
+        let overflow = metrics.content - viewport
+        if viewport > 0, overflow > 1 {
+            let inset = m.pickerFont * 0.3
+            let track = max(viewport - inset * 2, 1)
+            let height = min(track, max(m.pickerFont * 1.5, track * viewport / metrics.content))
+            let progress = min(max(metrics.offset / overflow, 0), 1)
+            HStack(alignment: .top, spacing: 0) {
+                Spacer(minLength: 0)
+                Capsule()
+                    .fill(Color.white.opacity(0.55))
+                    .frame(width: m.pickerFont * 0.2, height: height)
+                    .offset(y: inset + (track - height) * progress)
+                    .padding(.trailing, m.pickerFont * 0.15)
+                    .accessibilityIdentifier("pickerScrollThumb")
+            }
+            .allowsHitTesting(false)
+        }
+    }
+}
+
+// MARK: - Scrub drag
+
+/// A vertical drag that moves a number: up raises it, `sensitivity` is value per point, and
+/// moving sideways away from the box slows it down for fine control. The state it needs
+/// (where the drag began, how far it has gone) lives here, so every box that scrubs shares it.
+private struct ScrubDrag: ViewModifier {
     @Binding var value: Double
     let range: ClosedRange<Double>
     var sensitivity: Double = 0.15
-    var decimals: Int = 0
-    var labelForValue: ((Int) -> String)? = nil
-    var accessibilityId: String? = nil
-    @Environment(\.metrics) private var m
+    /// Snap to a whole number when the drag ends.
+    var rounds = true
+    /// True while a finger is dragging, for the green border.
+    @Binding var isActive: Bool
+    var onBegan: () -> Void = {}
+    var onEnded: () -> Void = {}
 
-    @GestureState private var isActive: Bool = false
+    @GestureState private var gestureActive = false
     @State private var base: Double = 0
     @State private var accumulated: Double = 0
     @State private var prevHeight: CGFloat = 0
@@ -658,9 +986,68 @@ private struct ScrubValue: View {
         max(range.lowerBound, min(range.upperBound, base - accumulated))
     }
 
+    /// Also runs when the system cancels a drag, which never reaches `onEnded`; leaving
+    /// `accumulated` behind would make the next drag start from the wrong place.
+    private func finish() {
+        guard dragStarted else { return }
+        var newVal = live
+        if rounds { newVal = newVal.rounded() }
+        base = newVal
+        value = newVal
+        accumulated = 0
+        prevHeight = 0
+        dragStarted = false
+        onEnded()
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .gesture(
+                DragGesture(minimumDistance: 2)
+                    .updating($gestureActive) { _, state, _ in state = true }
+                    .onChanged { g in
+                        guard dragStarted else {
+                            dragStarted = true
+                            prevHeight = g.translation.height
+                            onBegan()
+                            return
+                        }
+                        let dh = g.translation.height - prevHeight
+                        accumulated += dh * sensitivity * precisionFactor(g.translation.width)
+                        prevHeight = g.translation.height
+                        value = live
+                    }
+                    .onEnded { _ in finish() }
+            )
+            .onAppear { base = value }
+            .onChange(of: value) { _, v in if !gestureActive { base = v } }
+            .onChange(of: gestureActive) { _, active in
+                isActive = active
+                if !active { finish() }
+            }
+    }
+}
+
+// MARK: - Scrub value
+
+/// A box that shows a number and scrubs it by dragging. With `tapOptions` a tap also opens a list
+/// of labels, one per whole value in `range` starting at its lower bound.
+private struct ScrubValue: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var sensitivity: Double = 0.15
+    var decimals: Int = 0
+    var labelForValue: ((Int) -> String)? = nil
+    var accessibilityId: String? = nil
+    var tapOptions: [String]? = nil
+    @Environment(\.metrics) private var m
+
+    @State private var isActive = false
+    @State private var showOptions = false
+
     private var displayText: String {
-        if let label = labelForValue { return label(Int(live.rounded())) }
-        return decimals > 0 ? String(format: "%.\(decimals)f", live) : String(Int(live.rounded()))
+        if let label = labelForValue { return label(Int(value.rounded())) }
+        return decimals > 0 ? String(format: "%.\(decimals)f", value) : String(Int(value.rounded()))
     }
 
     var body: some View {
@@ -676,35 +1063,30 @@ private struct ScrubValue: View {
                 .font(.system(size: m.pickerFont, weight: .bold, design: .monospaced))
                 .foregroundColor(isActive ? C.green : .white)
         }
+        .contentShape(Rectangle())
+        .modifier(TapToOpen(isEnabled: tapOptions != nil) { showOptions = true })
+        .modifier(ScrubDrag(value: $value, range: range, sensitivity: sensitivity,
+                            rounds: decimals == 0, isActive: $isActive))
         .accessibilityElement(children: .ignore)
         .accessibilityIdentifier(accessibilityId ?? "")
         .accessibilityValue(displayText)
-        .gesture(
-            DragGesture(minimumDistance: 2)
-                .updating($isActive) { _, state, _ in state = true }
-                .onChanged { g in
-                    guard dragStarted else {
-                        dragStarted = true
-                        prevHeight = g.translation.height
-                        return
-                    }
-                    let dh = g.translation.height - prevHeight
-                    accumulated += dh * sensitivity * precisionFactor(g.translation.width)
-                    prevHeight = g.translation.height
-                    value = live
-                }
-                .onEnded { _ in
-                    var newVal = live
-                    if decimals == 0 { newVal = newVal.rounded() }
-                    base = newVal
-                    value = newVal
-                    accumulated = 0
-                    prevHeight = 0
-                    dragStarted = false
-                }
-        )
-        .onAppear { base = value }
-        .onChange(of: value) { _, v in if !isActive { base = v } }
+        // Scrub boxes hold numbers, so their lists are short labels that fit a narrow popover.
+        .optionListPopover(isPresented: $showOptions, labels: tapOptions ?? [],
+                           selectedIndex: Int((value - range.lowerBound).rounded()),
+                           snug: true) { idx in
+            value = range.lowerBound + Double(idx)
+        }
+    }
+}
+
+/// Adds a tap only when asked. A box with nothing to open must not carry a tap gesture at all:
+/// it would be exposed as something to activate, and centre and depth should stay plain values.
+private struct TapToOpen: ViewModifier {
+    let isEnabled: Bool
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        if isEnabled { content.onTapGesture(perform: action) } else { content }
     }
 }
 
@@ -715,6 +1097,9 @@ private struct ActiveLfoChip: View {
     /// Resolved by the caller from the active profile — the chip does not look up parameters.
     let paramShort: String
     let isTempo: Bool
+    /// Native top of the parameter (127, or 16383 for bend) so the chip can show centre and depth
+    /// on the same 0-99 scale as the sliders.
+    let valueMax: Double
     let selected: Bool
     let onSelect: () -> Void
     let onToggleEnabled: () -> Void
@@ -723,8 +1108,8 @@ private struct ActiveLfoChip: View {
 
     private func chipLabel() -> Text {
         let t = lfo.track == 0 ? "m" : "\(lfo.track)"
-        let dCenter = isTempo ? Int(lfo.centerValue.rounded()) : Int(midiToUI(lfo.centerValue))
-        let dDepth  = isTempo ? Int(lfo.depth.rounded())       : Int(midiToUI(lfo.depth))
+        let dCenter = isTempo ? Int(lfo.centerValue.rounded()) : Int(nativeToUI(lfo.centerValue, valueMax: valueMax))
+        let dDepth  = isTempo ? Int(lfo.depth.rounded())       : Int(nativeToUI(lfo.depth, valueMax: valueMax))
         var result = Text(t)
         if lfo.inverted { result = result + Text(Image(systemName: "arrow.up.arrow.down")) }
         result = result + Text("·\(paramShort)·\(lfo.wave.shortName)")
@@ -752,6 +1137,8 @@ private struct ActiveLfoChip: View {
         .background(C.bg3)
         .overlay(RoundedRectangle(cornerRadius: 3).stroke(selected ? C.green.opacity(0.7) : Color.clear, lineWidth: 1))
         .cornerRadius(3)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("lfoChip")
         .gesture(
             LongPressGesture(minimumDuration: 0.4, maximumDistance: 10)
                 .onEnded { _ in onSelect() }

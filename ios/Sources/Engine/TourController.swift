@@ -92,17 +92,15 @@ final class TourController: ObservableObject {
 
     // MARK: - Starting
 
-    /// Called once the splash has gone. Resumes where **later** left off.
+    /// Called once the splash has gone. A tour that was never finished starts at step 1, whether
+    /// it was never started or **later** closed it part-way: it does not resume.
     func startIfNeeded(caps: DeviceCapabilities) {
         steps = TourAnchor.steps(for: caps)
         guard openSheets == 0, currentStep == nil else { return }
         switch status {
         case .completed:
             return
-        case .deferred:
-            let resume = defaults.string(forKey: Self.resumeStepKey).flatMap(TourAnchor.init)
-            currentStep = resume.flatMap(validStep(atOrAfter:)) ?? steps.first
-        case .notStarted:
+        case .deferred, .notStarted:
             currentStep = steps.first
         }
     }
@@ -146,11 +144,12 @@ final class TourController: ObservableObject {
     /// Ends the tour for good.
     func skip() { finish() }
 
-    /// Closes the tour without finishing it; the next launch resumes at this step.
+    /// Closes the tour without finishing it; the next launch starts it again from step 1.
+    /// Clears the step an older build saved here, which nothing reads any more.
     func later() {
-        guard let cur = currentStep else { return }
+        guard currentStep != nil else { return }
         write(.deferred)
-        defaults.set(cur.rawValue, forKey: Self.resumeStepKey)
+        defaults.removeObject(forKey: Self.resumeStepKey)
         currentStep = nil
     }
 

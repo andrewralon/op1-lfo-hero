@@ -137,6 +137,227 @@ final class MultiDeviceUITests: XCTestCase {
         XCTAssertFalse(tp7.buttons["eq high"].exists, "tp-7 has no eq")
     }
 
+    // MARK: - OP-1 global controls
+
+    /// The OP-1's rec level, master EQ, sustain and pitch bend are global: each is offered in the
+    /// picker, forces the master (m) target, and the ones with a neutral point start their centre
+    /// A long picker list must show a scroll bar the moment it opens (the system one only appears
+    /// while scrolling), and a short list that fits must not draw one.
+    @MainActor func testPickerShowsAScrollBarOnlyWhenTheListOverflows() throws {
+        let app = launch(profile: "op1")
+        let thumb = app.descendants(matching: .any)["pickerScrollThumb"]
+
+        let params = app.buttons["paramPicker"]
+        XCTAssertTrue(params.waitForExistence(timeout: 5))
+        params.tap()
+        XCTAssertTrue(app.buttons["rec level"].waitForExistence(timeout: 3))
+        sleep(1)
+        try shot(app, "picker_scrollbar")
+        XCTAssertTrue(thumb.waitForExistence(timeout: 3), "the long parameter list must show a scroll bar")
+        app.buttons["rec level"].tap()
+
+        let waves = app.buttons["wavePicker"]
+        XCTAssertTrue(waves.waitForExistence(timeout: 3))
+        waves.tap()
+        XCTAssertTrue(app.buttons["sine"].waitForExistence(timeout: 3))
+        XCTAssertFalse(thumb.exists, "a list that fits has nothing to scroll, so no bar")
+    }
+
+    // MARK: - Waveform: the LFO being edited vs the running LFOs
+
+    /// "editor" while the waveform draws the editor's own curve, "running" while it draws the
+    /// chips that are running.
+    @MainActor private func waveformMode(_ app: XCUIApplication) -> String? {
+        app.descendants(matching: .any)["waveform"].value as? String
+    }
+
+    /// Scrubbing a box is touching an LFO control, the same as opening its list: the waveform
+    /// shows the LFO on deck, not the running ones.
+    @MainActor func testScrubbingAPickerShowsTheOnDeckLfo() throws {
+        let app = launch(profile: "op1")
+        app.buttons["repeatButton"].tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.buttons["wavePicker"].swipeUp()
+        XCTAssertEqual(waveformMode(app), "editor", "scrubbing the wave picker is touching an LFO control")
+        app.descendants(matching: .any)["lfoChipArea"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.buttons["paramPicker"].swipeUp()
+        XCTAssertEqual(waveformMode(app), "editor", "scrubbing the param picker is too")
+
+        // Taps count too: the picker box, and the icon beside it.
+        app.descendants(matching: .any)["lfoChipArea"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.buttons["waveIconButton"].tap()
+        XCTAssertEqual(waveformMode(app), "editor", "the icon next to the wave picker is a control")
+        app.descendants(matching: .any)["lfoChipArea"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.buttons["paramIconButton"].tap()
+        XCTAssertEqual(waveformMode(app), "editor", "the icon next to the param picker is a control")
+    }
+
+    @MainActor func testWaveformShowsRunningLfosUnlessYouAreEditing() throws {
+        let app = launch(profile: "op1")
+        XCTAssertEqual(waveformMode(app), "editor", "nothing running: the editor curve, not an empty box")
+
+        app.buttons["repeatButton"].tap()
+        XCTAssertEqual(waveformMode(app), "running", "a running LFO is shown")
+
+        // Changing a setting starts a draft: the curve you are shaping, not the running chip.
+        app.buttons["wavePicker"].tap()
+        app.buttons["square"].tap()
+        XCTAssertEqual(waveformMode(app), "editor")
+
+        // Tapping the empty chip area accepts the draft; back to what is running.
+        app.descendants(matching: .any)["lfoChipArea"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
+        XCTAssertEqual(waveformMode(app), "running")
+
+        // Preview is editing too, and pressing it counts as touching the controls even once it
+        // is off again: the running chips come back with the next touch elsewhere.
+        app.buttons["previewButton"].tap()
+        XCTAssertEqual(waveformMode(app), "editor")
+        app.buttons["previewButton"].tap()
+        XCTAssertEqual(waveformMode(app), "editor")
+        app.descendants(matching: .any)["lfoChipArea"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
+        XCTAssertEqual(waveformMode(app), "running")
+
+        // Touching anything outside the controls (here a mute pad) also ends it.
+        app.buttons["track2Button"].tap()
+        XCTAssertEqual(waveformMode(app), "editor")
+        app.buttons["muteButton1"].tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.buttons["muteButton1"].tap()
+
+        // A selected chip is the LFO being edited; committing it returns to the running ones.
+        let chip = app.descendants(matching: .any)["lfoChip"].firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 3))
+        chip.press(forDuration: 0.8)
+        XCTAssertEqual(waveformMode(app), "editor")
+        chip.press(forDuration: 0.8)
+        XCTAssertEqual(waveformMode(app), "running", "committing a chip edit is not a draft")
+    }
+
+    /// A paused chip is not drawn, so with only that one the waveform falls back to the editor.
+    @MainActor func testWaveformLeavesOutAPausedLfo() throws {
+        let app = launch(profile: "op1")
+        app.buttons["repeatButton"].tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.descendants(matching: .any)["lfoChip"].firstMatch.tap()    // tap pauses it
+        XCTAssertEqual(waveformMode(app), "editor")
+        app.descendants(matching: .any)["lfoChip"].firstMatch.tap()    // and again resumes it
+        XCTAssertEqual(waveformMode(app), "running")
+    }
+
+    // MARK: - Picker interaction: tap opens, drag scrubs
+
+    /// Drags `element` vertically by `dy` points (negative = up) from its centre.
+    @MainActor private func drag(_ element: XCUIElement, dy: CGFloat) {
+        let start = element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: 0, dy: dy)))
+        Thread.sleep(forTimeInterval: 0.3)
+    }
+
+    /// The speed box opens its 25-item list on a tap, like the param and wave boxes, and the
+    /// list is long enough to need the always-visible scroll bar.
+    @MainActor func testTappingTheSpeedBoxOpensTheListWithAScrollBar() throws {
+        let app = launch(profile: "op1")
+        let rate = app.descendants(matching: .any)["rateScrub"]
+        XCTAssertTrue(rate.waitForExistence(timeout: 5))
+        rate.tap()
+
+        XCTAssertTrue(app.buttons["f17"].waitForExistence(timeout: 3) || app.buttons["f1"].waitForExistence(timeout: 3),
+                      "the speed list must open")
+        let thumb = app.descendants(matching: .any)["pickerScrollThumb"]
+        XCTAssertTrue(thumb.waitForExistence(timeout: 3), "25 speeds overflow the popover, so a bar shows")
+
+        let list = app.scrollViews.containing(.button, identifier: "8").firstMatch
+        var tries = 0
+        while !app.buttons["f17"].isHittable && tries < 10 && list.exists { list.swipeUp(); tries += 1 }
+        app.buttons["f17"].tap()
+        XCTAssertEqual(rate.value as? String, "f17", "picking from the list sets the speed")
+    }
+
+    /// Centre and depth are values to drag, not lists: a tap does nothing.
+    @MainActor func testTappingCenterOrDepthOpensNothing() throws {
+        let app = launch(profile: "op1")
+        for id in ["centerScrub", "depthScrub"] {
+            let box = app.descendants(matching: .any)[id]
+            XCTAssertTrue(box.waitForExistence(timeout: 5))
+            let before = box.value as? String
+            box.tap()
+            sleep(1)
+            XCTAssertFalse(app.descendants(matching: .any)["pickerScrollThumb"].exists, id)
+            XCTAssertFalse(app.buttons["f1"].exists, "\(id) must not open a list")
+            XCTAssertEqual(box.value as? String, before, id)
+        }
+    }
+
+    /// A drag on the wave box steps through the shapes; up goes to later ones, as on the speed box.
+    @MainActor func testDraggingTheWaveBoxStepsThroughTheShapes() throws {
+        let app = launch(profile: "op1")
+        let waves = app.buttons["wavePicker"]
+        XCTAssertTrue(waves.waitForExistence(timeout: 5))
+        let first = waves.label
+        drag(waves, dy: -70)
+        XCTAssertNotEqual(waves.label, first, "dragging up must move to another shape")
+        drag(waves, dy: 70)
+        XCTAssertEqual(waves.label, first, "and dragging back down returns to where it began")
+    }
+
+    /// The center box follows the parameter you let go on, not the ones passed over on the way.
+    @MainActor func testDraggingTheParamBoxRecentresOnTheOneYouLandOn() throws {
+        let app = launch(profile: "op1")
+        let params = app.buttons["paramPicker"]
+        let center = app.descendants(matching: .any)["centerScrub"]
+        XCTAssertTrue(params.waitForExistence(timeout: 5))
+        XCTAssertEqual(center.value as? String, "90")
+
+        // Pitch bend is the last item, so enough upward drags land on it (and stay: it is clamped).
+        var tries = 0
+        while params.label != "pitch bend" && tries < 6 { drag(params, dy: -300); tries += 1 }
+        XCTAssertEqual(params.label, "pitch bend")
+        XCTAssertEqual(center.value as? String, "49", "released on bend: center jumps to bend's rest")
+
+        // Back out past the EQ and sustain (which also centre at 49 or not at all) to a plain one.
+        tries = 0
+        while params.label == "pitch bend" || (center.value as? String) == "49" {
+            drag(params, dy: 300); tries += 1
+            if tries >= 6 { break }
+        }
+        XCTAssertEqual(center.value as? String, "90", "released on a plain parameter: back to the default")
+    }
+
+    /// on it. The simulator has no MIDI, so this checks the layout and the state only.
+    @MainActor func testOP1GlobalControlsAreOfferedAndForceTheMasterTarget() throws {
+        let app = launch(profile: "op1")
+        let cases: [(name: String, centre: String?)] = [
+            ("rec level", "74"), ("eq low", "49"), ("eq mid", "49"),
+            ("eq high", "49"), ("sustain", nil), ("pitch bend", "49"),
+        ]
+        for c in cases {
+            let picker = app.buttons["paramPicker"]
+            XCTAssertTrue(picker.waitForExistence(timeout: 5))
+            picker.tap()
+            let option = app.buttons[c.name]
+            XCTAssertTrue(option.waitForExistence(timeout: 3), "'\(c.name)' must be in the OP-1's picker")
+            let list = app.scrollViews.containing(.button, identifier: c.name).firstMatch
+            var tries = 0
+            while !option.isHittable && tries < 15 && list.exists { list.swipeUp(); tries += 1 }
+            XCTAssertTrue(option.isHittable, "'\(c.name)' must be reachable by scrolling")
+            option.tap()
+
+            XCTAssertTrue(app.buttons["masterButton"].isEnabled, "\(c.name) targets master")
+            for t in 1...4 {
+                XCTAssertFalse(app.buttons["track\(t)Button"].isEnabled,
+                               "\(c.name) is global, so track \(t) must not be selectable")
+            }
+            if let centre = c.centre {
+                let value = app.descendants(matching: .any)["centerScrub"].value as? String
+                XCTAssertEqual(value, centre, "\(c.name): a new LFO must start centred on its neutral point")
+            }
+            if c.name == "pitch bend" { try shot(app, "op1_bend_live") }
+        }
+    }
+
     // MARK: - Slaved to a clock that never arrives
 
     /// Switching the clock source to a device that isn't sending clock freezes every LFO. The

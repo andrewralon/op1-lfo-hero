@@ -153,6 +153,58 @@ final class SettingsMigrationTests: XCTestCase {
         XCTAssertEqual(volumes[4], 99, "already at the new default -- untouched either way")
     }
 
+    // MARK: - v2 → v3 (pitch bend became 14-bit)
+
+    /// A saved TP-7 bend chip held centre/depth/original in 0-127. Bend is now native 0-16383, so
+    /// unmigrated it would sweep a 128th of its range.
+    func testV2MigrationRescalesSavedTP7BendChips() throws {
+        let v2Blob = """
+        {
+          "version": 2,
+          "deviceId": "tp7",
+          "perDevice": {
+            "tp7": {"activeLfos": [
+              {"id": "1B4E28BA-2FA1-11D2-883F-0016D3CCA427", "deviceId": "tp7", "track": 0,
+               "paramId": "tp7.pitchbend", "wave": "sine", "rateTicks": 96,
+               "depth": 20.0, "centerValue": 64.0, "inverted": false, "loop": true,
+               "isEnabled": true, "originalValue": 63.0},
+              {"id": "2B4E28BA-2FA1-11D2-883F-0016D3CCA427", "deviceId": "tp7", "track": 1,
+               "paramId": "tp7.vol", "wave": "sine", "rateTicks": 96,
+               "depth": 20.0, "centerValue": 64.0, "inverted": false, "loop": true,
+               "isEnabled": true, "originalValue": 80.0}
+            ]}
+          }
+        }
+        """
+        let s = try decodeSettings(v2Blob)
+        XCTAssertEqual(s.version, AppState.Settings.currentVersion)
+        let clips = try XCTUnwrap(s.perDevice["tp7"]).activeLfos
+        let bend = try XCTUnwrap(clips.first { $0.paramId == "tp7.pitchbend" })
+        XCTAssertEqual(bend.depth, (20.0 * 16383 / 127).rounded())
+        XCTAssertEqual(bend.centerValue, (64.0 * 16383 / 127).rounded())
+        XCTAssertEqual(bend.originalValue, 8192, "restore returns to exact no-bend")
+        let vol = try XCTUnwrap(clips.first { $0.paramId == "tp7.vol" })
+        XCTAssertEqual(vol.depth, 20.0, "7-bit chips are left alone")
+        XCTAssertEqual(vol.centerValue, 64.0)
+        XCTAssertEqual(vol.originalValue, 80.0)
+    }
+
+    /// The pre-rename id is migrated too, and a blob already at v3 is never rescaled again.
+    func testBendMigrationHandlesTheOldIdAndRunsOnlyOnce() throws {
+        let old = LfoClip(deviceId: "tp7", track: 0, paramId: "tp7.speed", wave: .sine, rateTicks: 96,
+                          depth: 10, centerValue: 64, inverted: false, loop: true, originalValue: 64)
+        let once = AppState.Settings.migratedBendClip(old)
+        XCTAssertEqual(once.depth, (10.0 * 16383 / 127).rounded())
+
+        var s = AppState.Settings()
+        var st = AppState.DeviceState()
+        st.activeLfos = [once]
+        s.perDevice["tp7"] = st
+        let back = try JSONDecoder().decode(AppState.Settings.self, from: JSONEncoder().encode(s))
+        XCTAssertEqual(back.perDevice["tp7"]?.activeLfos.first?.depth, once.depth,
+                       "a v3 blob must not be rescaled again")
+    }
+
     /// Saving must persist `currentVersion`, not silently downgrade it -- otherwise the v1→v2
     /// migration reapplies on every future launch and wipes out a genuine later choice to set a
     /// track's volume back to 90.

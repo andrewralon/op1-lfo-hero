@@ -61,7 +61,7 @@ python -m src.app
   - Track 5 = `#c25fa0` (magenta) — 6-channel devices only (TX-6 / TP-7)
   - Track 6 = `#3fb0a8` (teal) — 6-channel devices only
 - Dark theme throughout — near-black backgrounds (iOS `Theme.swift`: `#111111` / `#1a1a1a` / `#2a2a2a`, with `#454545` reserved for borders that need more contrast)
-- **All UI text is lowercase** — labels, button text, status messages (e.g. "scanning…", "no device found", "tempo mode:", window title "op1 lfo hero"). Match this in any new strings.
+- **All UI text is lowercase** — labels, button text, status messages (e.g. "scanning…", "tap to connect a device", "tempo mode:", window title "op1 lfo hero"). Match this in any new strings.
 - Green (`#4ec94e`-ish) marks active/centered/selected state (e.g. pan knob indicator is green at dead-center, white/text-colored off-center).
 
 ## iOS UI scaling (`LayoutMetrics`)
@@ -159,6 +159,7 @@ was clipping digits because it was derived from the column instead of the space 
 - `FEATURES.md` — iOS backlog: `## To fix` / `## Later (or not possible)` / `## Done`, each item prefixed with a severity (`HIGH`/`MED`/`LOW`)
 - `FEATURES_PYTHON.md` — same structure, for the Python app
 - `RESEARCH.md` — empirical MIDI protocol findings (e.g. why certain OP-1 tempo modes are indistinguishable over MIDI)
+- `SHIPPING.md` — the checklist for every App Store release (version numbers, what goes stale, fastlane lanes). Copy it into a scratch plan per release.
 
 When a task originates from one of these files, check the box (`- [ ]` → `- [x]`) and move the item under `## Done` as part of the same change — don't leave completed items unchecked.
 
@@ -276,9 +277,9 @@ Use XCUITest (not `cliclick` coordinate math) to drive the simulator — accessi
 - `repeatButton` — looping LFO start button (↻)
 - `oneShotButton` — one-shot LFO start button (→|)
 - `trashButton` — delete all chips button
-- `tourCard`, `tourTitle`, `tourCounter` — first-run tutorial hint card, its title and its `n / total` counter
-- `tourSkipButton` (top right) / `tourLaterButton` / `tourBackButton` / `tourNextButton` (bottom row) — the card's buttons (`tourNextButton` reads "start" on the welcome card and "done" on the last step; `tourBackButton` is disabled on the first)
-- `replayTourButton` (settings) / `replayTourFromHelp` (help) — the "show tutorial" button in each sheet's header, restarts the tutorial at step 1
+- `tourCard`, `tourTitle`, `tourCounter` — first-run tutorial hint card, its title and its `n/total` counter
+- `tourSkipButton` (top right) / `tourLaterButton` / `tourBackButton` / `tourNextButton` (bottom row) — the card's buttons (`tourNextButton` reads "next", or "done" on the last step; `tourBackButton` is disabled on the first)
+- `replayTourFromHelp` (help) — the "start tutorial" button, the first item in the help sheet; restarts the tutorial at step 1. `versionLabel` — the app version at the top left of the help sheet (not settings)
 - `muteButton1` … `muteButton<n>` — mute pads; `value` is `muted` / `unmuted`
 
 **Reset app state in UITests** — pass `--uitest-reset` as a launch argument to clear UserDefaults before the test. It also marks the first-run tutorial done, because the tutorial's overlay swallows every tap — **every UI test must pass `--uitest-reset`** (or `--uitest-tour` to test the tutorial itself), including tests that otherwise want no setup. Add `--uitest-profile <id>` (`op1` / `tx6` / `tp7`) to pin the device, so 6-track layouts can be tested with no hardware attached:

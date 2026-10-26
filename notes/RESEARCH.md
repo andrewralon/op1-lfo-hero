@@ -1333,6 +1333,40 @@ First run of the actual app against real hardware. Everything below was verified
 **Control is one-way, app -> device.** The TP-7's mix values do not follow back into the app,
 which matches `mirrorsIncomingCC: false` and is the same behaviour as the OP-1.
 
+## Hardware findings — OP-1 Field global controls: sustain, pitch bend, EQ, record level (2026-10-23)
+
+Question: which of the reference's remaining CCs fit the LFO parameter system, and how do they
+actually behave? The reference is thin ("any channel", a range) and two of its claims turned out
+to be incomplete.
+
+Method: OP-1 Field over Bluetooth to a Mac. `tools/midi/sweep` sends a slow centre -> top ->
+bottom -> centre sweep of one CC or pitch bend on chosen channels, announcing each, while the
+operator plays notes or runs a tape loop and watches the OP-1's screen. Single values with
+`tools/midi/cc18map OP-1 raw`. The OP-1 reports nothing back, so every result is read off the
+device by eye and ear.
+
+| control | result |
+|---|---|
+| **Sustain, CC 64** | 127 holds live notes; 0 and 63 release; behaves like a piano pedal. Exactly 64 was not sent (taken from the reference). It does nothing to tape playback: it only holds what is being played live on the selected instrument (confirmed on an OP-1, 2026-10-25), like pitch bend. |
+| **Pitch bend** | **Global, channel 1 only.** It bends the selected instrument's live notes. Channels 2, 3 and 4 do nothing (three runs of each): not the instrument, not the tape loop, not another track. It never touches recorded or played-back tape. Presumably it drives the instrument's portamento / bend-range settings (T2, envelope screen); that link is a guess. Channels 5-16 were not swept. |
+| **Bend is a held level** | One `E0 7F 7F` stayed in effect with nothing re-sent: 3 s in one test, then 30+ s in another through releasing keys and switching instrument. It cleared only when the patch was reset on the device. The no-bend value is **8192** (`E0 00 40`); 0-16383 has no integer midpoint. |
+| **Master EQ, CC 90 / 91 / 92** | All three move the matching knob on the OP-1's EQ screen and audibly change the sound. **64 is dead centre on all three.** Answered on channel 1. |
+| **Record level, CC 78** | One global level, moved by the same CC on channel 1 and channel 4 ("any channel"). It drives the red record-level line on the tape screen and the volume of whatever the synth or drum engine is playing live, so it sets the level recorded to tape. Tape playback is unaffected. TE's guide calls it both the recording level and "the main level for Synthesizer and Drum sounds". |
+
+**Record level resets to CC 95 on power-up.** No default is published, so it was measured from
+photos of the tape-screen dot, aligned on the dot's red line: the startup photo versus photos after
+sending CC 78 = 95 and = 96 put the dot at 75.55%, 75.49% and 76.03% of the way up the line. That is
+-0.1 of a step for 95 and +0.6 for 96, which fits 95 and not 96. 95 / 127 = 74.8% (74 on the 0-99
+display scale). One step is about 1.5 px on the best photos; use a close-up with the whole line in
+frame, because a wide shot (86 px line) could not separate 95 from 96.
+
+**Consequences for the app.** The device holds every one of these, so a stopped LFO leaves them
+wherever it last put them. Each carries a neutral `restValue` that the "previous" pause/finish
+option returns to: bend 8192, EQ 64, record level 95, sustain 0. A force-quit, a crash or a
+Bluetooth drop in the middle of a bend LFO leaves the bend on; sending 8192, or resetting the
+patch, clears it. Bluetooth also dropped between probing sessions (the OP-1 goes to sleep and the
+endpoint disappears): re-run `./mididiag` before trusting a silent result.
+
 ## Hardware findings — OP-1 Field transmit behavior (2026-10-16)
 
 Question: does the OP-1 Field send CC when its own controls move, or echo CC it receives? The

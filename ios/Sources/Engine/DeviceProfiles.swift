@@ -45,7 +45,17 @@ extension DeviceProfile {
             // Measured on hardware: the OP-1 Field sends no CC when its controls move and does
             // not echo CC it receives, so there is nothing to mirror (notes/RESEARCH.md).
             mirrorsIncomingCC: false
-        )
+        ),
+        // Unlike the TX-6 an OP-1 in its default state is controllable, so these are about
+        // getting the connection and the tempo mode right rather than unlocking anything. The
+        // tempo-mode wording is from notes/RESEARCH.md; the app cannot see the mode, only whether
+        // clock arrives.
+        setupSteps: [
+            "for the app to control the op-1, set op-1 to `midi sync` and tap the metronome so it reads `app`.",
+            "for the op-1 to control the app, set op-1 to `beat match` and tap the metronome so it reads `op1`.",
+            "usb-c is required for the app to control the tempo on the op-1.",
+            "op-1 does not send midi values when controls change on the device, so the app displays what the app last sent, not what just changed on op-1.",
+        ]
     )
 
     private static let op1Params: [ParamSpec] = {
@@ -90,6 +100,34 @@ extension DeviceProfile {
         // (CC 74-77) — a long-standing intentional overload of the same UI parameter.
         for i in 1...4 { p.append(trackAndMaster("lfo \(i)", "l\(i)", cc: 57 + i, masterCC: 73 + i)) }
 
+        // Global controls, measured on a real OP-1 Field (notes/PLANS.md, "Measured on hardware").
+        // They are not per track: CC 64/78/90-92 are "any channel", and bend answers on channel 1
+        // only. They shape what the instrument is playing live, before the tape. The ids are
+        // appended after the 20 above, whose order is a persistence contract.
+        //
+        // The OP-1 never reports state back, so each carries the neutral value it should return to
+        // when an LFO stops (`restValue`, native units) and, where a centre is meaningful, the
+        // slider position a new LFO starts on (`defaultCenter`, 0-99).
+        //
+        // Record level rests at the device's startup position, CC 95 (74.8% of max): measured from
+        // aligned photos of the tape-screen dot, since no default is published.
+        p.append(masterOnly("op1.recLevel", "rec level", "rcl", cc: 78, channel: 0,
+                            defaultCenter: 74, restValue: 95))
+        // Master EQ is flat at 64 (confirmed on the EQ screen).
+        p.append(masterOnly("op1.eqLow",  "eq low",  "eql", cc: 90, channel: 0,
+                            defaultCenter: 49, restValue: 64))
+        p.append(masterOnly("op1.eqMid",  "eq mid",  "eqm", cc: 91, channel: 0,
+                            defaultCenter: 49, restValue: 64))
+        p.append(masterOnly("op1.eqHigh", "eq high", "eqh", cc: 92, channel: 0,
+                            defaultCenter: 49, restValue: 64))
+        // Sustain pedal: 63 and below release, 64 and above hold (0/63 release and 127 holds were
+        // measured). Resting means released, or stopping an LFO would leave notes ringing.
+        p.append(masterOnly("op1.sustain", "sustain", "sus", cc: 64, channel: 0,
+                            encoding: .switching(SwitchEncoding()), restValue: 0))
+        // One global bend on channel 1 that moves the selected instrument's live notes — not the
+        // tape, not other tracks. 14-bit; see `masterPitchBend`.
+        p.append(masterPitchBend("op1.pitchbend", "pitch bend", "pit", channel: 0))
+
         return p
     }()
 }
@@ -111,27 +149,34 @@ private func perTrack(_ id: String, _ name: String, _ short: String, cc: Int,
 private func masterOnly(_ id: String, _ name: String, _ short: String,
                         cc: Int, channel: Int,
                         encoding: ValueEncoding = .continuous,
+                        defaultCenter: Double? = nil,
+                        restValue: Double? = nil,
                         lfoTargetable: Bool = true) -> ParamSpec {
     ParamSpec(id: id, name: name, short: short,
               track: nil,
               master: .cc(cc: cc, channel: .pinned(channel), encoding: encoding),
+              defaultCenter: defaultCenter, restValue: restValue,
               lfoTargetable: lfoTargetable)
 }
 
-/// A master-level pitch-bend control (the TP-7's playback speed).
+/// A master-level pitch-bend control (the TP-7's playback speed, the OP-1's live-notes bend).
 ///
-/// Centred at 49 rather than the global default of 90. Bend's neutral point is the middle of the
-/// range, and 90 would start a new LFO at roughly **1.9x speed** — then leave the tape pitched up
-/// when the chip stops, with nothing on the device to show why.
+/// **14-bit end to end.** `valueMax` is 16383 and every value the app holds for it — LFO centre,
+/// depth, output, rest — is in native bend units, so an LFO sweeps all 16384 positions and rests on
+/// the exact no-bend value, 8192 (`E0 00 40`). 0-16383 has no integer midpoint; 8192 is the MIDI
+/// convention for "no bend".
 ///
-/// 49 rather than 50 because the 0-99 display scale cannot express MIDI 64 exactly: display 49
-/// maps to MIDI 63 and bend 8126, within 1% of true centre (8192). Display 50 lands on MIDI 65,
-/// which is nearly 3% fast.
+/// Centred at display 49 rather than the global default of 90. Bend's neutral point is the middle
+/// of the range, and 90 would start a new LFO at roughly **1.9x speed** — then leave the tape pitched
+/// up when the chip stops, with nothing on the device to show why. The 0-99 slider cannot express
+/// 8192 (it has no 49.5), so `nativeCenter` maps display 49 to exactly `restValue`.
+///
+/// Both devices hold the level once sent, so a stopped LFO that does not send 8192 leaves it bent.
 private func masterPitchBend(_ id: String, _ name: String, _ short: String,
                              channel: Int) -> ParamSpec {
     ParamSpec(id: id, name: name, short: short,
               track: nil, master: .pitchBend(channel: .pinned(channel)),
-              defaultCenter: 49)
+              defaultCenter: 49, valueMax: 16383, restValue: 8192)
 }
 
 /// TE's documented on/off convention for the 6-channel devices: 0-63 off, 64-127 on.
@@ -180,11 +225,9 @@ extension DeviceProfile {
         ),
         // Verified on hardware: a default TX-6 ignores the app entirely until both are set.
         setupSteps: [
-            "set `midi control` to `in` — until you do, the tx-6 ignores everything the app sends. note this also stops the tx-6 sending its own knob/fader messages.",
-            "set `clock SRC` to match how you are connected: `usb` over usb-c, `ble` over bluetooth. it only accepts clock and play/stop from the source you pick, so with the wrong one the app's tempo, play, pause and stop silently do nothing, while volume, pan and mute still work.",
-            "to go the other way and have the app follow the tx-6, set `clock SRC` to internal and enable clock `out`, then tap the metronome so it reads `tx6`. the −/+ buttons then move both tempos together.",
-            "while an lfo drives a channel, moving that channel's fader on the tx-6 will fight the lfo rather than take over. pause the chip first.",
-            "lfos restart when you press play in the app. pressing play on the tx-6 itself can't restart them: in `in` it sends nothing, and in `out` it ignores the app.",
+            "for the app to control the tx-6, set `midi -> control` to `in`. set `clock -> src` to match your connection: `usb` or `ble`. tx-6 only accepts clock and play/stop from that source.",
+            "for the tx-6 to control the app, set `midi -> control` to `out`. set `clock -> src` to `internal` and set `clock -> out` to `on`. tap the metronome so it reads `tx6`. the −/+ buttons then move both tempos together.",
+            "lfos restart when you press play in the app only.",
         ]
     )
 
@@ -299,8 +342,8 @@ extension DeviceProfile {
             mirrorsIncomingCC: false
         ),
         setupSteps: [
-            "use `sync` for the app to follow the tp-7's tempo — it streams midi clock in that mode. volume/mute/gain control works in `off` and `sync` alike.",
-            "note: in `ctrl` mode the tp-7 acts as a midi controller for other gear. it will not playback and stops receiving commands from the app"
+            "for the tp-7 to control the app's tempo, set midi to `sync` — so it streams midi clock. volume/mute/gain works in `off` and `sync` alike.",
+            "note: `ctrl` mode is not recommended. the device acts as a midi controller for other gear. it will not playback and will not receive commands from the app."
         ]
     )
 

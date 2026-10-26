@@ -726,19 +726,17 @@ final class TP7PlaybackParamsTests: XCTestCase {
 
     // MARK: - Speed (pitch bend)
 
-    /// Pitch bend is 14-bit, but parameters are always 0-127, so the value must be mapped
-    /// across the full range — otherwise an LFO would only ever reach the slowest speeds.
-    func testSpeedMapsAcrossTheFullPitchBendRange() {
-        XCTAssertEqual(send("tp7.pitchbend", 0),   [[0xE0, 0, 0]], "slowest = x0.25")
-        XCTAssertEqual(send("tp7.pitchbend", 127), [[0xE0, 127, 127]], "fastest = x2.0")
+    /// Bend is 14-bit and so is its parameter: values are native 0...16383, sent as-is with
+    /// nothing stretched, so an LFO reaches every position from the slowest speed to the fastest.
+    func testSpeedIsSentInNativeFourteenBitUnits() {
+        XCTAssertEqual(send("tp7.pitchbend", 0),     [[0xE0, 0, 0]], "slowest = x0.25")
+        XCTAssertEqual(send("tp7.pitchbend", 16383), [[0xE0, 127, 127]], "fastest = x2.0")
     }
 
-    /// Mid-scale must land at pitch-bend centre, which the device treats as normal speed.
-    func testSpeedMidScaleIsAboutCentre() {
-        let p = send("tp7.pitchbend", 64)[0]
-        let value = Int(p[1]) | Int(p[2]) << 7
-        XCTAssertEqual(p[0], 0xE0)
-        XCTAssertEqual(Double(value), 8192, accuracy: 100, "64 should sit at x1.0 (8192)")
+    /// The exact no-bend value must be expressible, and is what the device treats as normal speed.
+    func testSpeedCentreIsExactly8192() {
+        XCTAssertEqual(send("tp7.pitchbend", 8192), [[0xE0, 0, 64]], "8192 = x1.0, no bend")
+        XCTAssertEqual(DeviceProfile.tp7.param("tp7.pitchbend")?.restValue, 8192)
     }
 
     func testSpeedIsMasterOnlyAndTargetable() {
@@ -1181,29 +1179,31 @@ final class TP7DirectionLfoTests: XCTestCase {
 /// had; pitch bend does, and the global default of 90 is badly wrong for it.
 final class DefaultCentreTests: XCTestCase {
 
-    /// 90 in display units is MIDI 116, which is bend ~14963 — roughly 1.9x speed. A fresh chip
-    /// would start the tape at nearly double speed and leave it pitched up when stopped, with
-    /// nothing on the device to show why.
-    func testPitchBendCentresNearNeutral() {
-        let spec = DeviceProfile.tp7.param("tp7.pitchbend")!
-        let centre = try! XCTUnwrap(spec.defaultCenter)
-        XCTAssertEqual(centre, 49)
-
-        // Display 49 -> MIDI 63 -> bend 8126, within 1% of true centre (8192).
-        let midi = uiToMidi(centre)
-        XCTAssertEqual(midi, 63)
-        let bend = Int((Double(midi) * 16383.0 / 127.0).rounded())
-        XCTAssertLessThan(abs(bend - 8192), 100, "should sit within ~1% of neutral bend")
+    /// 90 in display units would be bend ~14963 — roughly 1.9x speed. A fresh chip would start the
+    /// tape at nearly double speed and leave it pitched up when stopped, with nothing on the device
+    /// to show why. The declared centre must land on the *exact* no-bend value, 8192.
+    func testPitchBendCentresExactlyOnNeutral() {
+        for profile in [DeviceProfile.tp7, DeviceProfile.op1Field] {
+            let id = profile.id == "tp7" ? "tp7.pitchbend" : "op1.pitchbend"
+            let spec = profile.param(id)!
+            let centre = try! XCTUnwrap(spec.defaultCenter)
+            XCTAssertEqual(centre, 49)
+            XCTAssertEqual(spec.nativeCenter(fromDisplay: centre), 8192,
+                           "\(id): the neutral slider position must be exactly no bend")
+        }
     }
 
     /// Only parameters with a real neutral point declare one — otherwise selecting a parameter
     /// would yank the centre away from wherever the user had put it.
-    func testOnlyPitchBendDeclaresACentre() {
+    func testOnlyParamsWithANeutralPointDeclareACentre() {
+        // Pitch bend, the OP-1's master EQ bands (flat at 64) and its record level (startup
+        // position 95) have a genuine neutral point. Anything else declaring one is a mistake.
+        let allowed: Set<String> = ["op1.eqLow", "op1.eqMid", "op1.eqHigh", "op1.recLevel"]
         for p in DeviceRegistry.all {
             for spec in p.params where spec.defaultCenter != nil {
-                guard case .pitchBend? = spec.master else {
-                    return XCTFail("\(p.id) '\(spec.id)' declares a centre but is not pitch bend")
-                }
+                if case .pitchBend? = spec.master { continue }
+                XCTAssertTrue(allowed.contains(spec.id),
+                              "\(p.id) '\(spec.id)' declares a centre but has no neutral point")
             }
         }
     }
@@ -1684,7 +1684,7 @@ final class ConnectionStatusTests: XCTestCase {
     func testAConnectedUSBDeviceShowsEvenWhenNothingHasClaimedTheRouter() {
         let s = status(usb: .connected("OP-1"), ble: .notFound)
         XCTAssertEqual(s.label, "OP-1 (usb)")
-        XCTAssertTrue(s.isConnected, "was reading Bluetooth's \"no device found\" while USB worked")
+        XCTAssertTrue(s.isConnected, "was reading Bluetooth's \"tap to connect a device\" while USB worked")
     }
 
     func testAConnectedBluetoothDeviceShowsWhenNothingHasClaimedTheRouter() {
@@ -1706,7 +1706,7 @@ final class ConnectionStatusTests: XCTestCase {
     func testNothingConnectedStillReportsScanningAndNoDevice() {
         XCTAssertEqual(status(ble: .scanning).label, "scanning…")
         XCTAssertFalse(status(ble: .scanning).isConnected)
-        XCTAssertEqual(status(ble: .notFound).label, "no device found; tap to connect")
+        XCTAssertEqual(status(ble: .notFound).label, "tap to connect a device")
     }
 
     func testUnmatchedUSBDevicesAreListedWhenNothingIsConnected() {
@@ -2076,5 +2076,342 @@ final class RawStampedTempoTests: XCTestCase {
             destination.onClock?()
         }
         XCTAssertEqual(clock.bpm, 80.0, accuracy: 1.0, "averaged: 31.5 ms is 79.4 BPM, snapped and held")
+    }
+}
+
+/// The OP-1's global controls — record level, master EQ, sustain and pitch bend — measured on a
+/// real OP-1 Field (notes/PLANS.md, "Measured on hardware"). All of them are master-level: CC 64,
+/// 78 and 90-92 are "any channel", and bend answers on channel 1 only, moving the selected
+/// instrument's live notes rather than the tape.
+final class OP1GlobalControlsTests: XCTestCase {
+
+    private let profile = DeviceProfile.op1Field
+    private var destination: RecordingDestination!
+    private var ctrl: Controller!
+    private var engine: AutomationEngine!
+
+    override func setUp() {
+        super.setUp()
+        destination = RecordingDestination()
+        ctrl = Controller(router: destination)
+        ctrl.setProfile(.op1Field)
+        engine = AutomationEngine()
+        engine.setProfile(.op1Field)
+        engine.controller = ctrl
+    }
+
+    private func spec(_ id: String) -> ParamSpec { profile.param(id)! }
+
+    private func send(_ id: String, _ value: Double) -> [[UInt8]] {
+        destination.reset()
+        ctrl.send(spec: spec(id), track: 0, value: value)
+        return destination.packets
+    }
+
+    private func clip(_ id: String, wave: LfoWave = .sine, rateTicks: Int = 96,
+                      centre: Double, depth: Double, original: Double) -> LfoClip {
+        LfoClip(deviceId: "op1", track: 0, paramId: id, wave: wave, rateTicks: rateTicks,
+                depth: depth, centerValue: centre, inverted: false, loop: true,
+                originalValue: original)
+    }
+
+    // MARK: - Shape
+
+    /// The new ids go after the 20 that existed, whose order is a persistence contract.
+    func testNewParametersAreAppendedAfterTheLegacyTwenty() {
+        XCTAssertEqual(profile.params.count, 26)
+        XCTAssertEqual(profile.params.suffix(6).map(\.id),
+                       ["op1.recLevel", "op1.eqLow", "op1.eqMid", "op1.eqHigh",
+                        "op1.sustain", "op1.pitchbend"])
+        XCTAssertEqual(profile.params.suffix(6).map(\.short), ["rcl", "eql", "eqm", "eqh", "sus", "pit"])
+    }
+
+    func testAllSixAreMasterOnlyAndTargetable() {
+        for spec in profile.params.suffix(6) {
+            XCTAssertTrue(spec.isMasterOnly, "\(spec.id) is global, not per track")
+            XCTAssertTrue(spec.isMasterCapable, "\(spec.id) must surface under the master (m) target")
+            XCTAssertTrue(spec.lfoTargetable, "\(spec.id)")
+            for t in 1...profile.trackCount {
+                XCTAssertFalse(spec.isAvailable(onTrack: t), "\(spec.id) must not offer a track target")
+            }
+        }
+    }
+
+    // MARK: - Wire bytes
+
+    func testRecLevelAndEQPassThroughOnChannelZero() {
+        for (id, cc) in [("op1.recLevel", 78), ("op1.eqLow", 90), ("op1.eqMid", 91), ("op1.eqHigh", 92)] {
+            for v in [0, 1, 63, 64, 126, 127] {
+                XCTAssertEqual(send(id, Double(v)), [[0xB0, UInt8(cc), UInt8(v)]], "\(id) at \(v)")
+            }
+        }
+    }
+
+    /// Measured: 0 and 63 release, 127 holds. The reference puts the switch point at 64.
+    func testSustainSnapsAtSixtyFour() {
+        for (v, wire) in [(0, 0), (1, 0), (63, 0), (64, 127), (65, 127), (127, 127)] {
+            XCTAssertEqual(send("op1.sustain", Double(v)), [[0xB0, 64, UInt8(wire)]], "sustain at \(v)")
+        }
+    }
+
+    // MARK: - Pitch bend: global, channel 1, 14-bit
+
+    func testBendIsOneGlobalFourteenBitControlOnChannelZero() {
+        let bend = spec("op1.pitchbend")
+        XCTAssertEqual(bend.valueMax, 16383)
+        guard case .pitchBend(.pinned(0))? = bend.master else {
+            return XCTFail("OP-1 bend answers on channel 1 only (wire channel 0)")
+        }
+        XCTAssertNil(bend.track, "channels 2-4 do nothing, so there is no per-track bend")
+    }
+
+    func testBendSendsNativeUnitsWithOneRounding() {
+        XCTAssertEqual(send("op1.pitchbend", 0),     [[0xE0, 0x00, 0x00]])
+        XCTAssertEqual(send("op1.pitchbend", 8192),  [[0xE0, 0x00, 0x40]], "exact no-bend value")
+        XCTAssertEqual(send("op1.pitchbend", 16383), [[0xE0, 0x7F, 0x7F]])
+        // 8191 = 0x1FFF. A value between two wire steps rounds once, to the nearer one.
+        XCTAssertEqual(send("op1.pitchbend", 8191.4), [[0xE0, 0x7F, 0x3F]], "rounds down to 8191")
+        XCTAssertEqual(send("op1.pitchbend", 8191.6), [[0xE0, 0x00, 0x40]], "rounds up to 8192")
+        XCTAssertEqual(send("op1.pitchbend", 99999), [[0xE0, 0x7F, 0x7F]], "clamped to the top")
+        XCTAssertEqual(send("op1.pitchbend", -5),    [[0xE0, 0x00, 0x00]], "clamped to the bottom")
+    }
+
+    /// An LFO on bend must use all 16384 positions. Before this, every value was rounded to a
+    /// whole 0-127 inside the LFO and stretched afterwards: 128 positions, ~129 apart.
+    func testABendLfoUsesTheFullFourteenBitRange() {
+        // One slow cycle (4 bars): a sine is symmetric, so a cycle of N ticks visits at most N/2
+        // distinct positions — 96 ticks would cap this at ~48 whatever the resolution.
+        engine.add(clip("op1.pitchbend", rateTicks: 384, centre: 8192, depth: 8191, original: 8192))
+        destination.reset()
+        for t in 1...384 { engine.onTick(t) }
+        let values = destination.packets.filter { $0.first == 0xE0 }
+            .map { Int($0[1]) | Int($0[2]) << 7 }
+        XCTAssertGreaterThan(Set(values).count, 128,
+                             "more distinct positions than the 128 a 7-bit LFO could ever reach")
+        XCTAssertTrue(values.allSatisfy { (0...16383).contains($0) })
+        let sevenBitGrid = Set((0...127).map { Int((Double($0) * 16383 / 127).rounded()) })
+        XCTAssertFalse(Set(values).isSubset(of: sevenBitGrid),
+                       "values off the old 128-step grid prove nothing is quantised to 7 bits")
+    }
+
+    func testABendLfoCentredOnTheNeutralSlidesPositionSendsExactCentre() {
+        let bend = spec("op1.pitchbend")
+        let centre = bend.nativeCenter(fromDisplay: bend.defaultCenter!)
+        engine.add(clip("op1.pitchbend", centre: centre, depth: 0, original: 8192))
+        destination.reset()
+        engine.onTick(1)
+        XCTAssertEqual(destination.packets, [[0xE0, 0x00, 0x40]])
+    }
+
+    // MARK: - Neutral snap and display scale
+
+    func testTheDefaultCentrePositionMapsToExactlyTheRestValue() {
+        for id in ["op1.pitchbend", "op1.eqLow", "op1.eqMid", "op1.eqHigh", "op1.recLevel"] {
+            let s = spec(id)
+            XCTAssertEqual(s.nativeCenter(fromDisplay: s.defaultCenter!), s.restValue!, "\(id)")
+            XCTAssertEqual(s.displayValue(fromNative: s.restValue!), s.defaultCenter!,
+                           "\(id): the rest value must read back as the same slider position")
+        }
+        XCTAssertEqual(spec("op1.eqLow").nativeCenter(fromDisplay: 49), 64, "flat EQ, not 63")
+    }
+
+    func testTheSnapAppliesToTheCentreOnlyNotToDepth() {
+        let eq = spec("op1.eqLow")
+        XCTAssertEqual(eq.nativeDepth(fromDisplay: 49), Double(uiToMidi(49)), "depth is never snapped")
+        let bend = spec("op1.pitchbend")
+        XCTAssertEqual(bend.nativeDepth(fromDisplay: 99), 16383, "depth 99 is full scale")
+        XCTAssertEqual(bend.nativeDepth(fromDisplay: 0), 0)
+    }
+
+    func testEverySliderPositionRoundTripsThroughTheFourteenBitScale() {
+        // d*16383/99 followed by *99/16383 lands just under d for 51 and 55 in plain floating
+        // point, which used to read back one step low and let an edit drift a chip's value.
+        let bend = spec("op1.pitchbend")
+        for d in stride(from: 0.0, through: 99.0, by: 1) {
+            XCTAssertEqual(bend.displayValue(fromNative: bend.nativeDepth(fromDisplay: d)), d, "depth \(d)")
+            if d != bend.defaultCenter {
+                XCTAssertEqual(bend.displayValue(fromNative: bend.nativeCenter(fromDisplay: d)), d, "centre \(d)")
+            }
+        }
+    }
+
+    func testSevenBitParametersKeepTheirOriginalDisplayConversion() {
+        let vol = spec("volume")
+        for v in stride(from: 0.0, through: 99.0, by: 1) {
+            XCTAssertEqual(vol.nativeDepth(fromDisplay: v), Double(uiToMidi(v)))
+            XCTAssertEqual(vol.nativeCenter(fromDisplay: v), Double(uiToMidi(v)))
+        }
+        for m in 0...127 {
+            XCTAssertEqual(vol.displayValue(fromNative: Double(m)), midiToUI(Double(m)))
+        }
+    }
+
+    // MARK: - Rest values
+
+    /// Measured: EQ is flat at 64, record level starts at 95 (74.8% of max), sustain rests released,
+    /// and bend rests at the exact no-bend value.
+    func testRestValues() {
+        XCTAssertEqual(spec("op1.eqLow").restValue,    64)
+        XCTAssertEqual(spec("op1.eqMid").restValue,    64)
+        XCTAssertEqual(spec("op1.eqHigh").restValue,   64)
+        XCTAssertEqual(spec("op1.recLevel").restValue, 95)
+        XCTAssertEqual(spec("op1.sustain").restValue,  0)
+        XCTAssertEqual(spec("op1.pitchbend").restValue, 8192)
+    }
+
+    func testEveryRestValueIsInRangeAndOnlyGenericParamsSetOne() {
+        for p in DeviceRegistry.all {
+            for s in p.params {
+                guard let r = s.restValue else { continue }
+                XCTAssertTrue((0...s.valueMax).contains(r), "\(p.id) \(s.id) rest \(r)")
+                XCTAssertEqual(s.role, .generic, "\(p.id) \(s.id): mixer roles already have real state")
+            }
+        }
+    }
+
+    /// Restoring puts the device in the neutral state, whatever the LFO last left it at.
+    func testRestoringSendsTheNeutralBytes() {
+        for (id, bytes) in [("op1.pitchbend", [0xE0, 0x00, 0x40]),
+                            ("op1.sustain",   [0xB0, 64, 0]),
+                            ("op1.eqLow",     [0xB0, 90, 64]),
+                            ("op1.eqMid",     [0xB0, 91, 64]),
+                            ("op1.eqHigh",    [0xB0, 92, 64]),
+                            ("op1.recLevel",  [0xB0, 78, 95])] {
+            let s = spec(id)
+            destination.reset()
+            engine.sendRestore(lfo: clip(id, centre: 100, depth: 10, original: s.restValue!),
+                               value: s.restValue!)
+            XCTAssertEqual(destination.packets, [bytes.map(UInt8.init)], id)
+        }
+    }
+
+    /// A preview ends through `clearPreview`, which restores the recorded original — for these
+    /// parameters that must be the rest value, not the preview chip's centre.
+    func testEndingAPreviewLeavesNoBendAndNoSustain() {
+        for (id, bytes) in [("op1.pitchbend", [0xE0, 0x00, 0x40]), ("op1.sustain", [0xB0, 64, 0])] {
+            let s = spec(id)
+            engine.setPreview([clip(id, centre: 14000, depth: 100, original: s.restValue!)])
+            destination.reset()
+            engine.clearPreview()
+            XCTAssertEqual(destination.packets, [bytes.map(UInt8.init)], id)
+        }
+    }
+}
+
+/// slope and hold: the two shapes built for one-shot use.
+final class SlopeAndHoldTests: XCTestCase {
+
+    /// See `LfoRestartOnPlayTests.keepAlive`.
+    private var keepAlive: [AnyObject] = []
+
+    private func makeEngine() -> (AutomationEngine, RecordingDestination) {
+        let dest = RecordingDestination()
+        let ctrl = Controller(router: dest)
+        ctrl.setProfile(.op1Field)
+        let engine = AutomationEngine()
+        engine.setProfile(.op1Field)
+        engine.controller = ctrl
+        keepAlive += [ctrl, dest, engine]
+        return (engine, dest)
+    }
+
+    private func clip(_ wave: LfoWave, inverted: Bool = false, loop: Bool = false) -> LfoClip {
+        LfoClip(deviceId: "op1", track: 1, paramId: "volume", wave: wave, rateTicks: 24,
+                depth: 40, centerValue: 64, inverted: inverted, loop: loop, originalValue: 10)
+    }
+
+    /// Ticks the engine from 0 to `last` and returns the volume values sent, plus the tick the
+    /// chip reported finished on.
+    private func run(_ lfo: LfoClip, to last: Int) -> (values: [Int], finishedAt: Int?) {
+        let (engine, dest) = makeEngine()
+        var finishedAt: Int?
+        var tick = 0
+        engine.finishedCallback = { _ in finishedAt = tick }
+        engine.add(lfo)
+        for t in 0...last { tick = t; engine.onTick(t) }
+        return (dest.packets.map { Int($0[2]) }, finishedAt)
+    }
+
+    func testSlopeOneShotRunsTwiceThePeriod() {
+        let r = run(clip(.slope), to: 60)
+        XCTAssertEqual(r.finishedAt, 48, "rateTicks 24 ramps for 48 ticks, not 24")
+    }
+
+    func testSlopeRisesAndLandsExactlyOnCenterPlusDepth() {
+        let v = run(clip(.slope), to: 60).values
+        XCTAssertEqual(v.first, 24, "starts at the bottom: center - depth")
+        XCTAssertEqual(v, v.sorted(), "never falls")
+        XCTAssertEqual(v.last, 104, "ends exactly on center + depth, not a tick short")
+    }
+
+    func testInvertedSlopeEndsOnCenterMinusDepth() {
+        let v = run(clip(.slope, inverted: true), to: 60).values
+        XCTAssertEqual(v.first, 104)
+        XCTAssertEqual(v, v.sorted(by: >))
+        XCTAssertEqual(v.last, 24)
+    }
+
+    func testLoopingSlopeRestartsAfterTwoPeriodsAndNeverFinishes() {
+        let r = run(clip(.slope, loop: true), to: 100)
+        XCTAssertNil(r.finishedAt)
+        XCTAssertLessThan(r.values.last ?? 0, 104, "a loop wraps back down rather than parking at the top")
+    }
+
+    func testHoldSendsTheCenterOnceAndIgnoresDepth() {
+        let r = run(clip(.hold), to: 30)
+        XCTAssertEqual(r.values, [64], "centre, sent once, not again when the chip finishes")
+        XCTAssertEqual(r.finishedAt, 24)
+    }
+
+    func testInvertedHoldIsStillTheCenter() {
+        XCTAssertEqual(run(clip(.hold, inverted: true), to: 30).values, [64])
+    }
+
+    func testOnlySlopeAndHoldKeepTheirFinalValue() {
+        for w in LfoWave.allCases {
+            XCTAssertEqual(w.keepsFinalValue, w == .slope || w == .hold, w.rawValue)
+            XCTAssertEqual(w.cycleMultiplier, w == .slope ? 2 : 1, w.rawValue)
+        }
+        XCTAssertEqual(LfoWave.slope.finalValue(), 1)
+        XCTAssertEqual(LfoWave.hold.finalValue(), 0)
+    }
+
+    func testNewShapesAreAppendedWhereThePickerExpectsThem() {
+        let all = LfoWave.allCases
+        XCTAssertEqual(all.firstIndex(of: .slope), all.firstIndex(of: .random)! + 1)
+        XCTAssertEqual(all.last, .hold)
+    }
+
+    func testAnUnknownWaveFromANewerBuildDecodesAsSine() throws {
+        let json = #"{"wave":"warble"}"#.data(using: .utf8)!
+        XCTAssertEqual(try JSONDecoder().decode(LfoClip.self, from: json).wave, .sine)
+    }
+}
+
+/// f1–f17 follow the OP-1's menus: f1 is the slowest, f17 the fastest.
+final class FreeRateOrderTests: XCTestCase {
+
+    func testF1IsTheSlowestAndF17TheFastest() {
+        XCTAssertEqual(FREE_RATE_SECONDS[9], FREE_RATE_MAX_S)
+        XCTAssertEqual(FREE_RATE_SECONDS[25]!, FREE_RATE_MIN_S, accuracy: 1e-12)
+        XCTAssertEqual(rateScrubLabel(for: 9), "f1")
+        XCTAssertEqual(rateScrubLabel(for: 25), "f17")
+    }
+
+    func testPeriodsStrictlyShortenFromF1ToF17() {
+        let periods = (9...25).map { FREE_RATE_SECONDS[$0]! }
+        XCTAssertEqual(periods.count, 17)
+        for (slower, faster) in zip(periods, periods.dropFirst()) {
+            XCTAssertGreaterThan(slower, faster)
+        }
+    }
+
+    func testASavedChipKeepsItsSpeedAndTakesTheLabelOfThatSpeed() {
+        // A chip stores seconds, so a 15 s chip was "f17" before the flip and is "f1" after.
+        let clip = LfoClip(track: 1, paramId: "volume", wave: .sine, rateTicks: 96,
+                           freeRatePeriod: FREE_RATE_MAX_S, depth: 10, centerValue: 64,
+                           inverted: false, loop: true, originalValue: 64)
+        XCTAssertEqual(clip.rateIndex, 9)
+        XCTAssertEqual(clip.rateLabel, "f1")
     }
 }

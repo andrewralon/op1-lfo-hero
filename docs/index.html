@@ -22,10 +22,21 @@
 
   <p><a href="https://apps.apple.com/us/app/op1-lfo-hero/id6781054996">get it on the app store</a> — iphone & ipad</p>
 
+  <h2>what's new in 1.1.1</h2>
+  <ul>
+    <li><strong>new op-1 field parameters:</strong> record level, eq low/mid/high, sustain and pitch bend</li>
+    <li><strong>new curves:</strong> slope and hold, for one-shot lfos</li>
+    <li><strong>step-by-step setup</strong> for the op-1 field, tx-6 and tp-7 is in help</li>
+    <li>loop and 1x chips can now both exist at the same time</li>
+    <li>the waveform view now shows active lfos</li>
+    <li>free rates f1 to f17 now run slowest to fastest, matching the op-1</li>
+    <li>ui improvements</li>
+  </ul>
+
   <h2>what's new in 1.1.0</h2>
   <ul>
-    <li><strong>tx-6 and tp-7 support!</strong> and op-1 field — six-track layouts, device auto-detect</li>
-    <li><strong>first-run tutorial</strong> so you know how to get started. view it again later in settings</li>
+    <li><strong>tx-6 and tp-7 support!</strong> and op-1 field — six-track layouts, device auto-detect, and a manual device picker in settings</li>
+    <li><strong>first-run tutorial</strong> so you know how to get started. view it again later in help</li>
     <li><strong>midi tempo improvements</strong> — bpm readout is steadier, now timed by the device's own timestamps</li>
     <li>lfos pause with a banner when the device sends no clock — tap it to use the app's clock</li>
     <li>tempo maximum increased to 440 bpm</li>
@@ -59,6 +70,11 @@
   </ul>
   <p>toggle the app's tempo mode by tapping the <code>metronome</code>, then change the device to match.</p>
 
+  <h2>op-1 field setup</h2>
+  <ul>
+    <li>the op-1's <code>midi sync</code> mode is needed for tape transport from the app.</li>
+  </ul>
+
   <h2>tx-6 setup</h2>
   <ul>
     <li>set <code>midi control</code> to <code>in</code>. until you do, the tx-6 ignores everything the app sends (and stops sending its own knob and fader messages).</li>
@@ -71,11 +87,6 @@
   <ul>
     <li>use <code>sync</code> mode for the app to follow the tp-7's tempo. it only streams midi clock while its tape is moving. volume, mute and gain control work in <code>off</code> and <code>sync</code> alike.</li>
     <li>in <code>ctrl</code> mode the tp-7 acts as a controller for other gear: it will not play back and stops receiving commands from the app.</li>
-  </ul>
-
-  <h2>op-1 field</h2>
-  <ul>
-    <li>the op-1's <code>midi sync</code> mode is needed for tape transport from the app.</li>
   </ul>
 
   <h2>help wanted — got another te device?</h2>

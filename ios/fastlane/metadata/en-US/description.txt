@@ -5,8 +5,7 @@ op1 lfo hero works with the teenage engineering op-1 field, tx-6 and tp-7. it us
 that's about it. it's mildly fantastic, just like your face.
 
 stuff it does:
-· creates external lfos for all tracks (4 on the op-1, 6 on the tx-6 and tp-7) and the master bus
-· plus some things op1 doesn't give a way to control without external help ....
+· creates external lfos for all tracks (4 on the op-1, 6 on the tx-6 and tp-7) and master
 · did you know you can make a tempo lfo? now you do
 · you can even create lfos for lfos. it's lfos all the way down!
 · a satisfying number of curves

@@ -43,9 +43,9 @@ final class TourUITests: XCTestCase {
         XCTAssertTrue(done, "next didn't advance from step \(from) (\(title))", file: file, line: line)
     }
 
-    /// "3 / 16" → ("3", "16").
+    /// "3/16" → ("3", "16").
     private func counter(_ app: XCUIApplication) -> (String, String) {
-        let parts = app.staticTexts["tourCounter"].label.components(separatedBy: " / ")
+        let parts = app.staticTexts["tourCounter"].label.components(separatedBy: "/")
         return (parts.first ?? "", parts.last ?? "")
     }
 
@@ -66,7 +66,7 @@ final class TourUITests: XCTestCase {
         XCTAssertFalse(again.otherElements["tourCard"].waitForExistence(timeout: 3))
     }
 
-    @MainActor func testLaterComesBackAtTheSameStep() throws {
+    @MainActor func testLaterComesBackFromTheFirstStep() throws {
         let app = launchTour()
         tapNext(app)
         tapNext(app)
@@ -77,13 +77,13 @@ final class TourUITests: XCTestCase {
         app.terminate()
         let again = launch([])
         XCTAssertTrue(again.otherElements["tourCard"].waitForExistence(timeout: 8))
-        XCTAssertEqual(counter(again).0, "3")
+        XCTAssertEqual(counter(again).0, "1", "later starts over rather than resuming")
     }
 
     @MainActor func testWelcomeThenBack() throws {
         let app = launchTour()
         XCTAssertEqual(app.staticTexts["tourTitle"].label, "welcome")
-        XCTAssertEqual(app.buttons["tourNextButton"].label, "start")
+        XCTAssertEqual(app.buttons["tourNextButton"].label, "next")
         XCTAssertFalse(app.buttons["tourBackButton"].isEnabled, "nothing before the first step")
         tapNext(app)
         tapNext(app)
@@ -103,16 +103,35 @@ final class TourUITests: XCTestCase {
         XCTAssertFalse(again.otherElements["tourCard"].waitForExistence(timeout: 3))
     }
 
-    @MainActor func testReplayFromSettingsRestartsAtStepOne() throws {
+    /// The tutorial is the first item in help (not settings), and only help shows the app version.
+    @MainActor func testReplayFromHelpRestartsAtStepOne() throws {
         let app = launch(["--uitest-reset"])
         let settings = app.buttons["settingsButton"]
         XCTAssertTrue(settings.waitForExistence(timeout: 8))
         settings.tap()
-        let replay = app.buttons["replayTourButton"]
+        XCTAssertTrue(app.buttons["deviceOverridePicker"].exists || app.segmentedControls["deviceOverridePicker"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["versionLabel"].exists, "the version belongs in help only")
+        XCTAssertFalse(app.buttons["replayTourFromHelp"].exists, "the tutorial is not a settings item")
+        try save(app, "settings_top")
+        app.swipeUp(velocity: .fast)
+        try save(app, "settings_bottom")
+        app.buttons["done"].tap()
+
+        let help = app.buttons["helpButton"]
+        XCTAssertTrue(help.waitForExistence(timeout: 5))
+        help.tap()
+        XCTAssertTrue(app.staticTexts["versionLabel"].waitForExistence(timeout: 5), "help shows the version")
+        let replay = app.buttons["replayTourFromHelp"]
         XCTAssertTrue(replay.waitForExistence(timeout: 5))
+        try save(app, "help_top")
         replay.tap()
         XCTAssertTrue(app.otherElements["tourCard"].waitForExistence(timeout: 5))
         XCTAssertEqual(counter(app).0, "1")
+    }
+
+    private func save(_ app: XCUIApplication, _ name: String) throws {
+        try XCUIScreen.main.screenshot().pngRepresentation
+            .write(to: URL(fileURLWithPath: "/tmp/claude-ss/\(name).png"))
     }
 
     // MARK: - Device profile

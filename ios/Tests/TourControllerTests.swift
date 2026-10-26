@@ -77,31 +77,34 @@ final class TourControllerTests: XCTestCase {
         XCTAssertNil(again.currentStep)
     }
 
-    func testLaterResumesAtTheSameStepNextLaunch() {
+    func testLaterRestartsAtTheFirstStepNextLaunch() {
         let tour = launch()
         tour.startIfNeeded(caps: op1)
         tour.next(); tour.next()
-        let step = tour.currentStep
+        XCTAssertNotEqual(tour.currentStep, .welcome)
         tour.later()
         XCTAssertNil(tour.currentStep)
         XCTAssertEqual(tour.status, .deferred)
 
         let again = launch()
         again.startIfNeeded(caps: op1)
-        XCTAssertEqual(again.currentStep, step)
+        XCTAssertEqual(again.currentStep, .welcome)
     }
 
-    /// The resume point is stored by id, so a device change in between can't land on a
-    /// different step — it moves to the next one that still applies.
-    func testLaterOnPanResumesAtNextStepOnADeviceWithoutPan() {
+    /// An older build saved the step **later** was pressed on. Nothing reads it now, and
+    /// `later()` clears it.
+    func testAStaleResumeStepFromAnOlderBuildIsIgnored() {
+        defaults.set(TourController.currentVersion, forKey: TourController.versionKey)
+        defaults.set(TourController.Status.deferred.rawValue, forKey: TourController.statusKey)
+        defaults.set(TourAnchor.panKnob.rawValue, forKey: TourController.resumeStepKey)
+
         let tour = launch()
         tour.startIfNeeded(caps: op1)
-        while tour.currentStep != .panKnob { tour.next() }
-        tour.later()
+        XCTAssertEqual(tour.currentStep, .welcome)
 
-        let again = launch()
-        again.startIfNeeded(caps: tp7)
-        XCTAssertEqual(again.currentStep, .volumeFader)
+        tour.next()
+        tour.later()
+        XCTAssertNil(defaults.string(forKey: TourController.resumeStepKey))
     }
 
     func testBackGoesToThePreviousStepAndStopsAtTheFirst() {

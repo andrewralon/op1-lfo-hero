@@ -3,7 +3,7 @@ import Foundation
 import SwiftUI
 import UIKit
 
-struct EditorSnapshot {
+struct EditorSnapshot: Equatable {
     let param:    ParamSpec
     let wave:     LfoWave
     let rate:     Int
@@ -65,11 +65,15 @@ final class AppState: ObservableObject {
     }
     @Published var lfoRate   = 3           // 1-8
     @Published var lfoDepth  = 10.0        // display units (0-99)
-    @Published var lfoCenter = 90.0        // display units (0-99)
+    @Published var lfoCenter = AppState.defaultLfoCenter        // display units (0-99)
     @Published var trackOn   = [1: 1, 2: 0, 3: 0, 4: 0]  // 0=off 1=on 2=inv
     @Published var masterOn  = 0                            // 0=off 1=on 2=inv
     @Published var activeLfos: [LfoClip] = []
     @Published var isPreview  = false
+    /// True from a touch on any of the LFO editor's controls until a touch anywhere else. While
+    /// it is set the waveform shows the LFO being set up, not the running ones. A touch rather
+    /// than a changed value: pressing a control counts even if it ends up where it started.
+    @Published var onDeckTouched = false
 
     // Displayed lfo range (derived)
     var lfoRange: String {
@@ -161,7 +165,7 @@ final class AppState: ObservableObject {
     }
 
     struct Settings: Codable {
-        static let currentVersion = 2
+        static let currentVersion = 3
         /// The hardcoded volume default before it became 99 — see the v1→v2 migration below.
         private static let legacyDefaultVolume: Double = 90
 
@@ -198,6 +202,28 @@ final class AppState: ObservableObject {
                 }
                 version = 2
             }
+            if version == 2 {
+                // Pitch bend became 14-bit: a bend chip's centre, depth and original are now in
+                // native bend units (0-16383) rather than 0-127. Without this a saved TP-7 bend
+                // chip would sweep a 128th of its range. Only the TP-7 had a bend before.
+                if var tp7 = perDevice["tp7"] {
+                    tp7.activeLfos = tp7.activeLfos.map(Self.migratedBendClip)
+                    perDevice["tp7"] = tp7
+                }
+                version = 3
+            }
+        }
+
+        /// A saved bend chip rescaled from 0-127 to 0-16383. `originalValue` becomes 8192, the
+        /// no-bend value the old restore was really reaching for. Other clips pass through.
+        static func migratedBendClip(_ c: LfoClip) -> LfoClip {
+            guard c.paramId == "tp7.pitchbend" || c.paramId == "tp7.speed" else { return c }
+            let k = 16383.0 / 127.0
+            return LfoClip(id: c.id, deviceId: c.deviceId, track: c.track, paramId: c.paramId,
+                           wave: c.wave, rateTicks: c.rateTicks, freeRatePeriod: c.freeRatePeriod,
+                           depth: (c.depth * k).rounded(), centerValue: (c.centerValue * k).rounded(),
+                           inverted: c.inverted, loop: c.loop, isEnabled: c.isEnabled,
+                           originalValue: 8192)
         }
     }
 
@@ -527,7 +553,7 @@ final class AppState: ObservableObject {
     /// Follows the transport MIDI really travels over: the claimed one if there is one, otherwise
     /// whichever is connected, resolved the same way `MidiRouter.send` does. The router only claims
     /// a transport when a message *arrives*, and an OP-1 in midi sync sends none, so a connected
-    /// device would otherwise read as "scanning…" / "no device found" (Bluetooth's state) while MIDI
+    /// device would otherwise read as "scanning…" / "tap to connect a device" (Bluetooth's state) while MIDI
     /// flowed over USB.
     static func connectionStatus(active: MidiRouter.Transport?, usb: USBMidi.State,
                                  ble: BLEMidi.State) -> (label: String, isConnected: Bool) {
@@ -648,7 +674,8 @@ final class AppState: ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
                 let action = UserDefaults.standard.string(forKey: "oneShotFinishAction") ?? "previous"
-                switch action {
+                // Slope and hold end on their final value and keep it; a restore would undo them.
+                switch lfo.wave.keepsFinalValue ? "hold" : action {
                 case "center": self.automation.sendRestore(lfo: lfo, value: lfo.centerValue)
                 case "hold":   break
                 default:       self.automation.sendRestore(lfo: lfo, value: lfo.originalValue)
@@ -716,6 +743,8 @@ final class AppState: ObservableObject {
     /// Musical range for any tempo the app will accept or display. 0 is kept as a separate
     /// sentinel meaning "slaved, no clock data yet", so it is deliberately outside this.
     static let minBpm = 20.0
+    /// Where a new LFO's centre slider starts (display units) when the parameter has no neutral point.
+    static let defaultLfoCenter = 90.0
     /// The one tempo ceiling, used everywhere: what the app generates as clock master, the tempo LFO
     /// range, the typed and scrubbed BPM, a saved tempo, and what it accepts from a device it follows.
     /// Set to the highest of TE's own limits (OP-1 Field 440, TX-6 400, TP-7 shows 200 but is assumed to
@@ -795,8 +824,8 @@ final class AppState: ObservableObject {
             rt = RATE_TICKS[lfoRate] ?? (4 * PPQN)
         }
         let isTempo = lfoParam.role == .tempo
-        let depthMidi  = isTempo ? lfoDepth  : Double(uiToMidi(lfoDepth))
-        let centerMidi = isTempo ? lfoCenter : Double(uiToMidi(lfoCenter))
+        let depthMidi  = isTempo ? lfoDepth  : lfoParam.nativeDepth(fromDisplay: lfoDepth)
+        let centerMidi = isTempo ? lfoCenter : lfoParam.nativeCenter(fromDisplay: lfoCenter)
 
         if lfoParam.isMasterCapable && masterOn != 0 {
             addLfo(track: 0, rateTicks: rt, freeRatePeriod: period, depth: depthMidi, center: centerMidi,
@@ -818,7 +847,9 @@ final class AppState: ObservableObject {
         case .volume: return Double(uiToMidi(volumes[track] ?? profile.defaultVolume))
         case .pan:    return Double((pans[track] ?? 0) + 64)
         case .mute:   return (mutes[track] ?? false) ? 127.0 : 0.0
-        case .generic: return fallback
+        // The device cannot be read back, so "previous" is the parameter's neutral value where it
+        // has one (sustain off, flat EQ, no bend) and the chip's own centre where it doesn't.
+        case .generic: return spec.restValue ?? fallback
         }
     }
 
@@ -839,10 +870,13 @@ final class AppState: ObservableObject {
     private func addLfo(track: Int, rateTicks: Int, freeRatePeriod: Double?, depth: Double, center: Double,
                         inverted: Bool, loop: Bool) {
         // Dedup: paused/disabled chips also count — re-enable instead of adding a duplicate.
+        // A loop and a one-shot that match in everything else are different chips: one repeats,
+        // the other plays once, so `loop` is part of the identity.
         if activeLfos.contains(where: {
             $0.track == track && $0.paramId == lfoParam.id &&
             $0.wave == lfoWave && $0.rateTicks == rateTicks && $0.freeRatePeriod == freeRatePeriod &&
-            $0.depth == depth && $0.centerValue == center && $0.inverted == inverted
+            $0.depth == depth && $0.centerValue == center && $0.inverted == inverted &&
+            $0.loop == loop
         }) { return }
 
         let lfo = LfoClip(deviceId: profile.id, track: track, paramId: lfoParam.id, wave: lfoWave,
@@ -930,8 +964,8 @@ final class AppState: ObservableObject {
             rt = RATE_TICKS[lfoRate] ?? (4 * PPQN)
         }
         let isTempo = lfoParam.role == .tempo
-        let depthMidi  = isTempo ? lfoDepth  : Double(uiToMidi(lfoDepth))
-        let centerMidi = isTempo ? lfoCenter : Double(uiToMidi(lfoCenter))
+        let depthMidi  = isTempo ? lfoDepth  : lfoParam.nativeDepth(fromDisplay: lfoDepth)
+        let centerMidi = isTempo ? lfoCenter : lfoParam.nativeCenter(fromDisplay: lfoCenter)
         var clips: [LfoClip] = []
         if lfoParam.isMasterCapable && masterOn != 0 {
             clips.append(LfoClip(deviceId: profile.id, track: 0, paramId: lfoParam.id, wave: lfoWave,
@@ -987,8 +1021,8 @@ final class AppState: ObservableObject {
             lfoDepth  = lfo.depth
             lfoCenter = lfo.centerValue
         } else {
-            lfoDepth  = midiToUI(lfo.depth)
-            lfoCenter = midiToUI(lfo.centerValue)
+            lfoDepth  = spec.displayValue(fromNative: lfo.depth)
+            lfoCenter = spec.displayValue(fromNative: lfo.centerValue)
         }
         lfoParam = spec  // last — didSet may adjust masterOn
         updatePreviewIfActive()
@@ -997,6 +1031,7 @@ final class AppState: ObservableObject {
     func saveChipEdits(id: UUID) {
         guard let idx = activeLfos.firstIndex(where: { $0.id == id }) else { return }
         var lfo = activeLfos[idx]
+        let sameParam = lfo.paramId == lfoParam.id
 
         lfo.deviceId  = profile.id
         lfo.paramId   = lfoParam.id
@@ -1014,8 +1049,15 @@ final class AppState: ObservableObject {
             lfo.depth       = lfoDepth
             lfo.centerValue = lfoCenter
         } else {
-            lfo.depth       = Double(uiToMidi(lfoDepth))
-            lfo.centerValue = Double(uiToMidi(lfoCenter))
+            // A slider left where the chip's own value displays keeps that exact value: converting
+            // back would quantise it (and snap a near-rest centre to the rest value), so opening a
+            // chip and committing would change it.
+            if !(sameParam && lfoParam.displayValue(fromNative: lfo.depth) == lfoDepth) {
+                lfo.depth = lfoParam.nativeDepth(fromDisplay: lfoDepth)
+            }
+            if !(sameParam && lfoParam.displayValue(fromNative: lfo.centerValue) == lfoCenter) {
+                lfo.centerValue = lfoParam.nativeCenter(fromDisplay: lfoCenter)
+            }
         }
 
         // Track + inverted: master takes priority; otherwise lowest-indexed non-zero track.
@@ -1053,7 +1095,7 @@ final class AppState: ObservableObject {
                 $0.wave == primary.wave && $0.rateTicks == primary.rateTicks &&
                 $0.freeRatePeriod == primary.freeRatePeriod &&
                 $0.depth == primary.depth && $0.centerValue == primary.centerValue &&
-                $0.inverted == target.inverted
+                $0.inverted == target.inverted && $0.loop == primary.loop
             }) { continue }
 
             let spec = profile.param(primary.paramId) ?? lfoParam
@@ -1084,7 +1126,8 @@ final class AppState: ObservableObject {
             $0.freeRatePeriod == primary.freeRatePeriod &&
             $0.depth       == primary.depth       &&
             $0.centerValue == primary.centerValue &&
-            $0.inverted    == primary.inverted
+            $0.inverted    == primary.inverted    &&
+            $0.loop        == primary.loop
         }
         guard !dupes.isEmpty else { return }
         let dupeIDs = Set(dupes.map { $0.id })

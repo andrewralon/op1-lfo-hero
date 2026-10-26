@@ -1,1 +1,14 @@
-now works with the teenage engineering tx-6 and tp-7, plus the op-1 field. six-track layouts, device auto-detect, and a manual device picker in settings. settings are now stored more safely. a bunch of timing and transport fixes.
+new in 1.1.1:
+· new op-1 field parameters: record level, eq low/mid/high, sustain and pitch bend
+· new curves: slope and hold for one-shot lfos
+· step-by-step setup for op-1 field, tx-6 and tp-7 is in help
+· loop and 1x chips can now both exist at the same time
+· waveform view now shows active lfos
+· free rates f1 to f17 now run slowest to fastest, matching the op-1
+· ui improvements
+
+new in 1.1.0:
+· now works with the teenage engineering tx-6 and tp-7!
+· six-track layouts, device auto-detect, and a manual device picker in settings
+· settings are now stored more safely
+· a bunch of timing and transport fixes

@@ -18,7 +18,9 @@ let RATE_TICKS: [Int: Int] = [
 let RATE_LABELS = ["8×", "4×", "2×", "1b", "2b", "4b", "8b", "16b"]
 
 // Free rates (f1–f17): fixed-time, tempo-independent. Rate indices 9–25.
-// Period in seconds, log-spaced from FREE_RATE_MIN_S to FREE_RATE_MAX_S.
+// Period in seconds, log-spaced from FREE_RATE_MIN_S to FREE_RATE_MAX_S. Ordered like the
+// OP-1's own menus: f1 is the slowest (index 9, FREE_RATE_MAX_S) and f17 the fastest (index 25,
+// FREE_RATE_MIN_S). The tempo-synced rates before them still run fastest to slowest.
 let FREE_RATE_MIN_S = 0.02
 let FREE_RATE_MAX_S = 15.0
 let FREE_RATE_SECONDS: [Int: Double] = {
@@ -26,10 +28,10 @@ let FREE_RATE_SECONDS: [Int: Double] = {
     let n = 17
     let logMin = log(FREE_RATE_MIN_S), logMax = log(FREE_RATE_MAX_S)
     for i in 0..<n {
-        // Exponent < 1 gives larger steps near the fast end (f1-f3) and
-        // smaller steps near the slow end (f15-f17) vs pure log spacing.
+        // i counts up from the fastest rate. Exponent < 1 gives larger steps near the fast end
+        // (f15-f17) and smaller steps near the slow end (f1-f3) vs pure log spacing.
         let u = i == 0 ? 0.0 : pow(Double(i) / Double(n - 1), 0.75)
-        d[9 + i] = exp(logMin + u * (logMax - logMin))
+        d[25 - i] = exp(logMin + u * (logMax - logMin))
     }
     return d
 }()
@@ -54,6 +56,9 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
     case sweepUp = "sweep up"
     case sweepDn = "sweep dn"
     case random
+    // The one-shot shapes come last: slope is not a saw, it ends on a value and stays there.
+    case slope
+    case hold
 
     var id: String { rawValue }
 
@@ -62,12 +67,32 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
         case .sine:     return "sin"
         case .triangle: return "tri"
         case .saw:      return "saw"
+        case .slope:    return "slp"
         case .square:   return "squ"
         case .log:      return "log"
         case .exp:      return "exp"
         case .sweepUp:  return "swu"
         case .sweepDn:  return "swd"
         case .random:   return "rnd"
+        case .hold:     return "hld"
+        }
+    }
+
+    /// How many rate periods one cycle of this wave spans. A slope is a single rising ramp that
+    /// takes twice the period, so a free rate that tops out at 15 s can ramp for 30 s. This is
+    /// the one place that says so; the engine and both waveform views multiply by it.
+    var cycleMultiplier: Double { self == .slope ? 2 : 1 }
+
+    /// True for waves that end a one-shot on a fixed value and stay there, instead of being put
+    /// back by the on-finish setting. Restoring would undo what the shape exists to do.
+    var keepsFinalValue: Bool { self == .slope || self == .hold }
+
+    /// The wave's last value, in -1...1. `value(at: 1.0)` wraps back to the start of the cycle,
+    /// so a one-shot can't ask it for where the wave ends.
+    func finalValue() -> Double {
+        switch self {
+        case .slope: return 1
+        default:     return 0
         }
     }
 
@@ -81,6 +106,10 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
             if p < 0.75 { return 2 - 4 * p }
             return 4 * p - 4
         case .saw:
+            return 2 * p - 1
+        case .slope:
+            // `phase` already spans the doubled cycle (see `cycleMultiplier`), so this is one
+            // ramp across it, not two.
             return 2 * p - 1
         case .square:
             return p < 0.5 ? 1 : -1
@@ -105,6 +134,9 @@ enum LfoWave: String, CaseIterable, Identifiable, Codable {
             // Not called directly — AutomationEngine.evaluate() handles random with per-clip
             // stateful PRNG (xorshift64) so each clip and each cycle produces different values.
             return 0
+        case .hold:
+            // Zero, so centre + 0 * depth is the centre and inverting changes nothing.
+            return 0
         }
     }
 }
@@ -127,12 +159,12 @@ struct LfoClip: Identifiable, Codable, Equatable {
     var wave: LfoWave
     var rateTicks: Int
     var freeRatePeriod: Double? = nil  // non-nil → free rate (fixed seconds, not tempo-dependent)
-    var depth: Double        // MIDI units (0-127), or BPM for tempo
-    var centerValue: Double  // MIDI units (0-127), or BPM for tempo
+    var depth: Double        // native units (ParamSpec.valueMax: 0-127, 0-16383 for bend), or BPM for tempo
+    var centerValue: Double  // native units, or BPM for tempo
     var inverted: Bool
     let loop: Bool           // set at creation; not editable
     var isEnabled: Bool = true   // false = paused; chip stays in list but sends no MIDI
-    let originalValue: Double    // MIDI value of parameter captured at clip creation (for restore-on-disable)
+    let originalValue: Double    // native value of parameter captured at clip creation (for restore-on-disable)
 
     init(id: UUID = UUID(), deviceId: String = "op1", track: Int, paramId: String,
          wave: LfoWave, rateTicks: Int, freeRatePeriod: Double? = nil,
@@ -214,6 +246,14 @@ struct LfoClip: Identifiable, Codable, Equatable {
 
 func midiToUI(_ v: Double) -> Double {
     (v * 99 / 127).rounded(.down)
+}
+
+/// `midiToUI` for a parameter whose native range is not 0-127 (pitch bend, 0-16383). 7-bit
+/// parameters keep `midiToUI` exactly; wider ones scale linearly, rounding down the same way.
+func nativeToUI(_ v: Double, valueMax: Double) -> Double {
+    // The epsilon absorbs float error in the d*max/99 -> *99/max round trip, which otherwise
+    // lands just under the integer and floors one step low (display 51 and 55 on a 16383 range).
+    valueMax == 127 ? midiToUI(v) : (v * 99 / valueMax + 1e-9).rounded(.down)
 }
 
 func uiToMidi(_ v: Double) -> Int {
