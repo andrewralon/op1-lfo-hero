@@ -1,7 +1,8 @@
 new in 1.1.1:
-· step-by-step setup for op-1 field, tx-6 and tp-7 is in help
+· new op-1 field parameters: record level, eq low/mid/high, sustain and pitch bend
 · new curves: slope and hold for one-shot lfos
-· a loop chip and a 1x chip can separately exist
+· step-by-step setup for op-1 field, tx-6 and tp-7 is in help
+· loop and 1x chips can now both exist at the same time
 · waveform view now shows active lfos
 · free rates f1 to f17 now run slowest to fastest, matching the op-1
 · ui improvements

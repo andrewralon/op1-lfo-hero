@@ -52,7 +52,7 @@ Check each against the release, not against memory.
       | `promotional_text.txt` | 170 | 152 |
       | `keywords.txt` (commas count) | 100 | 95 |
       | `description.txt` | 4000 | 1881 |
-      | `release_notes.txt` ("What's New") | 4000 | 526 (1.1.1 draft) |
+      | `release_notes.txt` ("What's New") | 4000 | 616 (1.1.1 draft) |
 
       Apple's limits, from memory of App Store Connect; fix the table if it ever disagrees.
 - [ ] `notes/CHANGELOG.md` — add this version's entry (fuller than the store text; mark anything not

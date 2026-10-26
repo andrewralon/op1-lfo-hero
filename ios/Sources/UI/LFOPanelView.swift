@@ -701,12 +701,33 @@ private extension View {
     func optionListPopover(isPresented: Binding<Bool>, labels: [String], selectedIndex: Int,
                            snug: Bool = false,
                            onPick: @escaping (Int) -> Void) -> some View {
-        popover(isPresented: isPresented) {
-            OptionListPopover(labels: labels, selectedIndex: selectedIndex, snug: snug) { idx in
-                onPick(idx)
-                isPresented.wrappedValue = false
+        modifier(OnDeckListPopover(isPresented: isPresented, labels: labels,
+                                   selectedIndex: selectedIndex, snug: snug, onPick: onPick))
+    }
+}
+
+/// The list popover, which also keeps the waveform on the LFO being set up. The popover is its
+/// own UIKit hierarchy, so the screen-wide touch in `ContentView` never sees a tap on one of its
+/// rows (and a quick tap on the box that opens it can end before that gesture reports). Opening a
+/// list and picking from one therefore say "a control was touched" themselves.
+private struct OnDeckListPopover: ViewModifier {
+    @EnvironmentObject var app: AppState
+    @Binding var isPresented: Bool
+    let labels: [String]
+    let selectedIndex: Int
+    let snug: Bool
+    let onPick: (Int) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: isPresented) { _, open in if open { app.onDeckTouched = true } }
+            .popover(isPresented: $isPresented) {
+                OptionListPopover(labels: labels, selectedIndex: selectedIndex, snug: snug) { idx in
+                    onPick(idx)
+                    app.onDeckTouched = true
+                    isPresented = false
+                }
             }
-        }
     }
 }
 

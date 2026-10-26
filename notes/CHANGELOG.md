@@ -16,9 +16,9 @@ PRs [#4](https://github.com/andrewralon/op1-lfo-hero/pull/4) (OP-1 controls) and
 **New**
 - **Slope and hold waves**, meant for one-shot use. Slope is a single ramp (inverted, it ramps
   down); hold snaps to the centre value and stays.
-- **OP-1 Field master controls:** rec level, master EQ (low / mid / high), sustain and pitch bend,
+- **OP-1 Field master controls:** record level, master EQ (low / mid / high), sustain and pitch bend,
   offered under the master (m) target. Pitch bend is 14-bit, so it sweeps smoothly and returns to
-  the exact centre. **Not yet on a device.**
+  the exact centre.
 - **Picker rework:** tap the parameter, wave or speed box to pick from a list; drag across the five
   boxes to scrub them. Lists open beside their box and are sized to their labels.
 - **Waveform view** shows the LFO you are touching or editing, otherwise every running LFO. LFOs
@@ -37,7 +37,7 @@ PRs [#4](https://github.com/andrewralon/op1-lfo-hero/pull/4) (OP-1 controls) and
 **Fixed**
 - A loop chip and a 1x chip with the same settings can both exist.
 - A cancelled pending Bluetooth reconnect no longer clears the connection that replaced it (the
-  "phantom" OP-1 row in the device picker). **Not yet on a device.**
+  "phantom" OP-1 row in the device picker).
 - Editing a chip no longer loses precision, and switching parameter recentres.
 
 ## 1.1.0 — 2026-10-19
