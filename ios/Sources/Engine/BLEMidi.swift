@@ -490,6 +490,13 @@ extension BLEMidi: CBCentralManagerDelegate {
     }
 
     func centralManager(_ c: CBCentralManager, didDisconnectPeripheral p: CBPeripheral, error: Error?) {
+        // Only the device the link is actually with can disconnect it. A cancelled pending reconnect
+        // (the remembered device, dropped when another is picked or auto-connects) reports here too:
+        // treating it as a disconnect would clear the new link and list the absent device as a row.
+        guard p.identifier == peripheral?.identifier else {
+            if pendingReconnect?.identifier == p.identifier { pendingReconnect = nil }
+            return
+        }
         midiChar = nil
         peripheral = nil
         if pendingReconnect?.identifier == p.identifier { pendingReconnect = nil }
@@ -507,6 +514,11 @@ extension BLEMidi: CBCentralManagerDelegate {
     }
 
     func centralManager(_ c: CBCentralManager, didFailToConnect p: CBPeripheral, error: Error?) {
+        // Same rule as a disconnect: a failed pending reconnect says nothing about the current link.
+        guard p.identifier == peripheral?.identifier else {
+            if pendingReconnect?.identifier == p.identifier { pendingReconnect = nil }
+            return
+        }
         if pendingReconnect?.identifier == p.identifier { pendingReconnect = nil }
         list.unpin(p.identifier, now: CACurrentMediaTime(), grace: 0)
         publishList()
