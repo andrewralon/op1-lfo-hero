@@ -796,7 +796,7 @@ struct HelpView: View {
         // Devices that need settings changed on the hardware first — otherwise the app looks
         // broken through no fault of its own.
         if !app.profile.setupSteps.isEmpty {
-            var body = Text("before the app can control the \(dev), change these on the device itself:\n")
+            var body = Text("before the app can control the \(dev), change these on the device itself:")
             for step in app.profile.setupSteps {
                 body = body + Text("\n· ") + Text(step)
             }
@@ -804,7 +804,7 @@ struct HelpView: View {
         }
         return out + [
         (HelpCopy.title(.mutePad), Text("tap a track's colored number pad to mute/unmute it. bright colored background = unmuted; dark background = muted.")),
-        (HelpCopy.title(.panKnob), Text("drag up/down on a knob to pan right/left. release near top dead center to snap to center.\n[vertical scrubbing for horizontal controls like pan are hard. i'm open to better ideas...]")),
+        (HelpCopy.title(.panKnob), Text("drag up/down on a knob to pan right/left. release near top dead center to snap to center.\n[vertical scrubbing for horizontal controls like pan are weird. i'm open to better ideas...]")),
         (HelpCopy.title(.volumeFader), Text("drag up/down on a fader to set that track's volume. drag to the side for fine scrubbing.")),
         (HelpCopy.title(.transport), Text("play/stop control op1 tape playback (play only works when the app is the clock master). play resumes from where the last play stopped, not from where you moved the tape by hand. left/right arrow buttons (op-1 field and tp-7) move the device's tape position backward/forward. -/+ buttons (tx-6) adjust the tempo bpm.")),
         (HelpCopy.title(.tempoMode), app.profile.caps.canBeClockMaster
