@@ -37,6 +37,15 @@ private extension View {
     func clockWaitingBanner() -> some View { modifier(ClockWaitingBanner()) }
 }
 
+/// The coordinate space `ContentView` names for the whole screen, and the frame of the LFO controls
+/// in it, so a touch can be sorted into "on the controls" or "anywhere else".
+let onDeckSpace = "onDeckScreen"
+
+struct OnDeckControlsKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
+}
+
 struct LFOPanelView: View {
     var needsCombinedLfoRow: Bool = false
     var needsSideBySide: Bool = false
@@ -47,15 +56,9 @@ struct LFOPanelView: View {
     @State private var selectedLfoID: UUID? = nil
     @State private var editorSnapshot: EditorSnapshot? = nil
     @State private var chipSnapshot: LfoClip? = nil
-    /// The editor as it stood when the user last started, cleared or cancelled an LFO. The editor
-    /// differing from this is a draft in progress. Compared by value rather than flagged from
-    /// `onChange`: restoring the editor after a chip edit writes the same properties the user
-    /// does, and a flag cannot tell the two apart.
-    @State private var draftBaseline: EditorSnapshot? = nil
     @State private var showDeleteConfirm = false
     @State private var showHelp = false
     @State private var showSettings = false
-
     /// Choose the parameter an LFO will drive with the cycle button (the picker goes through
     /// `recentre` itself, so that a drag only re-centers where it lands).
     ///
@@ -151,21 +154,14 @@ struct LFOPanelView: View {
         return all[(idx + 1) % all.count]
     }
 
-    private var isDrafting: Bool {
-        guard let base = draftBaseline else { return false }
-        return base != app.chipEditorSnapshot()
-    }
-
-    /// Takes the editor as it is now as the starting point for the next draft.
-    private func acceptDraft() { draftBaseline = app.chipEditorSnapshot() }
-
-    /// What the waveform draws. While editing (a chip is selected, preview is on, or a draft is
-    /// in progress) it is empty, which makes `MultiWaveformView` draw the editor's own curve: that
-    /// is the LFO being edited, since `loadEditor` fills the editor from a selected chip and
-    /// `saveChipEdits` keeps it live. Otherwise every LFO that is running, so paused and finished
-    /// chips drop out; with none running it is empty again rather than drawing an empty box.
+    /// What the waveform draws. While an LFO is being set up (a chip is selected, preview is on,
+    /// or a control has been touched since the last touch elsewhere) it is empty, which makes
+    /// `MultiWaveformView` draw the editor's own curve: that is the LFO on deck, since `loadEditor`
+    /// fills the editor from a selected chip and `saveChipEdits` keeps it live. Otherwise every
+    /// LFO that is running, so paused and finished chips drop out; with none running it is empty
+    /// again rather than drawing an empty box.
     private var waveformLfos: [LfoClip] {
-        if selectedLfoID != nil || app.isPreview || isDrafting { return [] }
+        if selectedLfoID != nil || app.isPreview || app.onDeckTouched { return [] }
         return app.activeLfos.filter(\.isEnabled)
     }
 
@@ -266,7 +262,7 @@ struct LFOPanelView: View {
     }
 
     @ViewBuilder private var repeatBtn: some View {
-        Button { app.lfoStart(loop: true); acceptDraft() } label: {
+        Button { app.lfoStart(loop: true) } label: {
             Image(systemName: "repeat").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.green.opacity(0.25))
@@ -277,7 +273,7 @@ struct LFOPanelView: View {
     }
 
     @ViewBuilder private var oneShotBtn: some View {
-        Button { app.lfoStart(loop: false); acceptDraft() } label: {
+        Button { app.lfoStart(loop: false) } label: {
             Image(systemName: "arrow.forward.to.line").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.bg3)
@@ -303,7 +299,6 @@ struct LFOPanelView: View {
             Button("delete all", role: .destructive) {
                 cancelChipEdit()
                 app.stopAllLfos()
-                acceptDraft()
             }
         }
     }
@@ -334,7 +329,7 @@ struct LFOPanelView: View {
             .padding(.vertical, m.lfoScrollPad).padding(.leading, m.lfoScrollPad)
         }
         .contentShape(Rectangle())
-        .onTapGesture { cancelChipEdit(); acceptDraft() }
+        .onTapGesture { cancelChipEdit() }
         .accessibilityIdentifier("lfoChipArea")
         .tourAnchor(.chipArea)
     }
@@ -381,78 +376,86 @@ struct LFOPanelView: View {
     var body: some View {
         VStack(spacing: 0) {
 
-            // ── 1. Track + master toggle buttons ─────────────────────────────
-            // Wraps onto a second row when a 6-track device won't fit one row at the
-            // 44pt minimum touch target (iPhone portrait) — see LayoutMetrics.toggleBtnRows.
-            VStack(spacing: m.toggleBtnSpacing) {
-                ForEach(Array(toggleButtonRows.enumerated()), id: \.offset) { _, row in
-                    HStack(spacing: m.toggleBtnSpacing) {
-                        ForEach(row, id: \.self) { slot in
-                            switch slot {
-                            case .track(let t):
-                                TrackToggleButton(track: t,
-                                                  state: app.trackOn[t] ?? 0,
-                                                  disabled: app.lfoParam.isMasterOnly || app.masterOn > 0) {
-                                    app.cycleTrack(t)
+            // Sections 1-3 are the LFO's controls. `ContentView` watches touches against this frame:
+            // one inside puts the LFO on deck on the waveform, one outside takes it off.
+            VStack(spacing: 0) {
+                // ── 1. Track + master toggle buttons ─────────────────────────────
+                // Wraps onto a second row when a 6-track device won't fit one row at the
+                // 44pt minimum touch target (iPhone portrait) — see LayoutMetrics.toggleBtnRows.
+                VStack(spacing: m.toggleBtnSpacing) {
+                    ForEach(Array(toggleButtonRows.enumerated()), id: \.offset) { _, row in
+                        HStack(spacing: m.toggleBtnSpacing) {
+                            ForEach(row, id: \.self) { slot in
+                                switch slot {
+                                case .track(let t):
+                                    TrackToggleButton(track: t,
+                                                      state: app.trackOn[t] ?? 0,
+                                                      disabled: app.lfoParam.isMasterOnly || app.masterOn > 0) {
+                                        app.cycleTrack(t)
+                                    }
+                                    .tourAnchor(.trackToggle)
+                                case .master:
+                                    MasterToggleButton(state: app.masterOn,
+                                                       disabled: !app.lfoParam.isMasterCapable) {
+                                        app.cycleMaster()
+                                    }
+                                    .tourAnchor(.masterToggle)
+                                case .preview:
+                                    PreviewToggleButton(active: app.isPreview) {
+                                        app.togglePreview()
+                                    }
+                                    .tourAnchor(.preview)
                                 }
-                                .tourAnchor(.trackToggle)
-                            case .master:
-                                MasterToggleButton(state: app.masterOn,
-                                                   disabled: !app.lfoParam.isMasterCapable) {
-                                    app.cycleMaster()
-                                }
-                                .tourAnchor(.masterToggle)
-                            case .preview:
-                                PreviewToggleButton(active: app.isPreview) {
-                                    app.togglePreview()
-                                }
-                                .tourAnchor(.preview)
                             }
                         }
                     }
                 }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, m.toggleBtnTopPad)
-            .padding(.bottom, m.toggleBtnVPad)
-            .padding(.horizontal, m.toggleBtnHPad)
+                .frame(maxWidth: .infinity)
+                .padding(.top, m.toggleBtnTopPad)
+                .padding(.bottom, m.toggleBtnVPad)
+                .padding(.horizontal, m.toggleBtnHPad)
 
-            // ── 2+3. Param / wave / rate / depth / center controls ────────────
-            if needsCombinedLfoRow {
-                HStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    paramRow
-                    Spacer(minLength: m.controlHSpacing * 1.5)
-                    waveRow
-                    Spacer(minLength: m.controlHSpacing * 2)
-                    rateBox
-                    Spacer(minLength: m.controlHSpacing * 1.2)
-                    centerBox
-                    Spacer(minLength: m.controlHSpacing * 1.2)
-                    depthBox
-                    Spacer(minLength: 0)
-                }
-                .padding(.vertical, m.controlVPad)
-            } else {
-                HStack(spacing: m.controlHSpacing * 3) {
-                    Spacer()
-                    paramRow
-                    waveRow
-                    Spacer()
-                }
-                .padding(.vertical, m.controlVPad)
+                // ── 2+3. Param / wave / rate / depth / center controls ────────────
+                if needsCombinedLfoRow {
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        paramRow
+                        Spacer(minLength: m.controlHSpacing * 1.5)
+                        waveRow
+                        Spacer(minLength: m.controlHSpacing * 2)
+                        rateBox
+                        Spacer(minLength: m.controlHSpacing * 1.2)
+                        centerBox
+                        Spacer(minLength: m.controlHSpacing * 1.2)
+                        depthBox
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, m.controlVPad)
+                } else {
+                    HStack(spacing: m.controlHSpacing * 3) {
+                        Spacer()
+                        paramRow
+                        waveRow
+                        Spacer()
+                    }
+                    .padding(.vertical, m.controlVPad)
 
-                HStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    rateBox
-                    Spacer(minLength: m.controlHSpacing * 2)
-                    centerBox
-                    Spacer(minLength: m.controlHSpacing * 2)
-                    depthBox
-                    Spacer(minLength: 0)
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        rateBox
+                        Spacer(minLength: m.controlHSpacing * 2)
+                        centerBox
+                        Spacer(minLength: m.controlHSpacing * 2)
+                        depthBox
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, m.controlVPad)
                 }
-                .padding(.vertical, m.controlVPad)
             }
+            .background(GeometryReader { g in
+                Color.clear.preference(key: OnDeckControlsKey.self,
+                                       value: g.frame(in: .named(onDeckSpace)))
+            })
 
             // ── 4+5. Waveform + action buttons + LFO list ─────────────────────
             if needsSideBySide {
@@ -563,9 +566,6 @@ struct LFOPanelView: View {
         .onChange(of: app.lfoDepth)  { _, _ in app.updatePreviewIfActive(); liveUpdateChip() }
         .onChange(of: app.lfoCenter) { _, _ in app.updatePreviewIfActive(); liveUpdateChip() }
         .modifier(TrackToggleLiveUpdateModifier(onUpdate: liveUpdateChip))
-        .onAppear { acceptDraft() }
-        // A device switch rewrites the editor (parameter, targets); that is not the user drafting.
-        .onChange(of: app.profile.id) { _, _ in acceptDraft() }
         .onChange(of: app.activeLfos) { _, lfos in
             guard let id = selectedLfoID, !lfos.contains(where: { $0.id == id }) else { return }
             chipSnapshot = nil

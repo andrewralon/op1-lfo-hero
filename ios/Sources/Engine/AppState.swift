@@ -70,6 +70,10 @@ final class AppState: ObservableObject {
     @Published var masterOn  = 0                            // 0=off 1=on 2=inv
     @Published var activeLfos: [LfoClip] = []
     @Published var isPreview  = false
+    /// True from a touch on any of the LFO editor's controls until a touch anywhere else. While
+    /// it is set the waveform shows the LFO being set up, not the running ones. A touch rather
+    /// than a changed value: pressing a control counts even if it ends up where it started.
+    @Published var onDeckTouched = false
 
     // Displayed lfo range (derived)
     var lfoRange: String {

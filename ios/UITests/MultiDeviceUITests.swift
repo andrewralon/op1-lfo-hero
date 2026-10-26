@@ -187,11 +187,21 @@ final class MultiDeviceUITests: XCTestCase {
         app.descendants(matching: .any)["lfoChipArea"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
         XCTAssertEqual(waveformMode(app), "running")
 
-        // Preview is editing too.
+        // Preview is editing too, and pressing it counts as touching the controls even once it
+        // is off again: the running chips come back with the next touch elsewhere.
         app.buttons["previewButton"].tap()
         XCTAssertEqual(waveformMode(app), "editor")
         app.buttons["previewButton"].tap()
+        XCTAssertEqual(waveformMode(app), "editor")
+        app.descendants(matching: .any)["lfoChipArea"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
         XCTAssertEqual(waveformMode(app), "running")
+
+        // Touching anything outside the controls (here a mute pad) also ends it.
+        app.buttons["track2Button"].tap()
+        XCTAssertEqual(waveformMode(app), "editor")
+        app.buttons["muteButton1"].tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.buttons["muteButton1"].tap()
 
         // A selected chip is the LFO being edited; committing it returns to the running ones.
         let chip = app.descendants(matching: .any)["lfoChip"].firstMatch

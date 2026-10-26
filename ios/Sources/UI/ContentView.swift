@@ -245,6 +245,7 @@ struct ContentView: View {
     @Environment(\.horizontalSizeClass) private var hSize
     @EnvironmentObject private var app: AppState
     @EnvironmentObject private var tour: TourController
+    @State private var lfoControlsFrame: CGRect = .zero
 
     var body: some View {
         GeometryReader { geo in
@@ -284,6 +285,17 @@ struct ContentView: View {
                 StatusBarView()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .coordinateSpace(name: onDeckSpace)
+            .onPreferenceChange(OnDeckControlsKey.self) { lfoControlsFrame = $0 }
+            // Simultaneous, so the control that was touched still gets its own gesture. Decided on
+            // where the touch began.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .named(onDeckSpace))
+                    .onChanged { g in
+                        let onControls = lfoControlsFrame.contains(g.startLocation)
+                        if app.onDeckTouched != onControls { app.onDeckTouched = onControls }
+                    }
+            )
             // While the tour is up, VoiceOver can't reach the controls under it either.
             .accessibilityHidden(tour.isActive)
             .overlayPreferenceValue(TourAnchorKey.self) { TourOverlayLayer(anchors: $0) }
@@ -616,7 +628,7 @@ enum HelpCopy {
         case .depthBox:
             return "choose the depth the lfo swings either side of center. drag up/down to scrub it."
         case .waveform:
-            return "shows the lfo you're editing, otherwise every running lfo in its track's color."
+            return "shows the lfo you're setting up while you touch its controls, otherwise every running lfo in its track's color."
         case .startButtons:
             return "create an lfo from current settings that loops (repeat) or runs once (1x). or delete all lfos."
         case .chipArea:
@@ -803,7 +815,7 @@ struct HelpView: View {
         (HelpCopy.title(.preview), Text("enables live preview: the current editor settings are sent to the device in real time as you adjust them, so you can hear the effect while dialing in speed, depth, center, and wave shape. no chip is created — press repeat or 1x to create an lfo.")),
         (HelpCopy.title(.paramPicker), Text("choose which parameter the lfo modulates, and which waveform shape it follows. drag up/down on a box to scrub through its options, or tap it to open the list. tap the icons to step to the next option.\n· \(Text("slope").bold()) — one rising ramp over twice the speed. best as 1x on slow free rates, and it stays at the top.\n· \(Text("hold").bold()) — sends the center value and ignores depth. use with 1x to reset a parameter.")),
         (HelpCopy.title(.speedBox), Text("drag up/down on a box to scrub its value. on speed, tap the box to open the list, or tap the speed (timer) icon to step to the next speed value one at a time. speed sets lfo speed, depth sets its range, center sets its midpoint.")),
-        (HelpCopy.title(.waveform), Text("while you edit (a selected chip, preview on, or settings you have changed but not started), shows the lfo being edited. otherwise shows every running lfo overlaid, colored per track, and leaves out paused ones. with none running, it shows the current settings as a preview.")),
+        (HelpCopy.title(.waveform), Text("while you set one up (a selected chip, preview on, or after you touch any of the lfo controls, until you touch anywhere else), shows only that lfo. otherwise shows every running lfo overlaid, colored per track, and leaves out paused ones. with none running, it shows the current settings as a preview.")),
         (HelpCopy.title(.startButtons), Text("start the lfo looping (repeat), run it once (one-shot), or delete all lfos.")),
         (HelpCopy.title(.chipArea), Text("lfos are shown as chips with abbreviated names. example: 'track/master·parameter·wave·speed·center±depth·repeat/loop'.\n· \(Text("tap").bold()) — toggle the lfo on/off\n· \(Text("long-press").bold()) — edit the controls for selected chip and hear changes live, then long-press again to save changes.\n· \(Text("tap anywhere else").bold()) — cancel the current edit.\n· \(Text("×").bold()) — stop and delete the lfo.")),
         (HelpCopy.title(.statusBar), Text(app.profile.caps.canBeClockMaster
