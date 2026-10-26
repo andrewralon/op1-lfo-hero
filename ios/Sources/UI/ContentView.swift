@@ -736,8 +736,10 @@ private struct SheetItem<TextBody: View, Controls: View, Accessory: View>: View 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: SheetGap.titleToText(isPad)) {
+                // Titles stay a touch larger than their text on both: 18 over 17 on iPad, 16 over 15
+                // on iPhone (it was 13 over 15, which read as smaller than the description).
                 Text(title)
-                    .font(.system(size: isPad ? 18 : 13, weight: .semibold))
+                    .font(.system(size: isPad ? 18 : 16, weight: .semibold))
                     .italic(italic)
                     .foregroundColor(C.text)
                 text
