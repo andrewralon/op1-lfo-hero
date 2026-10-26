@@ -51,11 +51,10 @@ extension DeviceProfile {
         // tempo-mode wording is from notes/RESEARCH.md; the app cannot see the mode, only whether
         // clock arrives.
         setupSteps: [
-            "connect over usb-c (use a data cable — some usb-c cables only charge) or over bluetooth: set `bluetooth: on` on the op-1, then pick it from the device list in the status bar. usb-c is the better choice for tempo and transport.",
-            "to have the app follow the op-1's tempo, use `beat match` and tap the metronome so it reads `op1`. the op-1 sends the clock, so the lfos keep its time, and its own play and stop behave normally. works over usb-c or bluetooth.",
-            "to have the app control the op-1's tempo and tape, use `midi sync` and tap the metronome so it reads `app`. the app then sends the clock, and play, stop and the arrow buttons move the tape. needs usb-c: over bluetooth the app can't set the op-1's tempo. until clock arrives the op-1 shows `--` for its bpm.",
-            "the op-1 doesn't report its settings back, so the faders and knobs show what the app last sent, not what the op-1 is doing. and the app can't tell `midi sync` from `free`, or `beat match` from the other clock-out modes, so set the metronome to match what you chose on the op-1.",
-            "rec level, master eq, sustain and pitch bend are global: they shape what you're playing live, not a single track, so they use the master (m) target. pitch bend moves only the selected instrument's live notes, not the tape.",
+            "for the app to control the op-1, set op-1 to `midi sync` and tap the metronome so it reads `app`.",
+            "for the op-1 to control the app, set op-1 to `beat match` and tap the metronome so it reads `op1`.",
+            "usb-c is required for the app to control the tempo on the op-1.",
+            "op-1 does not send midi values when controls change on the device, so the app displays what the app last sent, not what just changed on op-1.",
         ]
     )
 
@@ -226,11 +225,9 @@ extension DeviceProfile {
         ),
         // Verified on hardware: a default TX-6 ignores the app entirely until both are set.
         setupSteps: [
-            "set `midi control` to `in` — until you do, the tx-6 ignores everything the app sends. note this also stops the tx-6 sending its own knob/fader messages.",
-            "set `clock SRC` to match how you are connected: `usb` over usb-c, `ble` over bluetooth. it only accepts clock and play/stop from the source you pick, so with the wrong one the app's tempo, play, pause and stop silently do nothing, while volume, pan and mute still work.",
-            "to go the other way and have the app follow the tx-6, set `clock SRC` to internal and enable clock `out`, then tap the metronome so it reads `tx6`. the −/+ buttons then move both tempos together.",
-            "while an lfo drives a channel, moving that channel's fader on the tx-6 will fight the lfo rather than take over. pause the chip first.",
-            "lfos restart when you press play in the app. pressing play on the tx-6 itself can't restart them: in `in` it sends nothing, and in `out` it ignores the app.",
+            "for the app to control the tx-6, set `midi -> control` to `in`. set `clock -> src` to match your connection: `usb` or `ble`. tx-6 only accepts clock and play/stop from that source.",
+            "for the tx-6 to control the app, set `midi -> control` to `out`. set `clock -> src` to `internal` and set `clock -> out` to `on`. tap the metronome so it reads `tx6`. the −/+ buttons then move both tempos together.",
+            "lfos restart when you press play in the app only.",
         ]
     )
 
@@ -345,8 +342,8 @@ extension DeviceProfile {
             mirrorsIncomingCC: false
         ),
         setupSteps: [
-            "use `sync` for the app to follow the tp-7's tempo — it streams midi clock in that mode. volume/mute/gain control works in `off` and `sync` alike.",
-            "note: in `ctrl` mode the tp-7 acts as a midi controller for other gear. it will not playback and stops receiving commands from the app"
+            "for the tp-7 to control the app's tempo, set midi to `sync` — so it streams midi clock. volume/mute/gain works in `off` and `sync` alike.",
+            "note: `ctrl` mode is not recommended. the device acts as a midi controller for other gear. it will not playback and will not receive commands from the app."
         ]
     )
 
