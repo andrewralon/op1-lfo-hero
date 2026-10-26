@@ -245,7 +245,7 @@ struct ContentView: View {
     @Environment(\.horizontalSizeClass) private var hSize
     @EnvironmentObject private var app: AppState
     @EnvironmentObject private var tour: TourController
-    @State private var lfoControlsFrame: CGRect = .zero
+    @State private var onDeckRegion = OnDeckRegion()
 
     var body: some View {
         GeometryReader { geo in
@@ -285,21 +285,17 @@ struct ContentView: View {
                 StatusBarView()
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .coordinateSpace(name: onDeckSpace)
-            .onPreferenceChange(OnDeckControlsKey.self) { lfoControlsFrame = $0 }
-            // Simultaneous, so the control that was touched still gets its own gesture. Decided on
-            // where the touch began.
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .named(onDeckSpace))
-                    .onChanged { g in
-                        let onControls = lfoControlsFrame.contains(g.startLocation)
-                        if app.onDeckTouched != onControls { app.onDeckTouched = onControls }
-                    }
-            )
+            // Where each touch began decides it: on the LFO controls, that LFO is on deck; anywhere
+            // else, every running LFO is shown. Written only when it changes.
+            .background(TouchStartObserver { p in
+                let onControls = onDeckRegion.contains(p)
+                if app.onDeckTouched != onControls { app.onDeckTouched = onControls }
+            })
             // While the tour is up, VoiceOver can't reach the controls under it either.
             .accessibilityHidden(tour.isActive)
             .overlayPreferenceValue(TourAnchorKey.self) { TourOverlayLayer(anchors: $0) }
             .environment(\.metrics, m)
+            .environment(\.onDeckRegion, onDeckRegion)
             .background(C.bg)
             .preferredColorScheme(.dark)
         }

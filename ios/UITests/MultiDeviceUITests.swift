@@ -171,6 +171,30 @@ final class MultiDeviceUITests: XCTestCase {
         app.descendants(matching: .any)["waveform"].value as? String
     }
 
+    /// Scrubbing a box is touching an LFO control, the same as opening its list: the waveform
+    /// shows the LFO on deck, not the running ones.
+    @MainActor func testScrubbingAPickerShowsTheOnDeckLfo() throws {
+        let app = launch(profile: "op1")
+        app.buttons["repeatButton"].tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.buttons["wavePicker"].swipeUp()
+        XCTAssertEqual(waveformMode(app), "editor", "scrubbing the wave picker is touching an LFO control")
+        app.descendants(matching: .any)["lfoChipArea"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.buttons["paramPicker"].swipeUp()
+        XCTAssertEqual(waveformMode(app), "editor", "scrubbing the param picker is too")
+
+        // Taps count too: the picker box, and the icon beside it.
+        app.descendants(matching: .any)["lfoChipArea"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.buttons["waveIconButton"].tap()
+        XCTAssertEqual(waveformMode(app), "editor", "the icon next to the wave picker is a control")
+        app.descendants(matching: .any)["lfoChipArea"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.buttons["paramIconButton"].tap()
+        XCTAssertEqual(waveformMode(app), "editor", "the icon next to the param picker is a control")
+    }
+
     @MainActor func testWaveformShowsRunningLfosUnlessYouAreEditing() throws {
         let app = launch(profile: "op1")
         XCTAssertEqual(waveformMode(app), "editor", "nothing running: the editor curve, not an empty box")

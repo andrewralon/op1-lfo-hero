@@ -37,16 +37,106 @@ private extension View {
     func clockWaitingBanner() -> some View { modifier(ClockWaitingBanner()) }
 }
 
-/// The coordinate space `ContentView` names for the whole screen, and the frame of the LFO controls
-/// in it, so a touch can be sorted into "on the controls" or "anywhere else".
-let onDeckSpace = "onDeckScreen"
+/// Where the LFO controls are on screen, so a touch can be sorted into "on the controls" or
+/// "anywhere else". It holds the marker view itself and measures it at the moment of the touch,
+/// rather than copying a frame into state: a frame passed up through a SwiftUI preference arrived
+/// as zero and never updated, which made every touch count as "elsewhere".
+final class OnDeckRegion {
+    weak var view: UIView?
 
-struct OnDeckControlsKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) { value = nextValue() }
+    /// `windowPoint` is in window coordinates, as `UITouch.location(in: nil)` reports them.
+    func contains(_ windowPoint: CGPoint) -> Bool {
+        guard let view, view.window != nil else { return false }
+        return view.convert(view.bounds, to: nil).contains(windowPoint)
+    }
+}
+
+private struct OnDeckRegionKey: EnvironmentKey {
+    static let defaultValue = OnDeckRegion()
+}
+
+extension EnvironmentValues {
+    var onDeckRegion: OnDeckRegion {
+        get { self[OnDeckRegionKey.self] }
+        set { self[OnDeckRegionKey.self] = newValue }
+    }
+}
+
+/// An invisible view the size of whatever it is the background of; it registers itself as the
+/// LFO controls' region.
+struct OnDeckRegionMarker: UIViewRepresentable {
+    let region: OnDeckRegion
+
+    func makeUIView(context: Context) -> UIView {
+        let v = UIView()
+        v.isUserInteractionEnabled = false
+        v.backgroundColor = .clear
+        region.view = v
+        return v
+    }
+
+    func updateUIView(_ v: UIView, context: Context) { region.view = v }
+}
+
+/// Reports where every touch on the screen begins, in window coordinates, without taking part in
+/// the touch.
+///
+/// A SwiftUI gesture on a parent cannot reliably see a touch that a child (a button, a picker, a
+/// scrub box) handles itself, which is exactly the touches that matter here. This is a UIKit
+/// recognizer on the window that sees the touch first and never cancels, delays or claims it, so
+/// every control keeps behaving as before.
+struct TouchStartObserver: UIViewRepresentable {
+    let onTouchBegan: (CGPoint) -> Void
+
+    func makeUIView(context: Context) -> ObserverView {
+        let v = ObserverView()
+        v.isUserInteractionEnabled = false
+        v.onTouchBegan = onTouchBegan
+        return v
+    }
+
+    func updateUIView(_ v: ObserverView, context: Context) { v.onTouchBegan = onTouchBegan }
+
+    final class ObserverView: UIView, UIGestureRecognizerDelegate {
+        var onTouchBegan: ((CGPoint) -> Void)?
+        private var recognizer: StartRecognizer?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if let r = recognizer { r.view?.removeGestureRecognizer(r); recognizer = nil }
+            guard let window else { return }
+            let r = StartRecognizer { [weak self] touch in
+                guard let self else { return }
+                self.onTouchBegan?(touch.location(in: nil))
+            }
+            r.cancelsTouchesInView = false
+            r.delaysTouchesBegan = false
+            r.delaysTouchesEnded = false
+            r.delegate = self
+            window.addGestureRecognizer(r)
+            recognizer = r
+        }
+
+        func gestureRecognizer(_ g: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+    }
+
+    /// Fails as soon as it has reported the touch, so it never holds up another recognizer.
+    private final class StartRecognizer: UIGestureRecognizer {
+        let report: (UITouch) -> Void
+        init(report: @escaping (UITouch) -> Void) {
+            self.report = report
+            super.init(target: nil, action: nil)
+        }
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+            touches.forEach(report)
+            state = .failed
+        }
+    }
 }
 
 struct LFOPanelView: View {
+    @Environment(\.onDeckRegion) private var onDeckRegion
     var needsCombinedLfoRow: Bool = false
     var needsSideBySide: Bool = false
 
@@ -190,6 +280,7 @@ struct LFOPanelView: View {
                     .font(.system(size: m.iconSize))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
+            .accessibilityIdentifier("paramIconButton")
             // The binding writes the parameter at once, so preview, a selected chip and the
             // label all follow a drag. Re-centering waits for the settle: passing over bend on
             // the way to another parameter must not move the center box.
@@ -208,6 +299,7 @@ struct LFOPanelView: View {
                     .font(.system(size: m.iconSize))
                     .foregroundColor(Color(hex: "#aaaaaa"))
             }.buttonStyle(.plain)
+            .accessibilityIdentifier("waveIconButton")
             CompactPicker(options: Array(LfoWave.allCases), selection: $app.lfoWave,
                           label: { $0.rawValue }, accessibilityId: "wavePicker")
         }
@@ -452,10 +544,7 @@ struct LFOPanelView: View {
                     .padding(.vertical, m.controlVPad)
                 }
             }
-            .background(GeometryReader { g in
-                Color.clear.preference(key: OnDeckControlsKey.self,
-                                       value: g.frame(in: .named(onDeckSpace)))
-            })
+            .background(OnDeckRegionMarker(region: onDeckRegion))
 
             // ── 4+5. Waveform + action buttons + LFO list ─────────────────────
             if needsSideBySide {
@@ -706,10 +795,10 @@ private extension View {
     }
 }
 
-/// The list popover, which also keeps the waveform on the LFO being set up. The popover is its
-/// own UIKit hierarchy, so the screen-wide touch in `ContentView` never sees a tap on one of its
-/// rows (and a quick tap on the box that opens it can end before that gesture reports). Opening a
-/// list and picking from one therefore say "a control was touched" themselves.
+/// The list popover, which also keeps the waveform on the LFO being set up. A row sits outside the
+/// LFO controls, so the touch that picks it would count as "anywhere else" and send the waveform
+/// back to the running LFOs. Opening a list and picking from one therefore say "a control was
+/// touched" themselves, after that touch has been seen.
 private struct OnDeckListPopover: ViewModifier {
     @EnvironmentObject var app: AppState
     @Binding var isPresented: Bool
