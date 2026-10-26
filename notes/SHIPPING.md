@@ -9,9 +9,22 @@ Related, not repeated here: `HARDWARE_CHECKLIST.md` (what to try on a real devic
 `../ios/fastlane/README.md` (the lanes), and `../CLAUDE.md` ("Screenshots and simulator testing"
 for the capture commands and the App Store slot sizes).
 
+## The order
+Build and submit from the release branch, and merge to `main` **last**. Copy is approved first,
+and screenshots are taken only after the TestFlight build is verified, so they are shot once, on
+the final UI.
+1. Verify (section 3), then write and **get approval for the final store text** (section 4).
+2. Push the release branch, then `fastlane beta` and verify the TestFlight build (section 6).
+3. Screenshots and previews (section 5), taken against that build's UI.
+4. `fastlane release build:<n>` (section 6).
+5. Merge the PR into `main`, close the PRs it replaces, delete their branches (section 7). The
+   site (`docs/`) goes live at this step.
+6. Tag the release on `main`, once it is live.
+
 ## 1. Decide what is shipping
-- [ ] Everything for this release is merged to `main` and the working tree is clean.
-- [ ] Open PRs that this release makes redundant are closed and their branches deleted.
+- [ ] The release branch has everything for this release and the working tree is clean. (It reaches
+      `main` last, see "The order".)
+- [ ] Note the open PRs that this release makes redundant; they are closed after the merge.
 - [ ] Pick the version. Is the current `MARKETING_VERSION` already live? Check App Store Connect
       (and TestFlight), not the repo: tags only record releases that were tagged. A new feature is
       a minor bump, a fix-only release is a patch.
@@ -51,7 +64,7 @@ Check each against the release, not against memory.
       | `subtitle.txt` | 30 | 27 |
       | `promotional_text.txt` | 170 | 152 |
       | `keywords.txt` (commas count) | 100 | 95 |
-      | `description.txt` | 4000 | 1881 |
+      | `description.txt` | 4000 | 1793 (1.1.1 draft) |
       | `release_notes.txt` ("What's New") | 4000 | 616 (1.1.1 draft) |
 
       Apple's limits, from memory of App Store Connect; fix the table if it ever disagrees.
@@ -67,7 +80,8 @@ Check each against the release, not against memory.
 - [ ] `CLAUDE.md` — the identifier list, device table and rules, if they changed.
 
 ## 5. Screenshots and previews
-Only when the visible UI changed enough to matter. App Store Connect needs a set for each slot, and
+Only when the visible UI changed enough to matter. **Do this after the final text is approved and
+the TestFlight build is verified**, never earlier: any later UI fix would mean taking them again. App Store Connect needs a set for each slot, and
 filling one slot does not fill the others. See `CLAUDE.md` for the simulators, sizes and the
 file-name rules.
 - [ ] `ios/fastlane/capture_screenshots.sh`, then **look at every image** in `/tmp/claude-ss/`.
@@ -77,6 +91,9 @@ file-name rules.
 - [ ] After a preview upload, pick the poster frame in App Store Connect once it finishes processing.
 
 ## 6. Build, test, submit
+Fastlane reads its App Store Connect key from `ios/fastlane/.env`. That file is gitignored, so a
+git worktree does not have it: load it from the main checkout without printing it
+(`set -a; . <main checkout>/ios/fastlane/.env; set +a`) rather than copying the secret around.
 1. `cd ios && fastlane whatif` previews the commit list the TestFlight notes will carry;
    `fastlane beta` builds, uploads to TestFlight and tags `beta/<build>`.
 2. Install the TestFlight build on the iPad and iPhone and run the hardware checks on **that**
@@ -88,8 +105,11 @@ file-name rules.
 - [ ] In App Store Connect, check the version page before and after: build selected, release notes,
       screenshots in every slot, and nothing left in "Prepare for Submission" or "Rejected".
 
-## 7. After it is live
-- [ ] Tag the release commit on `main`: `git tag v<marketing-version> && git push --tags`.
+## 7. Merge, then after it is live
+- [ ] **After** the build is submitted (section 6): merge the PR into `main`, close the PRs it made
+      redundant and delete their branches (local and remote), pull `main`, confirm the help
+      screen's version label, and re-run the unit tests on `main`. The site goes live on this merge.
+- [ ] Tag the release commit on `main` once the release is live: `git tag v<marketing-version> && git push --tags`.
 - [ ] Close the issues the release resolved, and move finished items under `## Done` in `FEATURES.md`.
 - [ ] Update `RELEASE_READINESS.md`, or replace it with the next release's snapshot if one was written.
 - [ ] Clean up what the release left around: local build folders, test simulators, merged branches.
