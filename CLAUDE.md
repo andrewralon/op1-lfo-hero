@@ -159,6 +159,7 @@ was clipping digits because it was derived from the column instead of the space 
 - `FEATURES.md` — iOS backlog: `## To fix` / `## Later (or not possible)` / `## Done`, each item prefixed with a severity (`HIGH`/`MED`/`LOW`)
 - `FEATURES_PYTHON.md` — same structure, for the Python app
 - `RESEARCH.md` — empirical MIDI protocol findings (e.g. why certain OP-1 tempo modes are indistinguishable over MIDI)
+- `SHIPPING.md` — the checklist for every App Store release (version numbers, what goes stale, fastlane lanes). Copy it into a scratch plan per release.
 
 When a task originates from one of these files, check the box (`- [ ]` → `- [x]`) and move the item under `## Done` as part of the same change — don't leave completed items unchecked.
 
