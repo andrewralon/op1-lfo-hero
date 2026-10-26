@@ -3,7 +3,7 @@ import Foundation
 import SwiftUI
 import UIKit
 
-struct EditorSnapshot {
+struct EditorSnapshot: Equatable {
     let param:    ParamSpec
     let wave:     LfoWave
     let rate:     Int

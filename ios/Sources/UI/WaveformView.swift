@@ -16,8 +16,6 @@ struct WaveformView: View {
             let midY    = size.height / 2
             let amp     = midY * 0.88
             let steps   = Int(w * 1.5)
-            // Target ~60 pt per color segment; steps are ~1.5 per pt so multiply directly.
-            let segLen  = max(1, Int(waveformSegmentPt * Double(steps) / Double(w)))
             let waveStroke = StrokeStyle(lineWidth: size.height * 0.012, lineCap: .round, lineJoin: .round)
 
             var center = Path()
@@ -56,31 +54,7 @@ struct WaveformView: View {
                                       y: midY - CGFloat(y) * amp))
                 }
 
-                if group.count == 1 {
-                    // Single track — one solid path
-                    var path = Path()
-                    for (i, pt) in pts.enumerated() {
-                        if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
-                    }
-                    ctx.stroke(path, with: .color(group[0].color), style: waveStroke)
-                } else {
-                    // Multiple tracks — solid alternating color segments, no gaps.
-                    // Each segment starts at the last point of the previous one so
-                    // there is never a break in the line.
-                    var start = 0; var ci = 0
-                    while start < pts.count - 1 {
-                        let end = min(start + segLen, pts.count - 1)
-                        var path = Path()
-                        for i in start...end {
-                            if i == start { path.move(to: pts[i]) }
-                            else          { path.addLine(to: pts[i]) }
-                        }
-                        ctx.stroke(path, with: .color(group[ci % group.count].color),
-                                   style: waveStroke)
-                        ci    += 1
-                        start  = end   // overlap by 1 pt — prevents pixel-level gaps
-                    }
-                }
+                strokeStriped(&ctx, points: pts, colors: group.map(\.color), style: waveStroke)
             }
         }
         .background(C.bg2)
@@ -109,10 +83,23 @@ struct MultiWaveformView: View {
                 center.addLine(to: CGPoint(x: size.width, y: midY))
                 ctx.stroke(center, with: .color(C.groove), lineWidth: 1)
 
+                // LFOs that draw the same curve (same wave, speed and direction, whatever the
+                // parameter or track) would paint over one another and leave only the last color
+                // visible, so they share one path that alternates their colors, as the editor
+                // curve does for several selected tracks.
+                var order: [CurveKey] = []
+                var colors: [CurveKey: [Color]] = [:]
+                var sample: [CurveKey: LfoClip] = [:]
                 for lfo in lfos {
+                    let key = CurveKey(wave: lfo.wave, ticks: displayTicks(lfo), inverted: lfo.inverted)
+                    if colors[key] == nil { order.append(key); sample[key] = lfo }
                     let c = lfo.track == 0 ? C.green : C.track(lfo.track)
-                    ctx.stroke(buildPath(lfo: lfo, size: size), with: .color(c),
-                               style: waveStroke)
+                    if !(colors[key] ?? []).contains(c) { colors[key, default: []].append(c) }
+                }
+                for key in order {
+                    guard let lfo = sample[key], let cs = colors[key] else { continue }
+                    strokeStriped(&ctx, points: buildPoints(lfo: lfo, size: size), colors: cs,
+                                  style: waveStroke)
                 }
             }
             .background(C.bg2)
@@ -120,17 +107,25 @@ struct MultiWaveformView: View {
         }
     }
 
-    private func buildPath(lfo: LfoClip, size: CGSize) -> Path {
-        let displayTicks: Int
+    private struct CurveKey: Hashable {
+        let wave: LfoWave
+        let ticks: Int
+        let inverted: Bool
+    }
+
+    private func displayTicks(_ lfo: LfoClip) -> Int {
         if let secs = lfo.freeRatePeriod {
-            displayTicks = max(1, Int(secs * max(AppState.minBpm, bpm) * Double(PPQN) / 60.0))
-        } else {
-            displayTicks = lfo.rateTicks
+            return max(1, Int(secs * max(AppState.minBpm, bpm) * Double(PPQN) / 60.0))
         }
-        let nCycles = Double(8 * PPQN) / (Double(displayTicks) * lfo.wave.cycleMultiplier)
+        return lfo.rateTicks
+    }
+
+    private func buildPoints(lfo: LfoClip, size: CGSize) -> [CGPoint] {
+        let nCycles = Double(8 * PPQN) / (Double(displayTicks(lfo)) * lfo.wave.cycleMultiplier)
         let amplitude = size.height / 2 * 0.88
         let steps = Int(size.width * 1.5)
-        var path = Path()
+        var pts = [CGPoint]()
+        pts.reserveCapacity(steps + 1)
         var prevStep = -1; var stepY = 0.0
 
         for i in 0...steps {
@@ -149,12 +144,38 @@ struct MultiWaveformView: View {
                 y = lfo.wave.value(at: phase)
             }
             if lfo.inverted { y = -y }
-            let px = CGFloat(t) * size.width
-            let py = size.height / 2 - CGFloat(y) * amplitude
-            if i == 0 { path.move(to: CGPoint(x: px, y: py)) }
-            else       { path.addLine(to: CGPoint(x: px, y: py)) }
+            pts.append(CGPoint(x: CGFloat(t) * size.width,
+                               y: size.height / 2 - CGFloat(y) * amplitude))
         }
-        return path
+        return pts
+    }
+}
+
+/// Strokes `points` in one color, or in solid alternating segments when several tracks share the
+/// curve. Each segment starts at the last point of the previous one so there is never a break.
+private func strokeStriped(_ ctx: inout GraphicsContext, points pts: [CGPoint], colors: [Color],
+                           style: StrokeStyle) {
+    guard pts.count > 1, let first = colors.first else { return }
+    if colors.count == 1 {
+        var path = Path()
+        for (i, pt) in pts.enumerated() {
+            if i == 0 { path.move(to: pt) } else { path.addLine(to: pt) }
+        }
+        ctx.stroke(path, with: .color(first), style: style)
+        return
+    }
+    // Target ~50 pt per color segment; points are ~1.5 per pt.
+    let segLen = max(1, Int(waveformSegmentPt * 1.5))
+    var start = 0; var ci = 0
+    while start < pts.count - 1 {
+        let end = min(start + segLen, pts.count - 1)
+        var path = Path()
+        for i in start...end {
+            if i == start { path.move(to: pts[i]) } else { path.addLine(to: pts[i]) }
+        }
+        ctx.stroke(path, with: .color(colors[ci % colors.count]), style: style)
+        ci += 1
+        start = end   // overlap by 1 pt — prevents pixel-level gaps
     }
 }
 

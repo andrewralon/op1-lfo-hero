@@ -163,6 +163,56 @@ final class MultiDeviceUITests: XCTestCase {
         XCTAssertFalse(thumb.exists, "a list that fits has nothing to scroll, so no bar")
     }
 
+    // MARK: - Waveform: the LFO being edited vs the running LFOs
+
+    /// "editor" while the waveform draws the editor's own curve, "running" while it draws the
+    /// chips that are running.
+    @MainActor private func waveformMode(_ app: XCUIApplication) -> String? {
+        app.descendants(matching: .any)["waveform"].value as? String
+    }
+
+    @MainActor func testWaveformShowsRunningLfosUnlessYouAreEditing() throws {
+        let app = launch(profile: "op1")
+        XCTAssertEqual(waveformMode(app), "editor", "nothing running: the editor curve, not an empty box")
+
+        app.buttons["repeatButton"].tap()
+        XCTAssertEqual(waveformMode(app), "running", "a running LFO is shown")
+
+        // Changing a setting starts a draft: the curve you are shaping, not the running chip.
+        app.buttons["wavePicker"].tap()
+        app.buttons["square"].tap()
+        XCTAssertEqual(waveformMode(app), "editor")
+
+        // Tapping the empty chip area accepts the draft; back to what is running.
+        app.descendants(matching: .any)["lfoChipArea"].coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.9)).tap()
+        XCTAssertEqual(waveformMode(app), "running")
+
+        // Preview is editing too.
+        app.buttons["previewButton"].tap()
+        XCTAssertEqual(waveformMode(app), "editor")
+        app.buttons["previewButton"].tap()
+        XCTAssertEqual(waveformMode(app), "running")
+
+        // A selected chip is the LFO being edited; committing it returns to the running ones.
+        let chip = app.descendants(matching: .any)["lfoChip"].firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 3))
+        chip.press(forDuration: 0.8)
+        XCTAssertEqual(waveformMode(app), "editor")
+        chip.press(forDuration: 0.8)
+        XCTAssertEqual(waveformMode(app), "running", "committing a chip edit is not a draft")
+    }
+
+    /// A paused chip is not drawn, so with only that one the waveform falls back to the editor.
+    @MainActor func testWaveformLeavesOutAPausedLfo() throws {
+        let app = launch(profile: "op1")
+        app.buttons["repeatButton"].tap()
+        XCTAssertEqual(waveformMode(app), "running")
+        app.descendants(matching: .any)["lfoChip"].firstMatch.tap()    // tap pauses it
+        XCTAssertEqual(waveformMode(app), "editor")
+        app.descendants(matching: .any)["lfoChip"].firstMatch.tap()    // and again resumes it
+        XCTAssertEqual(waveformMode(app), "running")
+    }
+
     // MARK: - Picker interaction: tap opens, drag scrubs
 
     /// Drags `element` vertically by `dy` points (negative = up) from its centre.

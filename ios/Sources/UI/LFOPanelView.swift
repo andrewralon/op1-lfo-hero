@@ -47,6 +47,11 @@ struct LFOPanelView: View {
     @State private var selectedLfoID: UUID? = nil
     @State private var editorSnapshot: EditorSnapshot? = nil
     @State private var chipSnapshot: LfoClip? = nil
+    /// The editor as it stood when the user last started, cleared or cancelled an LFO. The editor
+    /// differing from this is a draft in progress. Compared by value rather than flagged from
+    /// `onChange`: restoring the editor after a chip edit writes the same properties the user
+    /// does, and a flag cannot tell the two apart.
+    @State private var draftBaseline: EditorSnapshot? = nil
     @State private var showDeleteConfirm = false
     @State private var showHelp = false
     @State private var showSettings = false
@@ -146,6 +151,24 @@ struct LFOPanelView: View {
         return all[(idx + 1) % all.count]
     }
 
+    private var isDrafting: Bool {
+        guard let base = draftBaseline else { return false }
+        return base != app.chipEditorSnapshot()
+    }
+
+    /// Takes the editor as it is now as the starting point for the next draft.
+    private func acceptDraft() { draftBaseline = app.chipEditorSnapshot() }
+
+    /// What the waveform draws. While editing (a chip is selected, preview is on, or a draft is
+    /// in progress) it is empty, which makes `MultiWaveformView` draw the editor's own curve: that
+    /// is the LFO being edited, since `loadEditor` fills the editor from a selected chip and
+    /// `saveChipEdits` keeps it live. Otherwise every LFO that is running, so paused and finished
+    /// chips drop out; with none running it is empty again rather than drawing an empty box.
+    private var waveformLfos: [LfoClip] {
+        if selectedLfoID != nil || app.isPreview || isDrafting { return [] }
+        return app.activeLfos.filter(\.isEnabled)
+    }
+
     private var waveTracks: [(Color, Bool)] {
         let trackDisabled = app.lfoParam.isMasterOnly || app.masterOn > 0
         let masterDisabled = !app.lfoParam.isMasterCapable
@@ -243,7 +266,7 @@ struct LFOPanelView: View {
     }
 
     @ViewBuilder private var repeatBtn: some View {
-        Button { app.lfoStart(loop: true) } label: {
+        Button { app.lfoStart(loop: true); acceptDraft() } label: {
             Image(systemName: "repeat").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.green.opacity(0.25))
@@ -254,7 +277,7 @@ struct LFOPanelView: View {
     }
 
     @ViewBuilder private var oneShotBtn: some View {
-        Button { app.lfoStart(loop: false) } label: {
+        Button { app.lfoStart(loop: false); acceptDraft() } label: {
             Image(systemName: "arrow.forward.to.line").font(.system(size: m.actionIconSize))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(C.bg3)
@@ -280,6 +303,7 @@ struct LFOPanelView: View {
             Button("delete all", role: .destructive) {
                 cancelChipEdit()
                 app.stopAllLfos()
+                acceptDraft()
             }
         }
     }
@@ -310,7 +334,8 @@ struct LFOPanelView: View {
             .padding(.vertical, m.lfoScrollPad).padding(.leading, m.lfoScrollPad)
         }
         .contentShape(Rectangle())
-        .onTapGesture { cancelChipEdit() }
+        .onTapGesture { cancelChipEdit(); acceptDraft() }
+        .accessibilityIdentifier("lfoChipArea")
         .tourAnchor(.chipArea)
     }
 
@@ -433,11 +458,14 @@ struct LFOPanelView: View {
             if needsSideBySide {
                 HStack(spacing: 0) {
                     MultiWaveformView(
-                        lfos: [], wave: app.lfoWave,
+                        lfos: waveformLfos, wave: app.lfoWave,
                         rateTicks: app.lfoDisplayRateTicks,
                         depth: app.lfoDepth, tracks: waveTracks,
                         bpm: app.bpm
                     )
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityIdentifier("waveform")
+                    .accessibilityValue(waveformLfos.isEmpty ? "editor" : "running")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(C.bg2)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -478,11 +506,14 @@ struct LFOPanelView: View {
                 .frame(maxHeight: .infinity)
             } else {
                 MultiWaveformView(
-                    lfos: [], wave: app.lfoWave,
+                    lfos: waveformLfos, wave: app.lfoWave,
                     rateTicks: app.lfoDisplayRateTicks,
                     depth: app.lfoDepth, tracks: waveTracks,
                     bpm: app.bpm
                 )
+                .accessibilityElement(children: .ignore)
+                .accessibilityIdentifier("waveform")
+                .accessibilityValue(waveformLfos.isEmpty ? "editor" : "running")
                 .frame(height: m.waveformH)
                 .frame(maxWidth: .infinity)
                 .background(C.bg2)
@@ -532,6 +563,9 @@ struct LFOPanelView: View {
         .onChange(of: app.lfoDepth)  { _, _ in app.updatePreviewIfActive(); liveUpdateChip() }
         .onChange(of: app.lfoCenter) { _, _ in app.updatePreviewIfActive(); liveUpdateChip() }
         .modifier(TrackToggleLiveUpdateModifier(onUpdate: liveUpdateChip))
+        .onAppear { acceptDraft() }
+        // A device switch rewrites the editor (parameter, targets); that is not the user drafting.
+        .onChange(of: app.profile.id) { _, _ in acceptDraft() }
         .onChange(of: app.activeLfos) { _, lfos in
             guard let id = selectedLfoID, !lfos.contains(where: { $0.id == id }) else { return }
             chipSnapshot = nil
@@ -986,6 +1020,8 @@ private struct ActiveLfoChip: View {
         .background(C.bg3)
         .overlay(RoundedRectangle(cornerRadius: 3).stroke(selected ? C.green.opacity(0.7) : Color.clear, lineWidth: 1))
         .cornerRadius(3)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("lfoChip")
         .gesture(
             LongPressGesture(minimumDuration: 0.4, maximumDistance: 10)
                 .onEnded { _ in onSelect() }
