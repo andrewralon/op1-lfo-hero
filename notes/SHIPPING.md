@@ -41,7 +41,22 @@ Check each against the release, not against memory.
 - [ ] `description.txt`, `promotional_text.txt`, `subtitle.txt`, `keywords.txt` — still true? New
       devices, new parameters or new behaviour that belongs in the listing. The description
       states the minimum iOS version; compare it with the deployment target in the project.
-- [ ] `notes/APP_STORE.md` — the human-readable copy of the listing. Update its "What's New".
+- [ ] **Character limits.** App Store Connect rejects over-length text only when you submit, so count
+      first. Run `cd ios/fastlane/metadata/en-US && wc -m name.txt subtitle.txt promotional_text.txt
+      keywords.txt description.txt release_notes.txt` (a trailing newline counts as one).
+
+      | File | Limit | At 1.1.0 |
+      |---|---|---|
+      | `name.txt` | 30 | 13 |
+      | `subtitle.txt` | 30 | 27 |
+      | `promotional_text.txt` | 170 | 152 |
+      | `keywords.txt` (commas count) | 100 | 95 |
+      | `description.txt` | 4000 | 1881 |
+      | `release_notes.txt` ("What's New") | 4000 | 526 (1.1.1 draft) |
+
+      Apple's limits, from memory of App Store Connect; fix the table if it ever disagrees.
+- [ ] `notes/CHANGELOG.md` — add this version's entry (fuller than the store text; mark anything not
+      yet seen on a device), and put the date on it once it is live.
 - [ ] The site (`docs/`): the "what's new" section of `docs/index.html`, the setup sections, and
       `docs/support.html` troubleshooting if a status string or a setting changed. GitHub Pages
       builds from `main`, so it goes live when the PR merges, which may be before the App Store
