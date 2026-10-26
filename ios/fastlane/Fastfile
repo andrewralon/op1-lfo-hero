@@ -81,8 +81,8 @@ platform :ios do
       changelog: <<~NOTES
         o hai, tester person
         -thanks for testing! pls bug me with your bugs. random comments are welcome.
-        -there's no audio without an op1
-        -UI functionality - does it do what you expect? slide, change, ...
+        -there is no audio without connecting a device
+        -ui functionality - does it do what you expect? slide, change, ...
         -does it look good? too big or small, skewed or morphed? non-round circle, ...
         -is anything weird? does anything *not* do what you expect?
 
