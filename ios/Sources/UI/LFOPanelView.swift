@@ -615,8 +615,8 @@ private struct TrackToggleLiveUpdateModifier: ViewModifier {
 private struct OptionListPopover: View {
     let labels: [String]
     let selectedIndex: Int
-    /// Fit the width to the labels, for a list of short ones (the speeds): the fixed width suits
-    /// parameter names but leaves a column of "f1"…"f17" lost in the middle of a wide popover.
+    /// Fit the width to the labels instead of a fixed one, so a list of short labels is not lost in
+    /// the middle of a wide popover, and fits beside its box on a narrow screen.
     var snug = false
     let onPick: (Int) -> Void
     @Environment(\.metrics) private var m
@@ -660,7 +660,11 @@ private struct OptionListPopover: View {
 
         // Cap the popover so a long list (the TX-6 has ~30 parameters) can never grow past
         // the screen — without this the tail of the list is unreachable in portrait.
-        let naturalH = CGFloat(labels.count) * 44 + 40
+        // The list's real height: a row is a line of text, 4pt padding top and bottom and a divider,
+        // inside 8pt of padding top and bottom. Guessing a round 44pt a row left a blank band under
+        // the last row once a list was long enough to need the scrolling frame.
+        let line = UIFont.systemFont(ofSize: m.pickerFont, weight: .bold).lineHeight
+        let naturalH = ceil(CGFloat(labels.count) * (line + 9) + 16)
         let cappedH  = min(naturalH, m.screen.height * 0.6)
 
         Group {
@@ -767,8 +771,11 @@ private struct CompactPicker<T>: View where T: Identifiable & Hashable {
         .accessibilityLabel(label(selection))
         .accessibilityAddTraits(.isButton)
         .accessibilityIdentifier(accessibilityId ?? "")
+        // Sized to the labels: a fixed 220pt list did not fit beside the box on a narrow phone, so
+        // the system put it above, over the mixer.
         .optionListPopover(isPresented: $show, labels: options.map(label),
-                           selectedIndex: options.firstIndex(of: selection) ?? -1) { idx in
+                           selectedIndex: options.firstIndex(of: selection) ?? -1,
+                           snug: true) { idx in
             let from = selection
             selection = options[idx]
             onSettle?(from, options[idx])
