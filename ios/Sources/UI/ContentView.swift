@@ -685,8 +685,8 @@ private struct SheetScaffold<Content: View>: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 14)
+                    .padding(.top, 2)
+                    .padding(.bottom, 0)
 
                     content
 
@@ -790,21 +790,24 @@ struct HelpView: View {
     @EnvironmentObject private var tour: TourController
     @Environment(\.dismiss) private var dismiss
 
-    /// Computed, not stored: the copy names the connected device, which is only known at render.
+    /// Devices that need settings changed on the hardware first — otherwise the app looks broken
+    /// through no fault of its own. Shown above everything else, the tutorial included. Computed,
+    /// not stored: the copy names the connected device, which is only known at render.
+    private var setupSection: (String, Text)? {
+        guard !app.profile.setupSteps.isEmpty else { return nil }
+        let dev = app.profile.displayName
+        var body = Text("before the app can control the \(dev), change these on the device itself:")
+        for step in app.profile.setupSteps {
+            body = body + Text("\n· ") + Text(step)
+        }
+        return ("\(dev) setup — do this first", body)
+    }
+
+    /// Computed for the same reason: the copy names the connected device.
     private var sections: [(String, Text)] {
         let dev = app.profile.displayName
         let clk = app.profile.caps.clockLabel
-        var out: [(String, Text)] = []
-        // Devices that need settings changed on the hardware first — otherwise the app looks
-        // broken through no fault of its own.
-        if !app.profile.setupSteps.isEmpty {
-            var body = Text("before the app can control the \(dev), change these on the device itself:")
-            for step in app.profile.setupSteps {
-                body = body + Text("\n· ") + Text(step)
-            }
-            out.append(("\(dev) setup — do this first", body))
-        }
-        return out + [
+        return [
         (HelpCopy.title(.mutePad), Text("tap a track's colored number pad to mute/unmute it. bright colored background = unmuted; dark background = muted.")),
         (HelpCopy.title(.panKnob), Text("drag up/down on a knob to pan right/left. release near top dead center to snap to center.\n[vertical scrubbing for horizontal controls like pan are weird. i'm open to better ideas...]")),
         (HelpCopy.title(.volumeFader), Text("drag up/down on a fader to set that track's volume. drag to the side for fine scrubbing.")),
@@ -828,6 +831,9 @@ struct HelpView: View {
 
     var body: some View {
         SheetScaffold(title: "help", showsVersion: true) {
+            if let (title, body) = setupSection {
+                SheetItem(title) { body }
+            }
             SheetItem("tutorial", text: {
                 Text("a step-by-step tour of every button and knob: what each one does and how to use it.")
             }, controls: {
