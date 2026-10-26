@@ -866,10 +866,13 @@ final class AppState: ObservableObject {
     private func addLfo(track: Int, rateTicks: Int, freeRatePeriod: Double?, depth: Double, center: Double,
                         inverted: Bool, loop: Bool) {
         // Dedup: paused/disabled chips also count — re-enable instead of adding a duplicate.
+        // A loop and a one-shot that match in everything else are different chips: one repeats,
+        // the other plays once, so `loop` is part of the identity.
         if activeLfos.contains(where: {
             $0.track == track && $0.paramId == lfoParam.id &&
             $0.wave == lfoWave && $0.rateTicks == rateTicks && $0.freeRatePeriod == freeRatePeriod &&
-            $0.depth == depth && $0.centerValue == center && $0.inverted == inverted
+            $0.depth == depth && $0.centerValue == center && $0.inverted == inverted &&
+            $0.loop == loop
         }) { return }
 
         let lfo = LfoClip(deviceId: profile.id, track: track, paramId: lfoParam.id, wave: lfoWave,
@@ -1088,7 +1091,7 @@ final class AppState: ObservableObject {
                 $0.wave == primary.wave && $0.rateTicks == primary.rateTicks &&
                 $0.freeRatePeriod == primary.freeRatePeriod &&
                 $0.depth == primary.depth && $0.centerValue == primary.centerValue &&
-                $0.inverted == target.inverted
+                $0.inverted == target.inverted && $0.loop == primary.loop
             }) { continue }
 
             let spec = profile.param(primary.paramId) ?? lfoParam
@@ -1119,7 +1122,8 @@ final class AppState: ObservableObject {
             $0.freeRatePeriod == primary.freeRatePeriod &&
             $0.depth       == primary.depth       &&
             $0.centerValue == primary.centerValue &&
-            $0.inverted    == primary.inverted
+            $0.inverted    == primary.inverted    &&
+            $0.loop        == primary.loop
         }
         guard !dupes.isEmpty else { return }
         let dupeIDs = Set(dupes.map { $0.id })
