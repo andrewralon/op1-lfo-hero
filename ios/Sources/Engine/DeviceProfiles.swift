@@ -45,7 +45,18 @@ extension DeviceProfile {
             // Measured on hardware: the OP-1 Field sends no CC when its controls move and does
             // not echo CC it receives, so there is nothing to mirror (notes/RESEARCH.md).
             mirrorsIncomingCC: false
-        )
+        ),
+        // Unlike the TX-6 an OP-1 in its default state is controllable, so these are about
+        // getting the connection and the tempo mode right rather than unlocking anything. The
+        // tempo-mode wording is from notes/RESEARCH.md; the app cannot see the mode, only whether
+        // clock arrives.
+        setupSteps: [
+            "connect over usb-c (use a data cable — some usb-c cables only charge) or over bluetooth: set `bluetooth: on` on the op-1, then pick it from the device list in the status bar. usb-c is the better choice for tempo and transport.",
+            "to have the app follow the op-1's tempo, use `beat match` and tap the metronome so it reads `op1`. the op-1 sends the clock, so the lfos keep its time, and its own play and stop behave normally. works over usb-c or bluetooth.",
+            "to have the app control the op-1's tempo and tape, use `midi sync` and tap the metronome so it reads `app`. the app then sends the clock, and play, stop and the arrow buttons move the tape. needs usb-c: over bluetooth the app can't set the op-1's tempo. until clock arrives the op-1 shows `--` for its bpm.",
+            "the op-1 doesn't report its settings back, so the faders and knobs show what the app last sent, not what the op-1 is doing. and the app can't tell `midi sync` from `free`, or `beat match` from the other clock-out modes, so set the metronome to match what you chose on the op-1.",
+            "rec level, master eq, sustain and pitch bend are global: they shape what you're playing live, not a single track, so they use the master (m) target. pitch bend moves only the selected instrument's live notes, not the tape.",
+        ]
     )
 
     private static let op1Params: [ParamSpec] = {
